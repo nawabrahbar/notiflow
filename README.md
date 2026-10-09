@@ -22,16 +22,5 @@ Notification Handler is a clean, focused, privacy-first mobile application that 
 
 ---
 
-## Documentation
-- [Platform Feasibility & Architecture Report](file:///Users/mohammadenayatullah/Documents/Personal/notification-handler/docs/feasibility-report.md)
-- [Architecture Decision Record (ADR 001)](file:///Users/mohammadenayatullah/Documents/Personal/notification-handler/docs/architecture-decision.md)
-- [Architecture Overview](file:///Users/mohammadenayatullah/Documents/Personal/notification-handler/docs/architecture.md)
-- [Android Notification Pipeline Flow](file:///Users/mohammadenayatullah/Documents/Personal/notification-handler/docs/android-notification-flow.md)
-- [iOS Platform Limitations](file:///Users/mohammadenayatullah/Documents/Personal/notification-handler/docs/ios-platform-limitations.md)
-- [Privacy and Security Guarantees](file:///Users/mohammadenayatullah/Documents/Personal/notification-handler/docs/privacy.md)
-- [Testing Strategy & Verification](file:///Users/mohammadenayatullah/Documents/Personal/notification-handler/docs/testing.md)
-
----
-
 ## License
 Private and Confidential.
