@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!-- saved from url=(0012)about:srcdoc -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"></head><body class="bg-surface font-body-md text-on-surface antialiased flex flex-col min-h-[884px]" data-stitch-vh="min-h-[884px]===min-h-screen"><header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.03)] pt-safe"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Settings</h1><div class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary-container/50 text-secondary"><span class="material-symbols-outlined text-[15px]">verified_user</span><span class="font-label-sm text-label-sm uppercase tracking-wider">Protected</span></div></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></header><main class="flex-1 flex flex-col relative w-full pt-16 pb-28 px-margin bg-surface"><div class="flex flex-col w-full pb-8 space-y-6">
+<!-- Service & Engine Status -->
+<section class="flex flex-col space-y-3">
+<div class="flex items-center justify-between px-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Engine &amp; Background Services</span>
+<span class="flex items-center gap-1.5 font-label-md text-label-md text-secondary">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+</span>
+        Operational
+      </span>
+</div>
+<!-- Notification Access Card -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col space-y-3">
+<div class="flex items-start justify-between">
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 rounded-xl bg-secondary-container/40 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">notifications_active</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Notification Access</h2>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">Active · Connected</span>
+</div>
+</div>
+</div>
+<button class="px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors flex items-center gap-1" type="button">
+<span>System Settings</span>
+<span class="material-symbols-outlined text-[16px]">open_in_new</span>
+</button>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+        Local NotificationListenerService running on device. Routes alert state without intercepting external communications.
+      </p>
+</div>
+<!-- Battery Optimization Card -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex items-center justify-between">
+<div class="flex items-start space-x-3 pr-2">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant mt-0.5">
+<span class="material-symbols-outlined text-[20px]">battery_charging_full</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Battery Optimization</h2>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/60 text-on-secondary-container font-label-sm text-label-sm">
+              Unrestricted
+            </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">
+            Ensures scheduled silencing runs reliably when screen is off.
+          </p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-on-surface-variant flex-shrink-0" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</section>
+<!-- Hero / Deep Dive Section - On-Device Privacy Architecture -->
+<section class="flex flex-col space-y-3">
+<div class="flex items-center justify-between px-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">On-Device Integrity</span>
+<span class="flex items-center gap-1 font-label-md text-label-md text-primary font-semibold">
+<span class="material-symbols-outlined text-[16px]">verified</span>
+        Zero Telemetry
+      </span>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm space-y-5">
+<!-- Shield Header Banner -->
+<div class="flex items-center space-x-3.5 bg-surface-container-low/70 p-space-md rounded-xl">
+<div class="w-11 h-11 rounded-xl bg-primary flex items-center justify-center text-on-primary shadow-sm flex-shrink-0">
+<span class="material-symbols-outlined text-[24px]">gshield</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">100% Local &amp; Offline Processing</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Operates without an internet permission manifest</p>
+</div>
+</div>
+<!-- Pillars -->
+<div class="space-y-4">
+<!-- Item 1 -->
+<div class="flex items-start space-x-3">
+<div class="w-7 h-7 rounded-full bg-secondary-container/40 flex items-center justify-center text-secondary flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">visibility_off</span>
+</div>
+<div class="space-y-0.5">
+<p class="font-label-lg text-label-lg text-on-surface">Zero Message Content Inspected</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Only metadata (package key and timestamp) is evaluated to match schedules. Notification body, message preview, and sender identity are never read, stored, or parsed.
+            </p>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-start space-x-3">
+<div class="w-7 h-7 rounded-full bg-secondary-container/40 flex items-center justify-center text-secondary flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">wifi_off</span>
+</div>
+<div class="space-y-0.5">
+<p class="font-label-lg text-label-lg text-on-surface">No Cloud Telemetry or Network Traffic</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              The engine runs strictly offline with zero external network calls, diagnostic uploads, or third-party analytics pings.
+            </p>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-start space-x-3">
+<div class="w-7 h-7 rounded-full bg-secondary-container/40 flex items-center justify-center text-secondary flex-shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-[16px]">auto_delete</span>
+</div>
+<div class="space-y-0.5">
+<p class="font-label-lg text-label-lg text-on-surface">Automatic 24-Hour Ephemeral Log</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+              Interception counters and triage history automatically purge every 24 hours. Message contents are never retained under any condition.
+            </p>
+</div>
+</div>
+</div>
+<!-- Quick Action Buttons -->
+<div class="pt-2 flex flex-col sm:flex-row gap-2">
+<button class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[18px] text-primary">download</span>
+<span>Export Local Privacy Audit</span>
+</button>
+<button class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-surface-container-low text-on-surface-variant hover:text-on-surface transition-colors font-label-md text-label-md" type="button">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+<span>Security Disclosures</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Core Preferences -->
+<section class="flex flex-col space-y-3">
+<div class="px-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Triage &amp; Automation Preferences</span>
+</div>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<!-- Default Schedule Mode -->
+<button class="w-full p-space-md flex items-center justify-between text-left hover:bg-surface-container-low/40 transition-colors" type="button">
+<div class="flex items-start space-x-3 pr-2">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant mt-0.5">
+<span class="material-symbols-outlined text-[20px]">calendar_month</span>
+</div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Default Schedule Mode</p>
+<p class="font-body-sm text-body-sm text-primary font-medium mt-0.5">Allow by default (Suppress during scheduled hours)</p>
+<p class="font-label-sm text-label-sm text-outline mt-1">Rule template for newly discovered apps</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant text-[20px]">chevron_right</span>
+</button>
+<!-- Divider line via background -->
+<div class="h-px bg-surface-container-low mx-4"></div>
+<!-- Unmanaged Apps Switch -->
+<div class="p-space-md flex items-center justify-between">
+<div class="flex items-start space-x-3 pr-4">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant mt-0.5">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Keep Unmanaged Apps Untouched</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+              Notifications from apps without custom rules pass through standard system channels seamlessly.
+            </p>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+<input checked="" class="sr-only peer" id="unmanaged-toggle" type="checkbox">
+<div class="w-12 h-7 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<!-- Divider line via background -->
+<div class="h-px bg-surface-container-low mx-4"></div>
+<!-- VIP Bypass -->
+<button class="w-full p-space-md flex items-center justify-between text-left hover:bg-surface-container-low/40 transition-colors" type="button">
+<div class="flex items-start space-x-3 pr-2">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant mt-0.5">
+<span class="material-symbols-outlined text-[20px]">contact_emergency</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<p class="font-label-lg text-label-lg text-on-surface">Urgent &amp; VIP Interruptions</p>
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/60 text-secondary font-label-sm text-label-sm">Enabled</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+              Emergency Call Bypass: Direct calls and starred contacts break through silence windows.
+            </p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant text-[20px]">chevron_right</span>
+</button>
+</div>
+</section>
+<!-- Data & Storage -->
+<section class="flex flex-col space-y-3">
+<div class="px-1">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-outline">Local Storage &amp; Database</span>
+</div>
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 rounded-xl bg-surface-container-low flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">storage</span>
+</div>
+<div>
+<p class="font-label-lg text-label-lg text-on-surface">Encrypted Drift / SQLite DB</p>
+<p class="font-body-sm text-body-sm text-outline">Stored exclusively on internal sandbox</p>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-lg bg-surface-container-low font-label-md text-label-md text-on-surface font-semibold">
+          24 KB
+        </span>
+</div>
+<div class="flex flex-col sm:flex-row gap-2 pt-1">
+<button class="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-surface-container-low hover:bg-error-container/40 text-on-surface-variant hover:text-error transition-colors font-label-md text-label-md" id="btn-clear-logs" type="button">
+<span class="material-symbols-outlined text-[17px]">delete_sweep</span>
+<span>Clear Local Logs</span>
+</button>
+<button class="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-surface-container-low hover:bg-error-container/40 text-on-surface-variant hover:text-error transition-colors font-label-md text-label-md" id="btn-reset-rules" type="button">
+<span class="material-symbols-outlined text-[17px]">restart_alt</span>
+<span>Reset All Rules</span>
+</button>
+</div>
+</div>
+</section>
+<!-- About & Platform Transparency -->
+<section class="flex flex-col space-y-3 pt-2">
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm space-y-4 text-center">
+<div class="flex flex-col items-center justify-center space-y-1">
+<div class="w-12 h-12 rounded-2xl bg-secondary-container/40 text-secondary flex items-center justify-center mb-1">
+<span class="material-symbols-outlined text-[28px]">shield_lock</span>
+</div>
+<p class="font-headline-sm text-headline-sm text-on-surface">Notification Handler</p>
+<p class="font-label-md text-label-md text-on-surface-variant">Version 1.2.0 (Build 48)</p>
+<p class="font-body-sm text-body-sm text-outline mt-0.5">Running on Android 14 · Fully native Kotlin &amp; Flutter engine</p>
+</div>
+<div class="pt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+<a class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#">
+<span>Privacy Policy</span>
+<span class="material-symbols-outlined text-[14px]">arrow_outward</span>
+</a>
+<span class="text-outline-variant font-label-md text-label-md">•</span>
+<a class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#">
+<span>Open Source Licenses</span>
+<span class="material-symbols-outlined text-[14px]">arrow_outward</span>
+</a>
+<span class="text-outline-variant font-label-md text-label-md">•</span>
+<a class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#">
+<span>Architecture Specs</span>
+<span class="material-symbols-outlined text-[14px]">arrow_outward</span>
+</a>
+</div>
+</div>
+</section>
+</div>
+</main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-1px_12px_rgba(0,0,0,0.04)]" data-active-classes="text-primary font-semibold"><div class="flex items-center justify-around h-16 px-gutter"><a class="flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="rules" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-sm text-label-sm">Rules</span></a><a class="flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="apps" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">apps</span><span class="font-label-sm text-label-sm">Apps</span></a><a class="flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="activity" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">schedule</span><span class="font-label-sm text-label-sm">Activity</span></a><a aria-current="page" class="flex flex-col items-center justify-center gap-space-xs min-w-[56px] min-h-[44px] transition-colors text-primary font-semibold" data-path="settings" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">settings</span><span class="font-label-sm text-label-sm">Settings</span></a></div></nav>
+<div id="stitch-agent-cursor" data-stitch-injected="" style="left: -40px; top: -40px; display: none;">
+  [SVG]
+  [SVG]
+  [SVG]
+  [SVG]
+</div>
+</body><div data-stitch-injected="" style="position: fixed; inset: 0px; z-index: 2147483647; pointer-events: none; overflow: hidden; display: none;"><div style="position: absolute; pointer-events: none; display: none; box-sizing: border-box; border-style: solid; border-color: rgb(152, 154, 255); z-index: 1; border-radius: 4px;"></div><div style="position: absolute; pointer-events: none; display: none; box-sizing: border-box; border-style: solid; border-color: rgb(96, 86, 240); z-index: 2; border-radius: 4px; opacity: 1;"></div><div style="position: absolute; pointer-events: none; display: none; box-sizing: border-box; border-style: solid; border-color: rgb(152, 154, 255); z-index: 1; border-radius: 4px;"></div><div style="position: absolute; pointer-events: none; display: none; box-sizing: border-box; border-style: solid; border-color: rgb(96, 86, 240); z-index: 2; border-radius: 4px;"></div></div></html>

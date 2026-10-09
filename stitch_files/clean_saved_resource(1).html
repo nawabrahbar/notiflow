@@ -1,0 +1,214 @@
+<header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.03)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><img alt="A modern, minimalist vector app icon for 'Notification Handler'. A sleek bell emblem intertwined with a precise clock schedule ring or toggle shield, styled in deep teal (#0D9488) and emerald with subtle warm amber accents. Crisp geometry, flat vector design, clean rounded contours, transparent background.. Design context: - Primary color: #0d9488
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-md
+. The logo should be visually consistent with these brand tokens." class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VWSwlnEPkDTsVBFo24lfX_ZAzSXfRmHZCrwVHhmR6JIqpERjSvriTsHKUpvHvg-xL-MMFegUP3NXF8JTcZ-CqFpEVsjfhHrweSfqjG6cUNwfeu2xoyv3jIRh89KbpYRY22st6WdNosd-9U0Fn4bVl5D7LtdcXQuB288RdLlLJATkg1B7P0BEm8mIJa3Ehu3lfU7mJFUtqfezMrxQqGEMdMZt2BJ8vINV13VS1DwtPc7H-5LNG0a0LPFQ"><div class="flex items-center gap-space-xs"><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight font-semibold">Notification Handler</span><span class="w-1.5 h-1.5 rounded-full bg-primary inline-block ml-0.5" title="Active"></span></div></div><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin pt-16 pb-24 bg-surface"><div class="flex flex-col w-full">
+<div class="relative overflow-hidden rounded-xl bg-surface-container-low p-space-md mb-space-md shadow-sm">
+<div class="flex items-center justify-between">
+<div class="space-y-0.5">
+<p class="font-headline-sm text-headline-sm text-on-surface">Manage Notification Flow</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Calibrate delivery schedules for 42 monitored apps</p>
+</div>
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">spa</span>
+</div>
+</div>
+</div>
+<div class="relative w-full mb-space-md">
+<div class="absolute inset-y-0 left-0 pl-space-md flex items-center pointer-events-none text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="w-full h-12 pl-11 pr-10 bg-surface-container-lowest text-on-surface font-body-md text-body-md rounded-xl shadow-sm placeholder:text-outline focus:outline-none transition-all duration-200" id="appSearch" placeholder="Search apps..." type="text">
+<button class="hidden absolute inset-y-0 right-0 pr-space-md flex items-center text-outline hover:text-on-surface" id="clearSearch">
+<span class="material-symbols-outlined text-[18px]">cancel</span>
+</button>
+</div>
+<div class="flex items-center gap-space-xs overflow-x-auto pb-space-sm mb-space-sm scrollbar-none" id="categoryRail">
+<button class="filter-chip active-filter px-4 py-2 rounded-full font-label-md text-label-md transition-all shrink-0 bg-primary text-on-primary shadow-sm" data-category="all">
+All (42)
+</button>
+<button class="filter-chip px-4 py-2 rounded-full font-label-md text-label-md transition-all shrink-0 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface shadow-sm" data-category="messaging">
+Messaging
+</button>
+<button class="filter-chip px-4 py-2 rounded-full font-label-md text-label-md transition-all shrink-0 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface shadow-sm" data-category="social">
+Social
+</button>
+<button class="filter-chip px-4 py-2 rounded-full font-label-md text-label-md transition-all shrink-0 bg-surface-container-lowest text-on-surface-variant hover:text-on-surface shadow-sm" data-category="work">
+Work
+</button>
+</div>
+<div class="flex items-center justify-between py-2 px-1 mb-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span id="resultsCount">Showing 6 high priority apps</span>
+<span class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-[14px]">auto_awesome</span>
+Focus auto-routing active
+</span>
+</div>
+<div class="flex flex-col gap-space-sm" id="appsList">
+<div class="app-card group relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200" data-category="work" data-name="Slack">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-surface-container-high flex items-center justify-center shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Minimal modern flat vector icon representing work productivity workspace with pastel turquoise and soft amber accents on a crisp clean background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBA1AIzqWz-kP2OpcedQkYzl5-pFlHV1ie4NspzQw5CDWL7lDveBVreAac_JhGlXUBwExFLLLZ7V9N3FcScuM4gc8GdzYs2mPDVpA4kYnrST-1qSgg5oUlDxtLswpuY27gj3cewxB-JXX3kOImDWTk08XfADNgHba5N-MDm2x_Ol4PWUmmHayhAaYunuJZ8jb717ZhnN0EY5fCm41Nqa0BtHvxLb3rEEVlZK4czGmlzMx93lifIAWc">
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">Slack</span>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-secondary-container text-on-secondary-container">
+Scheduled
+</span>
+<span class="font-body-sm text-body-sm text-outline truncate">Deliver at 9:00 AM, 2:00 PM</span>
+</div>
+</div>
+</div>
+<button aria-label="Configure Slack" class="shrink-0 w-9 h-9 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</button>
+</div>
+</div>
+<div class="app-card group relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200" data-category="messaging" data-name="WhatsApp">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-surface-container-high flex items-center justify-center shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Vibrant clean speech bubble message icon with emerald teal tone in Scandinavian minimalist style on a soft white backdrop." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDDN7GN0oEj6cZH-W-vtD1c-AeNavKm4tjd8bfa7z_NWYKwj7AZG58IJADZjX0koALsqIv_Aj92yB-v-WmH8HRVVhtfPfPg2Ff799_zSuu78xPTz8m58RuIcR67bl7vQkR3GRJMkAxgzwoiqteaiZ0QGE9vhq6lgy1nu_v3oJEOjvKtTcdxzQO8fVYxqwHy7HIorVdK80qiemDdHmX6wqNHeUMlHexfRg1_6tFdPnymA4ZVPjkgpe0">
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">WhatsApp</span>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-primary-fixed text-on-primary-fixed">
+Always Allowed
+</span>
+<span class="font-body-sm text-body-sm text-outline truncate">Family &amp; VIPs</span>
+</div>
+</div>
+</div>
+<button aria-label="Configure WhatsApp" class="shrink-0 w-9 h-9 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</button>
+</div>
+</div>
+<div class="app-card group relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200" data-category="social" data-name="Instagram">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-surface-container-high flex items-center justify-center shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Stylized camera aperture emblem with soft warm amber and peach gradients, clean vector iconography on white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWTb4x_i65TGSWab0vi7c79rKSgfLpdvhHaxQqjS8nIVZ0t8xbbxMFs3ifwflz8ukUzXNTxetiu0zbuTlxOE8t6RukYDZ13QK2iz2dhTg-GNBPYNOyMLA5d54tr7aMEHlUGgzxSfNThnG8E0D5ZNWQYBqCg9Gkd2jgvZ3m4_k5nJ5OzfQqNPaj8-elsBU_eqFb8vdSEjpY8_Q9cyoWuAsMWGcS4aH_rvfYQZpjgFqScLY_VurgLy8">
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">Instagram</span>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-tertiary-fixed text-on-tertiary-fixed">
+Batched Daily
+</span>
+<span class="font-body-sm text-body-sm text-outline truncate">Held until 6:00 PM</span>
+</div>
+</div>
+</div>
+<button aria-label="Configure Instagram" class="shrink-0 w-9 h-9 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</button>
+</div>
+</div>
+<div class="app-card group relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200" data-category="messaging" data-name="Telegram">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-surface-container-high flex items-center justify-center shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Paper plane flight silhouette vector icon in muted blue-grey tones, minimalist clean geometric styling on isolated neutral canvas." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5OXyI3IxnT2Bv0QaXGvpkLEoFIaqpj7Jwwiq5ig3zJmAPY7jFsa3pufj5Z3r1soAznH3-FTdX3ptR_6V26RU7CiB40uFghcw8pxUYcqkrxcfqQ1k0d9k0aEuAci0l3hv_ItOgi5New1xSl4fblPAmP-tPnuZwHh3Fb08DbXdJ8G0j_daAoLT0wpRKKUYgbsk3y1nGYPw_tHRhGSwuhkOO8hOiMJfDWB_r-bWsvU_zJdTgokhupdA">
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">Telegram</span>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-surface-container-high text-on-surface-variant">
+Not configured
+</span>
+<span class="font-body-sm text-body-sm text-outline truncate">Default device rules</span>
+</div>
+</div>
+</div>
+<button aria-label="Set up Telegram" class="shrink-0 px-3 py-1.5 rounded-full bg-surface-container text-on-surface hover:bg-primary hover:text-on-primary flex items-center gap-1 font-label-sm text-label-sm transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Set rule</span>
+</button>
+</div>
+</div>
+<div class="app-card group relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200" data-category="work" data-name="Gmail">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-surface-container-high flex items-center justify-center shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Geometric minimalist envelope icon with warm accent fold, tranquil clean lines, vector art on light surface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBSVlkxjUTjM9Q3XBy0umLSkJBd3IFiJcCvHjDt-H08FHPiz-H49CmaXf3OtNaYjq7cwa7Qnno39RnOsz45igWWnI52PCw7VYUb8jo8Uvn7wh7t_FY8t8zxVcyaWXi205ylcYQ-dk7ysUzaMsmlYNOwr36m1RlTXFKNC1BhULJzFToKBZG_jk1RwSO9Zxvt1E3FY_8ks0J-AmB6OxMwY_NH9th0VfsRnyXIKaZ1ICXtEIO0eIxkFpY">
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">Gmail</span>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-secondary-container text-on-secondary-container">
+Scheduled
+</span>
+<span class="font-body-sm text-body-sm text-outline truncate">Work hours only</span>
+</div>
+</div>
+</div>
+<button aria-label="Configure Gmail" class="shrink-0 w-9 h-9 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-primary hover:text-on-primary flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+</button>
+</div>
+</div>
+<div class="app-card group relative bg-surface-container-lowest rounded-xl p-space-md shadow-sm hover:shadow-md transition-all duration-200" data-category="social" data-name="YouTube">
+<div class="flex items-center justify-between gap-space-md">
+<div class="flex items-center gap-space-md min-w-0">
+<div class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-surface-container-high flex items-center justify-center shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Subtle rounded play triangle screen icon with calm ochre-amber tone, minimalist flat design, modern graphic on pale slate." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1ZKH2bGQz9nl2KrvDS0jOYvpAeSSkcCoUdX9NmXrOYxL3ajetxnXAA1rGGFU1K8iqsTiDxDqRTwvD_jNNdxUQEV5CTosjR3AtgRRLflAv3Fmo5vFBXUaSgRq7zF5JT8XtoDS0CIzxyK0uoKOfg2LjvKcqCdFxCm4eZ0ZIoAwIznVGpTz0JNBAvJfwRYo5lmc-EcZUB7jdJf2MS0YA4nkIYIw2Xs0lhCnDLBlRwQDCTDKl_N8IQxQ">
+</div>
+<div class="flex flex-col min-w-0">
+<span class="font-headline-sm text-headline-sm text-on-surface truncate">YouTube</span>
+<div class="flex items-center gap-2 mt-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-surface-container-high text-on-surface-variant">
+Not configured
+</span>
+<span class="font-body-sm text-body-sm text-outline truncate">Instant delivery</span>
+</div>
+</div>
+</div>
+<button aria-label="Set up YouTube" class="shrink-0 px-3 py-1.5 rounded-full bg-surface-container text-on-surface hover:bg-primary hover:text-on-primary flex items-center gap-1 font-label-sm text-label-sm transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span>Set rule</span>
+</button>
+</div>
+</div>
+</div>
+<div class="hidden flex-col items-center justify-center py-12 px-6 text-center" id="emptyState">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center text-outline mb-space-sm">
+<span class="material-symbols-outlined text-[28px]">search_off</span>
+</div>
+<p class="font-headline-sm text-headline-sm text-on-surface">No matching applications</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant max-w-xs mt-1">Try another keyword or tap All to browse all installed apps.</p>
+<button class="mt-4 px-4 py-2 rounded-xl bg-primary text-on-primary font-label-md text-label-md shadow-sm" id="resetFilters">
+Show all 42 apps
+</button>
+</div>
+<div class="mt-space-lg rounded-xl bg-surface-container-low p-space-md flex items-center gap-space-md shadow-sm">
+<span class="material-symbols-outlined text-primary text-[24px]">verified</span>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Quiet Mind Protection</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Unconfigured apps will default to low-vibration mode during scheduled sleep.</span>
+</div>
+</div>
+</div>
+</main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.03)]" data-active-classes="text-primary font-semibold"><div class="flex justify-around items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="rules" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">tune</span><span class="font-label-sm text-label-sm">Rules</span></a><a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] transition-colors text-primary font-semibold" data-path="apps" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">apps</span><span class="font-label-sm text-label-sm">Apps</span></a><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="activity" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">history_toggle_off</span><span class="font-label-sm text-label-sm">Activity</span></a><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] text-on-surface-variant hover:text-on-surface transition-colors" data-path="settings" href="https://app-companion-430619.appspot.com/projects/2823387895768659037?pli=1&amp;usegapi=1&amp;jsh=m%3B%2F_%2Fscs%2Fabc-static%2F_%2Fjs%2Fk%3Dgapi.lb.en.gh7qIZtzO5w.O%2Fd%3D1%2Frs%3DAHpOoo84YKT1RVy0T6hcXi5rH3LooB1WCw%2Fm%3D__features__#"><span class="material-symbols-outlined text-[22px]">settings</span><span class="font-label-sm text-label-sm">Settings</span></a></div></nav>
+<div id="stitch-agent-cursor" data-stitch-injected="" style="left: -40px; top: -40px; display: none;">
+<svg class="cursor-pointer" width="20" height="20" viewBox="0 0 34 34" fill="none">
+<path d="M15.0624 32.3549L5.16251 5.48544L32.0324 15.3848L19.3046 19.6276L15.0624 32.3549Z" fill="#7168f6"></path>
+<path d="M4.80877 5.13207C4.94657 4.99427 5.15206 4.94886 5.33496 5.01606L32.205 14.9156C32.4041 14.9889 32.5354 15.1799 32.5323 15.392C32.529 15.6043 32.392 15.7924 32.1905 15.8595L19.6994 20.0227L15.5369 32.5131C15.4697 32.7145 15.2824 32.8509 15.0701 32.8542C14.8578 32.8575 14.6664 32.7268 14.5929 32.5276L4.69276 5.65826L4.67343 5.5892C4.63863 5.42535 4.68814 5.25283 4.80877 5.13207Z" stroke="rgba(255,255,255,0.15)" stroke-linejoin="round"></path>
+</svg>
+<svg class="cursor-text" width="20" height="28" viewBox="0 0 20 28" fill="none">
+<path d="M6 2h8M6 26h8M10 2v24" stroke="#7168f6" stroke-width="2.5" stroke-linecap="round"></path>
+</svg>
+<svg class="cursor-paint" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<path d="M18.5 1.5c.8-.8 2.1-.8 2.8 0 .8.8.8 2.1 0 2.8L11 14.5l-3.5 1 1-3.5L18.5 1.5z" fill="#7168f6" stroke="#4f44e1" stroke-width="1" stroke-linejoin="round"></path>
+<path d="M7 14.5c-2 2-3.5 4-3.5 5.5 0 1.5 1 2.5 2.5 2.5 1.5 0 3.5-1.5 5.5-3.5" stroke="#7168f6" stroke-width="1.5" stroke-linecap="round"></path>
+<path d="M4 20c-.5.5-1.2 1-2 1.2" stroke="#6056f0" stroke-width="1" stroke-linecap="round"></path>
+</svg>
+<svg id="stitch-cursor-label" width="28" height="14" viewBox="0 0 28 14" fill="none">
+<rect width="28" height="14" rx="7" fill="#7168f6"></rect>
+<circle cx="10.5" cy="7" r="1.8" fill="white"></circle>
+<circle cx="17.5" cy="7" r="1.8" fill="white"></circle>
+</svg>
+</div>

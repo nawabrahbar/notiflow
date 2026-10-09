@@ -1,0 +1,146 @@
+<header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.03)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><button aria-label="Go back" class="min-w-[44px] min-h-[44px] -ml-2 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors rounded-full" onclick="history.back()"><span class="material-symbols-outlined text-[20px]">arrow_back</span></button><img alt="A modern, minimalist vector app icon for 'Notification Handler'. A sleek bell emblem intertwined with a precise clock schedule ring or toggle shield, styled in deep teal (#0D9488) and emerald with subtle warm amber accents. Crisp geometry, flat vector design, clean rounded contours, transparent background.. Design context: - Primary color: #0d9488
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-md
+. The logo should be visually consistent with these brand tokens." class="h-7 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VWSwlnEPkDTsVBFo24lfX_ZAzSXfRmHZCrwVHhmR6JIqpERjSvriTsHKUpvHvg-xL-MMFegUP3NXF8JTcZ-CqFpEVsjfhHrweSfqjG6cUNwfeu2xoyv3jIRh89KbpYRY22st6WdNosd-9U0Fn4bVl5D7LtdcXQuB288RdLlLJATkg1B7P0BEm8mIJa3Ehu3lfU7mJFUtqfezMrxQqGEMdMZt2BJ8vINV13VS1DwtPc7H-5LNG0a0LPFQ"><h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight font-semibold truncate max-w-[180px]">App Detail</h1></div><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin pt-16 pb-safe bg-surface"><div class="flex flex-col w-full pb-space-xl">
+<div class="relative w-full rounded-xl overflow-hidden bg-surface-container-lowest p-space-lg shadow-sm mb-space-md">
+<div class="absolute -right-12 -top-12 w-44 h-44 rounded-full bg-primary/5 blur-2xl pointer-events-none"></div>
+<div class="absolute -left-10 -bottom-10 w-36 h-36 rounded-full bg-secondary-container/20 blur-xl pointer-events-none"></div>
+<div class="relative z-10 flex items-start justify-between gap-space-md">
+<div class="flex items-center gap-space-md">
+<div class="relative flex items-center justify-center w-14 h-14 rounded-full bg-primary-container text-on-primary-container shadow-sm flex-shrink-0">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+<span class="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-primary ring-2 ring-surface-container-lowest flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-on-primary"></span>
+</span>
+</div>
+<div class="min-w-0">
+<div class="flex items-center gap-space-xs">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight truncate">WhatsApp</h2>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1.5 mt-0.5">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+Scheduled Rule Active
+</p>
+</div>
+</div>
+<button aria-checked="true" class="relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out bg-primary focus:outline-none focus:ring-2 focus:ring-primary/20" id="master-toggle" onclick="toggleMasterSwitch()" role="switch">
+<span class="sr-only">Toggle rule active state</span>
+<span class="pointer-events-none translate-x-6 inline-block h-6 w-6 transform rounded-full bg-on-primary shadow-sm ring-0 transition duration-200 ease-in-out my-1 ml-1" id="master-toggle-knob"></span>
+</button>
+</div>
+<div class="mt-space-md pt-space-md flex items-center justify-between">
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary-fixed text-on-secondary-fixed">
+<span class="material-symbols-outlined text-[16px]">notifications_off</span>
+<span class="font-label-md text-label-md font-medium tracking-wide">Silenced until 6:00 PM</span>
+</div>
+<span class="font-label-sm text-label-sm text-outline tracking-wider uppercase font-semibold">Focusing</span>
+</div>
+</div>
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-lg shadow-sm mb-space-md">
+<div class="flex items-center justify-between mb-space-md">
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">bedtime</span>
+</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Current Schedule</h3>
+</div>
+<button class="min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center rounded-full text-primary hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+</div>
+<div class="bg-surface-container-low rounded-lg p-space-md mb-space-md flex flex-col gap-space-xs">
+<div class="flex items-baseline justify-between">
+<span class="font-headline-md text-headline-md font-semibold text-on-surface tracking-tight">6:00 PM – 6:00 AM</span>
+<span class="font-label-sm text-label-sm text-primary font-semibold px-2 py-0.5 rounded bg-primary-fixed/40">12 hrs quiet</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant font-medium">Everyday Evening &amp; Night</p>
+</div>
+<div class="flex items-center justify-between pt-space-xs">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px] text-outline">repeat</span>
+<span class="font-body-md text-body-md">Repeat</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface font-medium">Daily (Mon – Sun)</span>
+</div>
+<div class="mt-space-md pt-space-md flex items-center justify-between gap-1.5">
+<div class="flex-1 flex flex-col items-center gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">M</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">T</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">W</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">T</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">F</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">S</span>
+</div>
+<div class="flex-1 flex flex-col items-center gap-1.5">
+<div class="w-full h-1.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">S</span>
+</div>
+</div>
+</div>
+<div class="w-full bg-surface-container-lowest rounded-xl p-space-lg shadow-sm mb-space-lg">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-[18px] text-tertiary">search_off</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Temporary Break</h3>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mb-space-md">Allow alerts gently for a moment without changing your routine.</p>
+<div class="grid grid-cols-3 gap-space-sm" id="override-pills">
+<button class="override-pill min-h-[44px] flex items-center justify-center px-space-xs py-2 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md transition-all active:scale-95 hover:bg-surface-container" onclick="selectOverride(this, '+30m')" type="button">
+<span>+30 min</span>
+</button>
+<button class="override-pill min-h-[44px] flex items-center justify-center px-space-xs py-2 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md transition-all active:scale-95 hover:bg-surface-container" onclick="selectOverride(this, '+1h')" type="button">
+<span>+1 hour</span>
+</button>
+<button class="override-pill min-h-[44px] flex items-center justify-center px-space-xs py-2 rounded-lg bg-surface-container-low text-on-surface font-label-md text-label-md transition-all active:scale-95 hover:bg-surface-container" onclick="selectOverride(this, 'today')" type="button">
+<span>Pause today</span>
+</button>
+</div>
+<div class="hidden mt-space-md pt-space-xs flex items-center gap-2 text-primary font-body-sm text-body-sm" id="break-toast">
+<span class="material-symbols-outlined text-[18px]">done_all</span>
+<span id="break-toast-text">Break applied with care</span>
+</div>
+</div>
+<div class="w-full flex flex-col items-center justify-center pt-space-sm pb-space-md">
+<button class="min-h-[44px] px-space-md flex items-center gap-2 rounded-full text-outline hover:text-error hover:bg-error-container/30 transition-colors font-label-md text-label-md" onclick="confirmRemoval()" type="button">
+<span class="material-symbols-outlined text-[18px]">delete_sweep</span>
+<span>Remove rule for WhatsApp</span>
+</button>
+<p class="font-label-sm text-label-sm text-outline-variant mt-1 text-center">Notifications will follow default system alerts</p>
+</div>
+</div>
+</main>
+<div id="stitch-agent-cursor" data-stitch-injected="" style="left: -40px; top: -40px; display: none;">
+<svg class="cursor-pointer" width="20" height="20" viewBox="0 0 34 34" fill="none">
+<path d="M15.0624 32.3549L5.16251 5.48544L32.0324 15.3848L19.3046 19.6276L15.0624 32.3549Z" fill="#7168f6"></path>
+<path d="M4.80877 5.13207C4.94657 4.99427 5.15206 4.94886 5.33496 5.01606L32.205 14.9156C32.4041 14.9889 32.5354 15.1799 32.5323 15.392C32.529 15.6043 32.392 15.7924 32.1905 15.8595L19.6994 20.0227L15.5369 32.5131C15.4697 32.7145 15.2824 32.8509 15.0701 32.8542C14.8578 32.8575 14.6664 32.7268 14.5929 32.5276L4.69276 5.65826L4.67343 5.5892C4.63863 5.42535 4.68814 5.25283 4.80877 5.13207Z" stroke="rgba(255,255,255,0.15)" stroke-linejoin="round"></path>
+</svg>
+<svg class="cursor-text" width="20" height="28" viewBox="0 0 20 28" fill="none">
+<path d="M6 2h8M6 26h8M10 2v24" stroke="#7168f6" stroke-width="2.5" stroke-linecap="round"></path>
+</svg>
+<svg class="cursor-paint" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<path d="M18.5 1.5c.8-.8 2.1-.8 2.8 0 .8.8.8 2.1 0 2.8L11 14.5l-3.5 1 1-3.5L18.5 1.5z" fill="#7168f6" stroke="#4f44e1" stroke-width="1" stroke-linejoin="round"></path>
+<path d="M7 14.5c-2 2-3.5 4-3.5 5.5 0 1.5 1 2.5 2.5 2.5 1.5 0 3.5-1.5 5.5-3.5" stroke="#7168f6" stroke-width="1.5" stroke-linecap="round"></path>
+<path d="M4 20c-.5.5-1.2 1-2 1.2" stroke="#6056f0" stroke-width="1" stroke-linecap="round"></path>
+</svg>
+<svg id="stitch-cursor-label" width="28" height="14" viewBox="0 0 28 14" fill="none">
+<rect width="28" height="14" rx="7" fill="#7168f6"></rect>
+<circle cx="10.5" cy="7" r="1.8" fill="white"></circle>
+<circle cx="17.5" cy="7" r="1.8" fill="white"></circle>
+</svg>
+</div>

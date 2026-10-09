@@ -1,0 +1,163 @@
+<header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.03)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><button aria-label="Go back" class="min-w-[44px] min-h-[44px] -ml-2 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors rounded-full" onclick="history.back()"><span class="material-symbols-outlined text-[20px]">arrow_back</span></button><img alt="A modern, minimalist vector app icon for 'Notification Handler'. A sleek bell emblem intertwined with a precise clock schedule ring or toggle shield, styled in deep teal (#0D9488) and emerald with subtle warm amber accents. Crisp geometry, flat vector design, clean rounded contours, transparent background.. Design context: - Primary color: #0d9488
+- Font: plusJakartaSans
+- Mode: light
+- Roundness: rounded-md
+. The logo should be visually consistent with these brand tokens." class="h-7 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VWSwlnEPkDTsVBFo24lfX_ZAzSXfRmHZCrwVHhmR6JIqpERjSvriTsHKUpvHvg-xL-MMFegUP3NXF8JTcZ-CqFpEVsjfhHrweSfqjG6cUNwfeu2xoyv3jIRh89KbpYRY22st6WdNosd-9U0Fn4bVl5D7LtdcXQuB288RdLlLJATkg1B7P0BEm8mIJa3Ehu3lfU7mJFUtqfezMrxQqGEMdMZt2BJ8vINV13VS1DwtPc7H-5LNG0a0LPFQ"><h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight font-semibold truncate max-w-[180px]">Create Rule</h1></div><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin pt-16 pb-safe bg-surface"><div class="flex flex-col w-full pb-8">
+<div class="flex items-center justify-between py-space-sm mb-space-md">
+<div class="flex items-center gap-space-sm bg-surface-container-low px-space-md py-1.5 rounded-full shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-primary tracking-wide uppercase font-semibold">Step 1 of 2</span>
+<span class="text-outline-variant font-label-sm text-label-sm">·</span>
+<span class="font-label-md text-label-md text-on-surface-variant font-medium">Time Window</span>
+</div>
+<div class="flex items-center gap-1.5 bg-surface-container-highest/60 px-space-sm py-1 rounded-full">
+<div class="w-5 h-5 rounded-full bg-[#25D366]/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-[13px] text-primary" style="font-variation-settings: 'FILL' 1;">chat</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-medium pr-1">WhatsApp</span>
+</div>
+</div>
+<div class="flex flex-col gap-1 mb-space-lg">
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface font-semibold tracking-tight">When should alerts sound?</p>
+<p class="font-body-md text-body-md text-on-surface-variant">Calibrate your focus envelope. Choose how notifications are filtered during this session.</p>
+</div>
+<div class="flex flex-col gap-space-md mb-space-lg">
+<label class="block font-label-md text-label-md text-outline font-semibold uppercase tracking-wider">Window Strategy</label>
+<div class="grid grid-cols-1 gap-space-md" id="strategy-selector">
+<button class="strategy-option text-left w-full p-space-lg rounded-xl bg-surface-container-lowest shadow-sm transition-all duration-200 relative overflow-hidden group" id="strategy-card-0" onclick="selectStrategy(0)" type="button">
+<div class="absolute top-0 left-0 bottom-0 w-1.5 bg-primary" id="strategy-indicator-0"></div>
+<div class="flex items-start justify-between gap-space-md pl-1">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-full bg-primary-fixed/40 flex items-center justify-center shrink-0 mt-0.5 text-primary">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">notifications_active</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">Allow during window</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-secondary-container text-on-secondary-container font-semibold" id="strategy-badge-0">Active</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Only notify during these hours, keeping everything silent outside.</p>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center shrink-0" id="strategy-icon-0">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</div>
+</div>
+</button>
+<button class="strategy-option text-left w-full p-space-lg rounded-xl bg-surface-container-low shadow-sm transition-all duration-200 relative overflow-hidden group" id="strategy-card-1" onclick="selectStrategy(1)" type="button">
+<div class="hidden absolute top-0 left-0 bottom-0 w-1.5 bg-primary" id="strategy-indicator-1"></div>
+<div class="flex items-start justify-between gap-space-md pl-1">
+<div class="flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 mt-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">do_not_disturb_on</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">Silence during window</span>
+<span class="hidden items-center px-2 py-0.5 rounded-full font-label-sm text-label-sm bg-secondary-container text-on-secondary-container font-semibold" id="strategy-badge-1">Active</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Block alerts during these hours, allow incoming messages otherwise.</p>
+</div>
+</div>
+<div class="w-6 h-6 rounded-full bg-surface-container-highest text-outline flex items-center justify-center shrink-0" id="strategy-icon-1">
+<span class="material-symbols-outlined text-[16px]">add</span>
+</div>
+</div>
+</button>
+</div>
+</div>
+<div class="flex flex-col gap-space-md mb-space-xl">
+<div class="flex items-center justify-between">
+<label class="font-label-md text-label-md text-outline font-semibold uppercase tracking-wider">Set Duration</label>
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-fixed text-on-tertiary-fixed shadow-sm">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">bedtime</span>
+<span class="font-label-sm text-label-sm font-semibold">12-hour overnight span</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-space-md">
+<div class="flex flex-col p-space-md bg-surface-container-lowest rounded-xl shadow-sm relative overflow-hidden">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase font-semibold">Starts</span>
+<span class="material-symbols-outlined text-[18px] text-tertiary">wb_twilight</span>
+</div>
+<div class="flex items-baseline gap-1 my-1">
+<span class="font-headline-lg-mobile text-headline-lg-mobile font-semibold text-on-surface tracking-tight">06:00</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant font-medium">PM</span>
+</div>
+<div class="mt-2 flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Evening shift</span>
+</div>
+</div>
+<div class="flex flex-col p-space-md bg-surface-container-lowest rounded-xl shadow-sm relative overflow-hidden">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-sm text-label-sm text-outline uppercase font-semibold">Ends</span>
+<span class="material-symbols-outlined text-[18px] text-primary">routine</span>
+</div>
+<div class="flex items-baseline gap-1 my-1">
+<span class="font-headline-lg-mobile text-headline-lg-mobile font-semibold text-on-surface tracking-tight">06:00</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant font-medium">AM</span>
+</div>
+<div class="mt-2 flex items-center gap-1">
+<span class="px-1.5 py-0.5 rounded bg-surface-container-highest text-primary font-label-sm text-label-sm font-bold leading-none">+1 Day</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Overnight</span>
+</div>
+</div>
+</div>
+<div class="p-space-md bg-surface-container-lowest rounded-xl shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between text-outline text-label-sm font-label-sm font-medium">
+<span>12 PM</span>
+<span class="text-tertiary font-semibold">6 PM (Start)</span>
+<span>12 AM</span>
+<span class="text-primary font-semibold">6 AM (End)</span>
+<span>12 PM</span>
+</div>
+<div class="h-3 w-full bg-surface-container-high rounded-full overflow-hidden relative">
+<div class="absolute left-[25%] right-[25%] top-0 bottom-0 bg-primary-container rounded-full"></div>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">spa</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Rest &amp; recharge period protected</span>
+</div>
+<button class="font-label-sm text-label-sm text-primary font-semibold hover:underline" type="button">Adjust times</button>
+</div>
+</div>
+</div>
+<div class="flex items-start gap-space-md p-space-md bg-surface-container-low rounded-xl mb-space-xl">
+<div class="w-9 h-9 rounded-full bg-secondary-fixed/50 flex items-center justify-center shrink-0 text-on-secondary-fixed-variant">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+</div>
+<div class="flex flex-col min-w-0">
+<p class="font-label-lg text-label-lg font-semibold text-on-surface">Zero-guilt quiet mode</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">WhatsApp alerts queued outside this window will be quietly accumulated and ready in your morning digest without intrusive chimes.</p>
+</div>
+</div>
+<div class="pt-space-xs">
+<button class="w-full h-12 bg-primary text-on-primary rounded-xl font-label-lg text-label-lg font-semibold flex items-center justify-center gap-space-sm shadow-md active:bg-primary-container transition-all" onclick="continueToStepTwo()" type="button">
+<span>Next: Select Days</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+<p class="text-center font-label-sm text-label-sm text-outline mt-3">All rules apply strictly to WhatsApp incoming events.</p>
+</div>
+</div>
+</main>
+<div id="stitch-agent-cursor" data-stitch-injected="" style="left: -40px; top: -40px; display: none;">
+<svg class="cursor-pointer" width="20" height="20" viewBox="0 0 34 34" fill="none">
+<path d="M15.0624 32.3549L5.16251 5.48544L32.0324 15.3848L19.3046 19.6276L15.0624 32.3549Z" fill="#7168f6"></path>
+<path d="M4.80877 5.13207C4.94657 4.99427 5.15206 4.94886 5.33496 5.01606L32.205 14.9156C32.4041 14.9889 32.5354 15.1799 32.5323 15.392C32.529 15.6043 32.392 15.7924 32.1905 15.8595L19.6994 20.0227L15.5369 32.5131C15.4697 32.7145 15.2824 32.8509 15.0701 32.8542C14.8578 32.8575 14.6664 32.7268 14.5929 32.5276L4.69276 5.65826L4.67343 5.5892C4.63863 5.42535 4.68814 5.25283 4.80877 5.13207Z" stroke="rgba(255,255,255,0.15)" stroke-linejoin="round"></path>
+</svg>
+<svg class="cursor-text" width="20" height="28" viewBox="0 0 20 28" fill="none">
+<path d="M6 2h8M6 26h8M10 2v24" stroke="#7168f6" stroke-width="2.5" stroke-linecap="round"></path>
+</svg>
+<svg class="cursor-paint" width="24" height="24" viewBox="0 0 24 24" fill="none">
+<path d="M18.5 1.5c.8-.8 2.1-.8 2.8 0 .8.8.8 2.1 0 2.8L11 14.5l-3.5 1 1-3.5L18.5 1.5z" fill="#7168f6" stroke="#4f44e1" stroke-width="1" stroke-linejoin="round"></path>
+<path d="M7 14.5c-2 2-3.5 4-3.5 5.5 0 1.5 1 2.5 2.5 2.5 1.5 0 3.5-1.5 5.5-3.5" stroke="#7168f6" stroke-width="1.5" stroke-linecap="round"></path>
+<path d="M4 20c-.5.5-1.2 1-2 1.2" stroke="#6056f0" stroke-width="1" stroke-linecap="round"></path>
+</svg>
+<svg id="stitch-cursor-label" width="28" height="14" viewBox="0 0 28 14" fill="none">
+<rect width="28" height="14" rx="7" fill="#7168f6"></rect>
+<circle cx="10.5" cy="7" r="1.8" fill="white"></circle>
+<circle cx="17.5" cy="7" r="1.8" fill="white"></circle>
+</svg>
+</div>
