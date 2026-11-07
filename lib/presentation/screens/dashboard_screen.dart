@@ -4,6 +4,7 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/schedule_rule.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
+import '../theme/app_theme.dart';
 import '../widgets/stitch_switch.dart';
 import 'add_apps_screen.dart';
 import 'app_details_screen.dart';
@@ -147,15 +148,17 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         _selectedAppIds.clear();
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Removed $count ${count == 1 ? 'app and its rules' : 'apps and their rules'}',
-              style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Removed $count ${count == 1 ? 'app and its rules' : 'apps and their rules'}',
+                style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+              ),
+              backgroundColor: AppTheme.signalWarning,
             ),
-            backgroundColor: const Color(0xFFF59E0B),
-          ),
-        );
+          );
       }
     }
   }

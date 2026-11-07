@@ -165,6 +165,15 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: signalSuccess,
+        contentTextStyle: GoogleFonts.inter(
+          color: Colors.white,
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.fixed,
+      ),
     );
   }
 
@@ -266,6 +275,15 @@ class AppTheme {
         unselectedItemColor: darkOnSurfaceVariant,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: signalSuccess,
+        contentTextStyle: GoogleFonts.inter(
+          color: Colors.white,
+          fontSize: 13.5,
+          fontWeight: FontWeight.w600,
+        ),
+        behavior: SnackBarBehavior.fixed,
       ),
     );
   }

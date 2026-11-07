@@ -61,15 +61,17 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
     });
 
     if (granted && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Access Restored · Focus Shield Online',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Access Restored · Focus Shield Online',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: AppTheme.signalSuccess,
           ),
-          backgroundColor: AppTheme.signalSuccess,
-        ),
-      );
+        );
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => MainNavigationShell(

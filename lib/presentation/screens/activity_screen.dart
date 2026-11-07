@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../../platform/android_notification_platform.dart';
+import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 
 /// Activity Log Screen matching Stitch Obsidian Signal redesign.
@@ -197,16 +198,18 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
     Color textMuted,
   ) {
     if (_events.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Activity log is already empty.',
-            style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Activity log is already empty.',
+              style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+            ),
+            backgroundColor: AppTheme.signalWarning,
+            duration: Duration(seconds: 2),
           ),
-          backgroundColor: Color(0xFFF59E0B),
-          duration: Duration(seconds: 2),
-        ),
-      );
+        );
       return;
     }
 
@@ -248,16 +251,18 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
               setState(() {
                 _events.clear();
               });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Triage activity log cleared.',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Triage activity log cleared.',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: AppTheme.signalSuccess,
+                    duration: Duration(seconds: 2),
                   ),
-                  backgroundColor: Color(0xFF22C55E),
-                  duration: Duration(seconds: 2),
-                ),
-              );
+                );
             },
             child: const Text('Clear All'),
           ),
@@ -506,15 +511,17 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
                           Navigator.pop(ctx);
                           final opened = await AndroidNotificationPlatform.openApp(packageName);
                           if (!opened && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Could not open $appName.',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Could not open $appName.',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                  ),
+                                  backgroundColor: AppTheme.signalError,
                                 ),
-                                backgroundColor: const Color(0xFFEF4444),
-                              ),
-                            );
+                              );
                           }
                         },
                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
