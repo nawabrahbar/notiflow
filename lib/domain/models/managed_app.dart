@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-/// Represents an installed application managed by Notification Handler.
+/// Represents an installed application managed by Notiflow.
 class ManagedApp {
   final String id;
   final String packageName;

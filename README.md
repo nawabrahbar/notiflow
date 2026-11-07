@@ -22,12 +22,6 @@ Every push to `main` is automatically built and published by GitHub Actions. You
 | **🗂️ All Releases Archive** | **[Browse All Releases](https://github.com/nawabrahbar/notiflow/releases)** | Complete history of all published Notiflow builds |
 | **⚙️ GitHub Actions Builds** | **[View CI/CD Workflow Runs](https://github.com/nawabrahbar/notiflow/actions/workflows/build-apk.yml)** | Live build logs and PR workflow artifacts |
 
-### Installing on Android 13+ (Sideloaded APK Note)
-When installing an `.apk` outside the Play Store on Android 13 or newer, Android places a security lock on **Notification Access** until you allow restricted settings:
-1. Install and open **Notiflow**, then tap **Unlock Restricted Settings** when prompted.
-2. **Step 1**: Tap **Open App Info** → tap the **`⋮`** menu (top-right corner) → tap **Allow restricted settings** and verify with your fingerprint/PIN.
-3. **Step 2**: Tap **Open Notification Access** → toggle **Notiflow** to **ON**.
-
 ---
 
 ## ✨ Key Features
@@ -77,8 +71,8 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 | # | Screen | File | Description |
 | :--- | :--- | :--- | :--- |
 | 1 | **Splash Screen** | [`lib/presentation/screens/splash_screen.dart`](lib/presentation/screens/splash_screen.dart) | Animated Stitch emblem, engine initialization, smart route dispatch |
-| 2 | **Onboarding Screen** | [`lib/presentation/screens/onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) | 3-step onboarding for value pillars & notification access |
-| 3 | **Permission Center** | [`lib/presentation/screens/permission_screen.dart`](lib/presentation/screens/permission_screen.dart) | Permission recovery, Android 13+ sideload guide, OEM battery tips |
+| 2 | **Onboarding Screen** | [`lib/presentation/screens/onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) | 3-step onboarding with direct 1-tap notification access setup |
+| 3 | **Permission Center** | [`lib/presentation/screens/permission_screen.dart`](lib/presentation/screens/permission_screen.dart) | Quick 2-step permission recovery with auto-return & OEM battery tips |
 | 4 | **Import & Presets** | [`lib/presentation/screens/import_rules_screen.dart`](lib/presentation/screens/import_rules_screen.dart) | `.notiflow` file picker, JSON paste modal, and 3 curated focus presets |
 | 5 | **Navigation Shell** | [`lib/presentation/screens/main_navigation_shell.dart`](lib/presentation/screens/main_navigation_shell.dart) | 4-tab bottom navigation (*Rules*, *Apps*, *Activity*, *Settings*) |
 | 6 | **Dashboard (Rules)** | [`lib/presentation/screens/dashboard_screen.dart`](lib/presentation/screens/dashboard_screen.dart) | Time-based greeting, triage counters, global overrides, managed apps |
@@ -91,12 +85,16 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 ### Native Android Engine (`android/app/src/main/kotlin/...`)
 - **[`NotificationHandlerListenerService.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/NotificationHandlerListenerService.kt)**: System-bound `NotificationListenerService` that intercepts posted notifications, extracts notification title/message/channel extras, records triage events, and cancels muted notifications in `< 5ms`.
 - **[`NativeScheduleStore.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/NativeScheduleStore.kt)**: Pure Kotlin schedule evaluator (`NativeScheduleEvaluator`) and persistent store (`SharedPreferences`) that runs independently even when the Flutter UI is closed.
-- **[`AndroidNotificationBridge.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/AndroidNotificationBridge.kt)**: MethodChannel bridge (`com.notificationhandler/bridge`) connecting Flutter with Android package discovery, permission intents, `.notiflow` file import/export, app launching, and real-time activity updates.
+- **[`AndroidNotificationBridge.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/AndroidNotificationBridge.kt)**: MethodChannel bridge (`com.notificationhandler/bridge`) connecting Flutter with Android package discovery, direct Notification Access deep-linking (`ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS`) with automatic foreground return, `.notiflow` file import/export, app launching, and real-time activity updates.
 
 ---
 
 ## 📋 Changelog & Recent Updates
 
+- **v1.5.4 (`+9`) — Direct Permission Deep-Link, Auto-Return & Clean Play Store Onboarding**:
+  - Removed the *"Sideloaded APK blocked on Android 13+?"* and *"Allow Restricted Settings"* cards from [`onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) and [`permission_screen.dart`](lib/presentation/screens/permission_screen.dart) for a clean Play Store onboarding experience.
+  - Updated [`AndroidNotificationBridge.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/AndroidNotificationBridge.kt) to deep-link directly to Notiflow's `Allow notification access` switch (`Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS`) on Android 11+, skipping the all-apps list.
+  - Added automatic foreground return to Notiflow the moment the user toggles Notification Access ON in Android Settings.
 - **v1.5.3 (`+8`) — Semantic Toast Colors by State**:
   - Updated all `SnackBar` toasts across the app to match project state colors: **Success Green** (`#22C55E`), **Error Red** (`#EF4444`), and **Warning Orange** (`#F59E0B`).
 - **v1.5.2 (`+7`) — Google Play Store `.aab` Bundle & Release Signing**:

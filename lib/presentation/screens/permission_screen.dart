@@ -3,7 +3,6 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
-import '../widgets/restricted_settings_sheet.dart';
 import '../widgets/stitch_header.dart';
 import 'main_navigation_shell.dart';
 
@@ -62,15 +61,17 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
     });
 
     if (granted && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Access Restored · Focus Shield Online',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Access Restored · Focus Shield Online',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: AppTheme.signalSuccess,
           ),
-          backgroundColor: AppTheme.signalSuccess,
-        ),
-      );
+        );
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => MainNavigationShell(
@@ -110,7 +111,7 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
               ),
               const SizedBox(height: 14),
               const Text(
-                'Apple iOS enforces strict app sandboxing and does not provide public system APIs for intercepting or canceling notifications from third-party apps.\n\nNotification Handler respects Apple privacy policies and operates 100% locally on supported Android devices.',
+                'Apple iOS enforces strict app sandboxing and does not provide public system APIs for intercepting or canceling notifications from third-party apps.\n\nNotiflow respects Apple privacy policies and operates 100% locally on supported Android devices.',
                 style: TextStyle(fontSize: 14, height: 1.5, color: AppTheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
@@ -124,15 +125,8 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
 
     return Scaffold(
       backgroundColor: AppTheme.surface,
-      appBar: StitchHeader(
+      appBar: const StitchHeader(
         title: 'Permission Required',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline_rounded, color: AppTheme.tertiaryAmber),
-            tooltip: 'Restricted Settings Guide (Android 13+)',
-            onPressed: () => RestrictedSettingsSheet.show(context, _platform),
-          ),
-        ],
       ),
       body: SafeArea(
         child: ListView(
@@ -228,7 +222,7 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
             const SizedBox(height: 6),
             const Center(
               child: Text(
-                'Without Notification Access, Notification Handler cannot evaluate schedules or quiet incoming alerts. All apps are currently passing through standard Android ringers.',
+                'Without Notification Access, Notiflow cannot evaluate schedules or quiet incoming alerts. All apps are currently passing through standard Android ringers.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -325,27 +319,25 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
             ),
             const SizedBox(height: 16),
 
-            // Step-by-Step Recovery Guide (3-Step Reconnection)
+            // Step-by-Step Recovery Guide (2-Step Reconnection)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
                 Text(
-                  '3-Step Reconnection',
+                  'Quick Reconnection',
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.onSurface),
                 ),
                 Text(
-                  'Takes ~15 seconds',
+                  'Takes ~5 seconds',
                   style: TextStyle(fontSize: 12, color: AppTheme.outline),
                 ),
               ],
             ),
             const SizedBox(height: 10),
 
-            _buildReconnectionStep('1', 'Open Android Settings', 'Use the primary button below to jump straight to the system access screen.'),
+            _buildReconnectionStep('1', 'Open Android Settings', 'Tap the button below to jump straight to Notiflow\'s notification access screen.'),
             const SizedBox(height: 8),
-            _buildReconnectionStep('2', 'Find ‘Notification Handler’', 'In Device & app notifications, tap on this app\'s entry.'),
-            const SizedBox(height: 8),
-            _buildReconnectionStep('3', 'Turn Switch ON & Confirm', 'Switch the permission toggle to Allow. Your schedule resumes instantly.'),
+            _buildReconnectionStep('2', 'Turn Switch ON & Confirm', 'Switch "Allow notification access" to ON. Notiflow resumes automatically.'),
             const SizedBox(height: 16),
 
             // Privacy & System Architecture Card
@@ -366,7 +358,7 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
                   const SizedBox(height: 12),
                   _buildPrivacyRow(Icons.security_rounded, 'Why Notification Access?', 'Android mandates the listener service permission to detect incoming banners and suppress ringers during your defined quiet windows.'),
                   const SizedBox(height: 12),
-                  _buildPrivacyRow(Icons.lock_rounded, '100% Offline & Private', 'Alert evaluation runs strictly in your local device sandbox. Senders, message text, and chat contents are never stored, tracked, or sent online.'),
+                  _buildPrivacyRow(Icons.lock_rounded, '100% Offline & Private', 'Alert evaluation runs strictly in your local device sandbox. Senders, message text, and chat contents are never sent online.'),
                 ],
               ),
             ),
@@ -440,54 +432,6 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
               ),
             ),
             const SizedBox(height: 20),
-
-            // Restricted Settings Helper Card for Sideloaded APKs
-            Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.secondaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.primaryTeal.withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Icon(Icons.lock_open_rounded, color: AppTheme.primaryTeal, size: 20),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Installed via APK? Allow Restricted Settings',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.onSurface),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'On Android 13+, sideloaded apps require unlocking "Allow restricted settings" in App Info before notification access can be toggled.',
-                    style: TextStyle(fontSize: 12, height: 1.35, color: AppTheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primaryTeal,
-                        side: const BorderSide(color: AppTheme.primaryTeal),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => RestrictedSettingsSheet.show(context, _platform),
-                      icon: const Icon(Icons.help_outline_rounded, size: 16),
-                      label: const Text('Open 2-Step APK Permission Guide', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
             // Interactive Action Buttons
             ElevatedButton(

@@ -123,7 +123,7 @@ void main() {
 
     expect(find.textContaining('ACTION REQUIRED'), findsOneWidget);
     expect(find.text('Notification Access is paused'), findsOneWidget);
-    expect(find.text('3-Step Reconnection'), findsOneWidget);
+    expect(find.text('Quick Reconnection'), findsOneWidget);
     expect(find.text('Using Samsung, Xiaomi, or OnePlus?'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Open Android Settings'), findsOneWidget);
   });

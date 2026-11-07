@@ -4,7 +4,6 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import 'import_rules_screen.dart';
-import '../widgets/restricted_settings_sheet.dart';
 
 /// 3-Step Onboarding Journey faithfully implemented from Stitch UX.
 /// Step 1: System Setup & Attention Ownership
@@ -446,70 +445,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
           ),
           child: Column(
             children: [
-              _buildStepItem('1', 'Open Android Settings', 'Directs to phone\'s Device & app notifications', isDark),
-              const SizedBox(height: 16),
-              _buildStepItem('2', 'Find "Notiflow"', 'Locate Notiflow in the listener list', isDark),
-              const SizedBox(height: 16),
-              _buildStepItem('3', 'Switch Toggle to ON', 'Accept the Android system dialog', isDark),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Sideloaded APK Helper
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: amber.withValues(alpha: 0.4)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.info_outline_rounded, color: amber, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Sideloaded APK blocked on Android 13+?',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: textMain,
-                    ),
-                  ),
-                ],
+              _buildStepItem(
+                '1',
+                'Open Android Settings',
+                'Opens Notiflow\'s notification permission screen directly',
+                isDark,
               ),
-              const SizedBox(height: 6),
-              Text(
-                'If Android grays out the toggle as a "Restricted Setting", unlock it in 2 taps via App Info.',
-                style: GoogleFonts.inter(fontSize: 12.5, color: textMuted, height: 1.35),
-              ),
-              const SizedBox(height: 10),
-              GestureDetector(
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => RestrictedSettingsSheet(),
-                  );
-                },
-                child: Row(
-                  children: [
-                    Text(
-                      'View 2-step unlock guide',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: amber,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_rounded, size: 14, color: amber),
-                  ],
-                ),
+              const SizedBox(height: 16),
+              _buildStepItem(
+                '2',
+                'Switch Toggle to ON',
+                'Turn on "Allow notification access" and accept the prompt — you\'ll return automatically',
+                isDark,
               ),
             ],
           ),

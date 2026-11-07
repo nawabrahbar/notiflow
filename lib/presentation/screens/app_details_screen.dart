@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
+import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
 import 'main_navigation_shell.dart';
@@ -351,15 +352,17 @@ class AppDetailsScreen extends StatelessWidget {
                         onPressed: () async {
                           await repository.deleteAppsAndRules([currentApp.id]);
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Removed "${currentApp.displayName}" from Rules page!',
-                                style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Removed "${currentApp.displayName}" from Rules page!',
+                                  style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                                ),
+                                backgroundColor: AppTheme.signalWarning,
                               ),
-                              backgroundColor: const Color(0xFFF59E0B),
-                            ),
-                          );
+                            );
                           if (Navigator.of(context).canPop()) {
                             Navigator.of(context).pop();
                           } else {
@@ -493,15 +496,17 @@ class AppDetailsScreen extends StatelessWidget {
                           onPressed: () async {
                             await repository.deleteRule(rule.id);
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Rule deleted and "${currentApp.displayName}" removed from Rules page!',
-                                  style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Rule deleted and "${currentApp.displayName}" removed from Rules page!',
+                                    style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                                  ),
+                                  backgroundColor: AppTheme.signalWarning,
                                 ),
-                                backgroundColor: const Color(0xFFF59E0B),
-                              ),
-                            );
+                              );
                             if (Navigator.of(context).canPop()) {
                               Navigator.of(context).pop();
                             } else {

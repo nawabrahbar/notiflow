@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
+import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import 'app_details_screen.dart';
 
@@ -372,15 +373,17 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                           category: _getAppCategory(app.displayName, app.packageName),
                                         );
                                         if (!context.mounted) return;
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Added "${app.displayName}" to Focus Shield!',
-                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                        ScaffoldMessenger.of(context)
+                                          ..hideCurrentSnackBar()
+                                          ..showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Added "${app.displayName}" to Focus Shield!',
+                                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                              ),
+                                              backgroundColor: AppTheme.signalSuccess,
                                             ),
-                                            backgroundColor: const Color(0xFF22C55E),
-                                          ),
-                                        );
+                                          );
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(

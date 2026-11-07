@@ -18,7 +18,7 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
 
   const StitchHeader({
     super.key,
-    this.title = 'Notification Handler',
+    this.title = 'Notiflow',
     this.onProfileTap,
     this.actions,
     this.showThemeToggle = true,

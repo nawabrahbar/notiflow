@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/rule_preset.dart';
+import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import 'main_navigation_shell.dart';
 
@@ -60,26 +61,30 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     });
 
     if (result) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Backup file restored successfully!',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Backup file restored successfully!',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: AppTheme.signalSuccess,
           ),
-          backgroundColor: Color(0xFF22C55E),
-        ),
-      );
+        );
       await _finishFlow();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Invalid .notiflow backup file.',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Invalid .notiflow backup file.',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: AppTheme.signalError,
           ),
-          backgroundColor: Color(0xFFEF4444),
-        ),
-      );
+        );
     }
   }
 
@@ -259,27 +264,31 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
 
       if (success) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Backup restored successfully!',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Backup restored successfully!',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: AppTheme.signalSuccess,
             ),
-            backgroundColor: Color(0xFF22C55E),
-          ),
-        );
+          );
         await _finishFlow();
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Invalid .notiflow backup format. Please verify JSON schema.',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Invalid .notiflow backup format. Please verify JSON schema.',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: AppTheme.signalError,
             ),
-            backgroundColor: Color(0xFFEF4444),
-          ),
-        );
+          );
       }
     }
   }
@@ -302,15 +311,17 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Applied "${preset.title}" rules!',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            'Applied "${preset.title}" rules!',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: AppTheme.signalSuccess,
         ),
-        backgroundColor: const Color(0xFF22C55E),
-      ),
-    );
+      );
     await _finishFlow();
   }
 

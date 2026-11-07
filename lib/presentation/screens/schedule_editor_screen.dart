@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
+import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
 
@@ -151,15 +152,17 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     setState(() => _isSaving = false);
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Schedule rule saved successfully!',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Schedule rule saved successfully!',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: AppTheme.signalSuccess,
           ),
-          backgroundColor: Color(0xFF22C55E),
-        ),
-      );
+        );
       Navigator.pop(context);
     }
   }

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
+import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
 import 'import_rules_screen.dart';
@@ -67,26 +68,30 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     try {
       final savedFile = await widget.repository.exportRulesToFile();
       if (!mounted || savedFile == null || savedFile.isEmpty) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Backup file saved: $savedFile',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: const Color(0xFF22C55E),
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
           SnackBar(
             content: Text(
-              'Failed to export backup file: $e',
+              'Backup file saved: $savedFile',
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: AppTheme.signalSuccess,
           ),
         );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to export backup file: $e',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: AppTheme.signalError,
+            ),
+          );
       }
     }
   }
@@ -142,15 +147,17 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               Navigator.of(ctx).pop();
               await widget.repository.resetAllRules();
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'All rules and schedules have been reset.',
-                    style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'All rules and schedules have been reset.',
+                      style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                    ),
+                    backgroundColor: AppTheme.signalWarning,
                   ),
-                  backgroundColor: Color(0xFFF59E0B),
-                ),
-              );
+                );
             },
             child: Text('Reset All', style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
           ),
