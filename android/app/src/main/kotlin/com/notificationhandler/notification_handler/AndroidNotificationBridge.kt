@@ -1,6 +1,7 @@
 package com.notificationhandler.notification_handler
 
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -8,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -37,6 +39,7 @@ class AndroidNotificationBridge(
     private var pendingExportResult: MethodChannel.Result? = null
     private var pendingExportContent: String? = null
     private var pendingExportFileName: String? = null
+    private var permissionWatcherRunnable: Runnable? = null
 
     init {
         channel.setMethodCallHandler(this)
@@ -48,6 +51,42 @@ class AndroidNotificationBridge(
                 }
             }
         }
+    }
+
+    private fun startPermissionGrantWatcher() {
+        permissionWatcherRunnable?.let { mainHandler.removeCallbacks(it) }
+        val alreadyGranted = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+        if (alreadyGranted) return
+
+        var attempts = 0
+        val runnable = object : Runnable {
+            override fun run() {
+                attempts++
+                val granted = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+                if (granted) {
+                    permissionWatcherRunnable = null
+                    try {
+                        val returnIntent = Intent(context, MainActivity::class.java).apply {
+                            addFlags(
+                                Intent.FLAG_ACTIVITY_NEW_TASK or
+                                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            )
+                        }
+                        context.startActivity(returnIntent)
+                    } catch (_: Exception) {
+                    }
+                    return
+                }
+                if (attempts < 150) {
+                    mainHandler.postDelayed(this, 400L)
+                } else {
+                    permissionWatcherRunnable = null
+                }
+            }
+        }
+        permissionWatcherRunnable = runnable
+        mainHandler.postDelayed(runnable, 500L)
     }
 
     fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
@@ -140,10 +179,33 @@ class AndroidNotificationBridge(
             }
             "openNotificationAccessSettings" -> {
                 try {
-                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    startPermissionGrantWatcher()
+                    var launchedDetail = false
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        try {
+                            val componentName = ComponentName(
+                                context,
+                                NotificationHandlerListenerService::class.java
+                            )
+                            val detailIntent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).apply {
+                                putExtra(
+                                    Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                                    componentName.flattenToString()
+                                )
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(detailIntent)
+                            launchedDetail = true
+                        } catch (_: Exception) {
+                            launchedDetail = false
+                        }
                     }
-                    context.startActivity(intent)
+                    if (!launchedDetail) {
+                        val fallbackIntent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(fallbackIntent)
+                    }
                     result.success(null)
                 } catch (e: Exception) {
                     result.error("SETTINGS_ERROR", "Could not open notification listener settings", e.message)
