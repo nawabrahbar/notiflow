@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Notiflow</title>
+  <style>
+    :root {
+      color-scheme: dark light;
+      --bg: #09090b;
+      --card: #18181b;
+      --border: #27272a;
+      --text: #fafafa;
+      --muted: #a1a1aa;
+      --accent: #f59e0b;
+      --green: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      padding: 32px 16px 64px;
+    }
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--green);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      margin-top: 28px;
+      margin-bottom: 10px;
+      font-size: 19px;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    h3 {
+      margin-top: 18px;
+      margin-bottom: 6px;
+      font-size: 16px;
+    }
+    p, li {
+      color: #e4e4e7;
+      font-size: 15px;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    code {
+      background: #27272a;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <span class="badge">100% On-Device · Zero Data Collection</span>
+    <h1>Privacy Policy for Notiflow</h1>
+    <div class="meta">
+      <strong>Effective Date:</strong> November 7, 2026 &nbsp;|&nbsp;
+      <strong>Package:</strong> <code>com.notificationhandler.notification_handler</code> &nbsp;|&nbsp;
+      <strong>Developer:</strong> Mohammad Enayatullah (nawabrahbar)
+    </div>
+
+    <h2>1. Overview &amp; Privacy-First Commitment</h2>
+    <p>
+      <strong>Notiflow</strong> is an offline, local-only Android notification scheduling and focus management application.
+    </p>
+    <ul>
+      <li><strong>Zero Data Collection:</strong> Notiflow does <strong>not</strong> collect, transmit, store on external servers, rent, sell, or share any personal information, notification content, or installed app data.</li>
+      <li><strong>100% Local Processing:</strong> All notification schedule evaluations, muting rules, activity logs of muted notifications, and <code>.notiflow</code> backup files are processed and stored exclusively on your Android device.</li>
+      <li><strong>No Trackers or Ads:</strong> Notiflow contains no analytics SDKs, no crash-reporting trackers, no advertising networks, and makes no background network requests.</li>
+    </ul>
+
+    <h2>2. Permissions We Request &amp; How They Are Used</h2>
+
+    <h3>A. Notification Listener Access (<code>BIND_NOTIFICATION_LISTENER_SERVICE</code>)</h3>
+    <p>
+      Android requires Notification Access so Notiflow can detect incoming notifications from the apps you choose to manage, silence/suppress them during your active block schedules or focus overrides, and record muted notifications in your on-device <strong>Activity</strong> log so you can review what arrived while an app was muted.
+      Notification titles, message text, and metadata are processed strictly locally on your device and <strong>never leave your phone</strong>.
+    </p>
+
+    <h3>B. Installed Applications List (<code>QUERY_ALL_PACKAGES</code>)</h3>
+    <p>
+      Used solely on-device to list your installed launcher applications (app name, package name, and icon) so you can select which apps to schedule or mute. Your installed app list is never transmitted off your device.
+    </p>
+
+    <h3>C. Receive Boot Completed (<code>RECEIVE_BOOT_COMPLETED</code>)</h3>
+    <p>
+      Used to restore your active notification schedules automatically when your device restarts.
+    </p>
+
+    <h3>D. User-Initiated Backup Export &amp; Import (Storage Access Framework)</h3>
+    <p>
+      When you export or import a <code>.notiflow</code> backup file, Notiflow uses Android's built-in system file picker (<code>ACTION_CREATE_DOCUMENT</code> / <code>ACTION_OPEN_DOCUMENT</code>) to read or write only the specific backup file you select.
+    </p>
+
+    <h2>3. Data Storage, Retention &amp; Deletion</h2>
+    <p>
+      All configuration rules and muted notification logs are stored locally in Android's private application sandbox. You can delete your data at any time:
+    </p>
+    <ul>
+      <li><strong>Clear Activity Log:</strong> Tap the Clear/Trash button in the <strong>Activity</strong> tab to permanently delete all locally logged muted notifications.</li>
+      <li><strong>Reset All Rules:</strong> Use <strong>Settings → Reset All Rules</strong> inside the app to erase all schedules, managed apps, and overrides.</li>
+      <li><strong>Revoke Permissions or Uninstall:</strong> You can disable Notification Access in Android Settings at any time, or uninstall Notiflow to permanently remove all local app data.</li>
+    </ul>
+
+    <h2>4. Third-Party Sharing &amp; Children's Privacy</h2>
+    <p>
+      Notiflow does not share data with any third parties and does not collect personal information from anyone, including children under the age of 13.
+    </p>
+
+    <h2>5. Contact Us</h2>
+    <p>
+      If you have questions about this Privacy Policy, please contact the developer via GitHub:
+      <a href="https://github.com/nawabrahbar/notiflow/issues" target="_blank" rel="noopener">https://github.com/nawabrahbar/notiflow/issues</a>
+    </p>
+  </div>
+</body>
+</html>
