@@ -16,8 +16,9 @@ Every push to `main` is automatically built and published by GitHub Actions. You
 
 | Resource | Direct Link | Description |
 | :--- | :--- | :--- |
-| **📲 Direct APK Download (Latest)** | **[Download `notiflow-latest.apk`](https://github.com/nawabrahbar/notiflow/releases/latest/download/notiflow-latest.apk)** | One-tap direct download of the newest Release APK |
-| **🏷️ Latest Release Page** | **[View Latest Release](https://github.com/nawabrahbar/notiflow/releases/latest)** | Release notes and versioned APK (`notiflow-v1.5.0.apk`) |
+| **📲 Direct APK Download (Latest)** | **[Download `notiflow-latest.apk`](https://github.com/nawabrahbar/notiflow/releases/latest/download/notiflow-latest.apk)** | One-tap direct download of the newest Release `.apk` for phone install |
+| **🏪 Play Store Bundle (`.aab`)** | **[Download `notiflow-latest.aab`](https://github.com/nawabrahbar/notiflow/releases/latest/download/notiflow-latest.aab)** | Signed Android App Bundle (`.aab`) ready for Google Play Console upload |
+| **🏷️ Latest Release Page** | **[View Latest Release](https://github.com/nawabrahbar/notiflow/releases/latest)** | Release notes, versioned `.apk`, and versioned `.aab` |
 | **🗂️ All Releases Archive** | **[Browse All Releases](https://github.com/nawabrahbar/notiflow/releases)** | Complete history of all published Notiflow builds |
 | **⚙️ GitHub Actions Builds** | **[View CI/CD Workflow Runs](https://github.com/nawabrahbar/notiflow/actions/workflows/build-apk.yml)** | Live build logs and PR workflow artifacts |
 
