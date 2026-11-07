@@ -47,7 +47,11 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     super.initState();
     final rule = widget.existingRule;
     if (rule != null) {
-      _nameController = TextEditingController(text: 'Focus Schedule');
+      _nameController = TextEditingController(
+        text: (rule.name != null && rule.name!.trim().isNotEmpty)
+            ? rule.name!
+            : 'Focus Schedule',
+      );
       _mode = rule.mode;
       _startHour = rule.startTime.hour;
       _startMinute = rule.startTime.minute;
@@ -127,10 +131,12 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   Future<void> _handleSave() async {
     setState(() => _isSaving = true);
     final now = DateTime.now();
+    final trimmedName = _nameController.text.trim();
 
     final rule = ScheduleRule(
       id: widget.existingRule?.id ?? 'rule_${now.millisecondsSinceEpoch}',
       appId: _effectiveApp.id,
+      name: trimmedName.isNotEmpty ? trimmedName : 'Focus Schedule',
       enabled: widget.existingRule?.enabled ?? true,
       mode: _mode,
       startTime: TimeOfDayValue(hour: _startHour, minute: _startMinute),

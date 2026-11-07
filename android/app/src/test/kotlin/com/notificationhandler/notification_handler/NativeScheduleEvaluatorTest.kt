@@ -127,4 +127,32 @@ class NativeScheduleEvaluatorTest {
         assertTrue("7:00 AM should be blocked outside 18:00-06:00 window",
             evaluator.shouldBlockNotification("com.whatsapp", morning))
     }
+
+    @Test
+    fun testGlobalMuteOverrideBlocksManagedApp() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload("""
+            {
+                "managedApps": [
+                    {"id": "app_whatsapp", "packageName": "com.whatsapp", "enabled": true}
+                ],
+                "schedules": [],
+                "overrides": [
+                    {
+                        "id": "ov_global",
+                        "appId": "global_mute",
+                        "mode": "block",
+                        "startDateTime": "2026-01-01T00:00:00Z",
+                        "endDateTime": "2030-01-01T00:00:00Z"
+                    }
+                ]
+            }
+        """.trimIndent())
+
+        val testTime = java.time.Instant.parse("2026-06-01T12:00:00Z").toEpochMilli()
+        assertTrue(
+            "Global mute override must block managed app even without rules",
+            evaluator.shouldBlockNotification("com.whatsapp", testTime)
+        )
+    }
 }

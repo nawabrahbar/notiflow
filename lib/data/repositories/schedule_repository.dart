@@ -43,7 +43,11 @@ class ScheduleRepository extends ChangeNotifier {
   String get defaultScheduleMode => _defaultScheduleMode;
   List<ManagedApp> get managedApps => List.unmodifiable(_managedApps);
   List<ScheduleRule> get schedules => List.unmodifiable(_schedules);
-  List<TemporaryOverride> get overrides => List.unmodifiable(_overrides.values);
+  List<TemporaryOverride> get overrides {
+    final now = DateTime.now();
+    _overrides.removeWhere((_, o) => !o.endDateTime.isAfter(now));
+    return List.unmodifiable(_overrides.values);
+  }
 
   /// Initializes local storage and syncs active configuration with native Android layer.
   Future<void> initialize() async {
@@ -86,6 +90,7 @@ class ScheduleRepository extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyUnmanagedUntouched, value);
     notifyListeners();
+    await _syncToNative();
   }
 
   /// Updates emergency VIP bypass setting.
@@ -94,6 +99,7 @@ class ScheduleRepository extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyVipBypass, value);
     notifyListeners();
+    await _syncToNative();
   }
 
   /// Updates default schedule mode for newly discovered apps.
@@ -231,8 +237,19 @@ class ScheduleRepository extends ChangeNotifier {
     }
   }
 
-  /// Sets a temporary override for an application.
+  static const Set<String> _globalOverrideKeys = {
+    'global',
+    'global_mute',
+    'global_allow',
+  };
+
+  /// Sets a temporary override for an application (or globally).
   Future<void> setOverride(TemporaryOverride override) async {
+    if (_globalOverrideKeys.contains(override.appId)) {
+      for (final key in _globalOverrideKeys) {
+        _overrides.remove(key);
+      }
+    }
     _overrides[override.appId] = override;
     await _persist();
   }
@@ -267,27 +284,46 @@ class ScheduleRepository extends ChangeNotifier {
 
   /// Clears any active temporary override for [appId].
   Future<void> clearOverride(String appId) async {
-    if (_overrides.remove(appId) != null) {
+    bool removed = _overrides.remove(appId) != null;
+    if (_globalOverrideKeys.contains(appId)) {
+      for (final key in _globalOverrideKeys) {
+        if (_overrides.remove(key) != null) removed = true;
+      }
+    }
+    if (removed) {
       await _persist();
     }
   }
 
-  /// Gets any active temporary override for [appId].
-  TemporaryOverride? getOverrideForApp(String appId) {
-    final override = _overrides[appId];
-    if (override == null) return null;
-    if (override.endDateTime.isBefore(DateTime.now())) {
-      // Expired
-      _overrides.remove(appId);
-      return null;
+  /// Gets any active temporary override for [appId] (checking per-app first, then global).
+  TemporaryOverride? getOverrideForApp(String appId, [DateTime? targetDateTime]) {
+    final dt = targetDateTime ?? DateTime.now();
+    final appOverride = _overrides[appId];
+    if (appOverride != null) {
+      if (appOverride.isActiveAt(dt)) {
+        return appOverride;
+      } else if (appOverride.endDateTime.isBefore(dt)) {
+        _overrides.remove(appId);
+      }
     }
-    return override;
+
+    for (final globalKey in _globalOverrideKeys) {
+      final globalOverride = _overrides[globalKey];
+      if (globalOverride != null) {
+        if (globalOverride.isActiveAt(dt)) {
+          return globalOverride;
+        } else if (globalOverride.endDateTime.isBefore(dt)) {
+          _overrides.remove(globalKey);
+        }
+      }
+    }
+    return null;
   }
 
   /// Evaluates the current state of an application.
   ScheduleDecision evaluateApp(ManagedApp app, [DateTime? targetDateTime]) {
     final dt = targetDateTime ?? DateTime.now();
-    final override = getOverrideForApp(app.id);
+    final override = getOverrideForApp(app.id, dt);
     final appRules = getRulesForApp(app.id);
     return _evaluator.evaluate(
       app: app,

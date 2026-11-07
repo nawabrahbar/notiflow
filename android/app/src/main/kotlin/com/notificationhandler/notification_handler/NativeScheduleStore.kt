@@ -144,8 +144,11 @@ class NativeScheduleEvaluator {
         val app = cachedApps[packageName] ?: return false
         if (!app.enabled) return false
 
-        // Check active temporary override
+        // Check active per-app temporary override first, then global overrides
         val override = cachedOverrides[app.id]
+            ?: cachedOverrides["global_mute"]
+            ?: cachedOverrides["global_allow"]
+            ?: cachedOverrides["global"]
         if (override != null && postTimeMs >= override.startMs && postTimeMs < override.endMs) {
             return override.mode == "block"
         }
@@ -182,6 +185,11 @@ class NativeScheduleEvaluator {
         return false
     }
 
+    fun isManagedPackage(packageName: String): Boolean {
+        val app = cachedApps[packageName] ?: return false
+        return app.enabled
+    }
+
     private fun isRuleMatching(
         rule: NativeScheduleRule,
         todayIso: Int,
@@ -211,6 +219,8 @@ class NativeScheduleStore(context: Context) {
     companion object {
         const val PREF_NAME = "notification_handler_schedules"
         const val KEY_PAYLOAD = "payload"
+        const val KEY_ACTIVITY_LOG = "activity_log"
+        private const val MAX_ACTIVITY_EVENTS = 100
     }
 
     private val prefs: SharedPreferences =
@@ -247,6 +257,41 @@ class NativeScheduleStore(context: Context) {
 
     fun shouldBlockNotification(packageName: String, postTimeMs: Long): Boolean {
         reloadIfChanged()
-        return evaluator.shouldBlockNotification(packageName, postTimeMs)
+        val blocked = evaluator.shouldBlockNotification(packageName, postTimeMs)
+        if (evaluator.isManagedPackage(packageName)) {
+            recordTriageEvent(packageName, postTimeMs, blocked)
+        }
+        return blocked
+    }
+
+    @Synchronized
+    fun recordTriageEvent(packageName: String, postTimeMs: Long, isBlocked: Boolean) {
+        try {
+            val raw = prefs.getString(KEY_ACTIVITY_LOG, null)
+            val currentArray = if (!raw.isNullOrBlank()) org.json.JSONArray(raw) else org.json.JSONArray()
+            val eventObj = JSONObject().apply {
+                put("packageName", packageName)
+                put("timestampMs", postTimeMs)
+                put("isBlocked", isBlocked)
+                put("reason", if (isBlocked) "Silenced by schedule rule" else "Allowed by schedule window")
+            }
+            val nextArray = org.json.JSONArray()
+            nextArray.put(eventObj)
+            val limit = minOf(currentArray.length(), MAX_ACTIVITY_EVENTS - 1)
+            for (i in 0 until limit) {
+                nextArray.put(currentArray.getJSONObject(i))
+            }
+            prefs.edit().putString(KEY_ACTIVITY_LOG, nextArray.toString()).apply()
+        } catch (_: Exception) {
+            // Ignore logging failures in background
+        }
+    }
+
+    fun getActivityLogJson(): String {
+        return prefs.getString(KEY_ACTIVITY_LOG, "[]") ?: "[]"
+    }
+
+    fun clearActivityLog() {
+        prefs.edit().remove(KEY_ACTIVITY_LOG).apply()
     }
 }

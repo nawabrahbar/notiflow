@@ -94,7 +94,7 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
         'content': content,
       });
       return path;
-    } on PlatformException {
+    } on Exception {
       return null;
     }
   }
@@ -104,8 +104,29 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
     try {
       final String? content = await _channel.invokeMethod<String>('pickBackupFile');
       return content;
-    } on PlatformException {
+    } on Exception {
       return null;
+    }
+  }
+
+  /// Fetches the privacy-safe triage activity log JSON from the native Android store.
+  static Future<List<Map<String, dynamic>>> fetchNativeActivityLog() async {
+    try {
+      final String? raw = await _channel.invokeMethod<String>('getActivityLog');
+      if (raw == null || raw.isEmpty) return [];
+      final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
+      return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } on Exception {
+      return [];
+    }
+  }
+
+  /// Clears the native Android triage activity log.
+  static Future<void> clearNativeActivityLog() async {
+    try {
+      await _channel.invokeMethod<void>('clearActivityLog');
+    } on Exception {
+      // No-op when running in tests or non-Android platform
     }
   }
 }

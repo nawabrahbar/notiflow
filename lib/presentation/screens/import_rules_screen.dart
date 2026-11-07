@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/rule_preset.dart';
 import '../widgets/stitch_header.dart';
@@ -30,8 +31,36 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
 
   final List<RulePreset> _presets = RulePreset.curatedPresets;
 
+  Future<void> _handlePickFromDevice() async {
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = null;
+    });
+
+    final success = await widget.repository.pickRulesFromFile();
+    if (!mounted) return;
+
+    setState(() {
+      _isProcessing = false;
+      if (success) {
+        _statusMessage = 'Rules successfully restored from .notiflow backup file!';
+        _isSuccessMessage = true;
+      }
+    });
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Backup restored successfully!'),
+          backgroundColor: Color(0xFF16A34A),
+        ),
+      );
+      await _finishFlow();
+    }
+  }
+
   Future<void> _handleChooseFile() async {
-    // Show modal allowing user to either paste JSON or select file
+    // Show modal allowing user to either pick a .notiflow file or paste JSON
     final TextEditingController jsonController = TextEditingController();
 
     final result = await showModalBottomSheet<String>(
@@ -81,14 +110,33 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Paste your .notiflow JSON content below to restore all schedules and managed app rules.',
+                  'Select a .notiflow file from device storage or paste your backup JSON content below.',
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     color: subTextColor,
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context, '__PICK_FILE__');
+                    },
+                    icon: const Icon(Icons.folder_open_rounded, size: 18, color: Color(0xFFF59E0B)),
+                    label: Text(
+                      'Select .notiflow File from Storage',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: textColor),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: borderCol),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
                 TextField(
                   controller: jsonController,
                   maxLines: 6,
@@ -162,6 +210,11 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
       },
     );
 
+    if (result == '__PICK_FILE__') {
+      await _handlePickFromDevice();
+      return;
+    }
+
     if (result != null && result.isNotEmpty) {
       setState(() {
         _isProcessing = true;
@@ -188,7 +241,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
             backgroundColor: Color(0xFF16A34A),
           ),
         );
-        _finishFlow();
+        await _finishFlow();
       }
     }
   }
@@ -217,11 +270,14 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
         backgroundColor: const Color(0xFFF59E0B),
       ),
     );
-    _finishFlow();
+    await _finishFlow();
   }
 
-  void _finishFlow() {
+  Future<void> _finishFlow() async {
     if (widget.isFromOnboarding) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('pref_onboarding_completed', true);
+      if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
