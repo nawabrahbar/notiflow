@@ -110,7 +110,7 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
               ),
               const SizedBox(height: 14),
               const Text(
-                'Apple iOS enforces strict app sandboxing and does not provide public system APIs for intercepting or canceling notifications from third-party apps.\n\nNotification Handler respects Apple privacy policies and operates 100% locally on supported Android devices.',
+                'Apple iOS enforces strict app sandboxing and does not provide public system APIs for intercepting or canceling notifications from third-party apps.\n\nNotiflow respects Apple privacy policies and operates 100% locally on supported Android devices.',
                 style: TextStyle(fontSize: 14, height: 1.5, color: AppTheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
