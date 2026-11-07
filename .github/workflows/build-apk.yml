@@ -40,39 +40,68 @@ jobs:
       - name: Run Flutter unit & widget tests
         run: flutter test
 
-      - name: Build Android Release APK
-        run: flutter build apk --release
+      - name: Configure Release Signing Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            cat <<EOF > android/key.properties
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+            echo "Release signing configured with upload-keystore.jks"
+          else
+            echo "No KEYSTORE_BASE64 secret found; falling back to debug signing"
+          fi
 
-      - name: Prepare APK artifacts
+      - name: Build Android Release APK & Play Store App Bundle (.aab)
+        run: |
+          flutter build apk --release
+          flutter build appbundle --release
+
+      - name: Prepare APK & AAB artifacts
         id: meta
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           cp build/app/outputs/flutter-apk/app-release.apk "notiflow-v${VERSION}.apk"
           cp build/app/outputs/flutter-apk/app-release.apk "notiflow-latest.apk"
+          cp build/app/outputs/bundle/release/app-release.aab "notiflow-v${VERSION}.aab"
+          cp build/app/outputs/bundle/release/app-release.aab "notiflow-latest.aab"
 
-      - name: Upload APK to Workflow Artifacts
+      - name: Upload APK & AAB to Workflow Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: notiflow-apk-${{ steps.meta.outputs.version }}
+          name: notiflow-release-${{ steps.meta.outputs.version }}
           path: |
             notiflow-v${{ steps.meta.outputs.version }}.apk
             notiflow-latest.apk
+            notiflow-v${{ steps.meta.outputs.version }}.aab
+            notiflow-latest.aab
           retention-days: 3
           if-no-files-found: error
 
-      - name: Publish APK to GitHub Releases
+      - name: Publish APK & AAB to GitHub Releases
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.meta.outputs.version }}-b${{ github.run_number }}
           name: Notiflow v${{ steps.meta.outputs.version }} (Build #${{ github.run_number }})
           body: |
-            ### Notiflow Android Release APK (v${{ steps.meta.outputs.version }})
-            - **Direct Phone Install**: Download `notiflow-v${{ steps.meta.outputs.version }}.apk` below on your Android phone and tap to install.
+            ### Notiflow Android Release (v${{ steps.meta.outputs.version }})
+            - **📲 Direct Phone Install (`.apk`)**: Download `notiflow-v${{ steps.meta.outputs.version }}.apk` (or `notiflow-latest.apk`) to install directly on your Android phone.
+            - **🏪 Google Play Console Upload (`.aab`)**: Download `notiflow-v${{ steps.meta.outputs.version }}.aab` (or `notiflow-latest.aab`) to upload to Google Play Console.
             - **Commit**: `${{ github.sha }}`
           files: |
             notiflow-v${{ steps.meta.outputs.version }}.apk
             notiflow-latest.apk
+            notiflow-v${{ steps.meta.outputs.version }}.aab
+            notiflow-latest.aab
           draft: false
           prerelease: false

@@ -50,3 +50,7 @@ app.*.map.json
 # Build artifacts and design web dumps
 /release_builds/
 /stitch_*_files/
+*.jks
+*.keystore
+/android/key.properties
+
