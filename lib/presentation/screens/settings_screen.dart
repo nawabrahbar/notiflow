@@ -65,22 +65,19 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
 
   Future<void> _exportBackup() async {
     try {
-      final path = await widget.repository.exportRulesToFile();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(path != null
-                ? 'Exported backup to device storage!'
-                : 'Backup exported and share sheet opened!'),
-            backgroundColor: const Color(0xFFF59E0B),
-          ),
-        );
-      }
+      final savedFile = await widget.repository.exportRulesToFile();
+      if (!mounted || savedFile == null || savedFile.isEmpty) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Backup file saved: $savedFile'),
+          backgroundColor: const Color(0xFF16A34A),
+        ),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to export backup: $e'),
+            content: Text('Failed to export backup file: $e'),
             backgroundColor: const Color(0xFFEF4444),
           ),
         );

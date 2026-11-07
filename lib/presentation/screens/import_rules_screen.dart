@@ -37,21 +37,32 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
       _statusMessage = null;
     });
 
-    final success = await widget.repository.pickRulesFromFile();
+    final result = await widget.repository.pickRulesFromFile();
     if (!mounted) return;
+
+    if (result == null) {
+      // User canceled the system file picker
+      setState(() {
+        _isProcessing = false;
+      });
+      return;
+    }
 
     setState(() {
       _isProcessing = false;
-      if (success) {
+      if (result) {
         _statusMessage = 'Rules successfully restored from .notiflow backup file!';
         _isSuccessMessage = true;
+      } else {
+        _statusMessage = 'Invalid .notiflow backup file. Please select a valid backup exported from Notiflow.';
+        _isSuccessMessage = false;
       }
     });
 
-    if (success) {
+    if (result) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Backup restored successfully!'),
+          content: Text('Backup file restored successfully!'),
           backgroundColor: Color(0xFF16A34A),
         ),
       );
@@ -396,7 +407,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // Card: Upload .notiflow JSON
+              // Card: Import .notiflow Backup File
               Container(
                 decoration: BoxDecoration(
                   color: cardBg,
@@ -423,7 +434,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Upload .notiflow JSON',
+                                'Import .notiflow Backup File',
                                 style: GoogleFonts.inter(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -432,7 +443,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Select an encrypted rule export from device storage or your local archive.',
+                                'Select an exported .notiflow backup file from your device storage to restore rules.',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: textMuted,
@@ -447,17 +458,36 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isProcessing ? null : _handlePickFromDevice,
+                        icon: const Icon(Icons.folder_open_rounded, size: 18),
+                        label: Text(
+                          'Select .notiflow File',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: amber,
+                          foregroundColor: const Color(0xFF09090B),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _isProcessing ? null : _handleChooseFile,
-                        icon: const Icon(Icons.attach_file_rounded, size: 18),
+                        icon: const Icon(Icons.data_object_rounded, size: 18),
                         label: Text(
-                          'Choose File / Paste JSON',
+                          'Or Paste Backup JSON',
                           style: GoogleFonts.inter(fontWeight: FontWeight.w600),
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D),
                           side: BorderSide(color: borderCol),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
