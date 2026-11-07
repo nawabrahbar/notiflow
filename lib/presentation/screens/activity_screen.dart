@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
+import '../../platform/android_notification_platform.dart';
 import '../widgets/stitch_header.dart';
 
 /// Activity Log Screen matching Stitch Obsidian Signal redesign.
@@ -23,9 +24,63 @@ class ActivityScreen extends StatefulWidget {
   State<ActivityScreen> createState() => ActivityScreenState();
 }
 
-class ActivityScreenState extends State<ActivityScreen> {
+class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObserver {
   String _selectedFilter = 'all'; // 'all', 'silenced', 'allowed'
   final List<Map<String, dynamic>> _events = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadNativeEvents();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadNativeEvents();
+    }
+  }
+
+  Future<void> _loadNativeEvents() async {
+    final nativeLogs = await AndroidNotificationPlatform.fetchNativeActivityLog();
+    if (!mounted || nativeLogs.isEmpty) return;
+
+    final appsByPkg = {
+      for (final a in widget.repository.managedApps) a.packageName: a.displayName,
+    };
+
+    setState(() {
+      _events
+        ..clear()
+        ..addAll(nativeLogs.map((raw) {
+          final pkg = raw['packageName'] as String? ?? 'Unknown App';
+          final displayName = appsByPkg[pkg] ?? pkg;
+          final tsMs = (raw['timestampMs'] as num?)?.toInt() ?? 0;
+          final dt = DateTime.fromMillisecondsSinceEpoch(tsMs);
+          final timeStr =
+              '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+          final isBlocked = raw['isBlocked'] as bool? ?? false;
+          return <String, dynamic>{
+            'icon': isBlocked
+                ? Icons.notifications_paused_rounded
+                : Icons.notifications_active_outlined,
+            'title': displayName,
+            'time': timeStr,
+            'content': pkg,
+            'isBlocked': isBlocked,
+            'reason': raw['reason'] as String? ??
+                (isBlocked ? 'Silenced by schedule' : 'Allowed by schedule'),
+          };
+        }));
+    });
+  }
 
   void clearActivity([BuildContext? targetContext]) {
     final ctx = targetContext ?? context;
@@ -90,8 +145,10 @@ class ActivityScreenState extends State<ActivityScreen> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              await AndroidNotificationPlatform.clearNativeActivityLog();
+              if (!mounted) return;
               setState(() {
                 _events.clear();
               });

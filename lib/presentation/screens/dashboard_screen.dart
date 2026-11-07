@@ -913,11 +913,19 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                 color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(
-                                _getDefaultIconForApp(app.displayName),
-                                color: textMain,
-                                size: 22,
-                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: app.iconBytes != null
+                                  ? Image.memory(
+                                      app.iconBytes!,
+                                      width: 44,
+                                      height: 44,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Icon(
+                                      _getDefaultIconForApp(app.displayName),
+                                      color: textMain,
+                                      size: 22,
+                                    ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(

@@ -78,6 +78,7 @@ class TimeOfDayValue implements Comparable<TimeOfDayValue> {
 class ScheduleRule {
   final String id;
   final String appId;
+  final String? name;
   final bool enabled;
   final ScheduleMode mode;
   final TimeOfDayValue startTime;
@@ -94,6 +95,7 @@ class ScheduleRule {
   const ScheduleRule({
     required this.id,
     required this.appId,
+    this.name,
     this.enabled = true,
     this.mode = ScheduleMode.allowDuring,
     required this.startTime,
@@ -110,6 +112,7 @@ class ScheduleRule {
   ScheduleRule copyWith({
     String? id,
     String? appId,
+    String? name,
     bool? enabled,
     ScheduleMode? mode,
     TimeOfDayValue? startTime,
@@ -122,6 +125,7 @@ class ScheduleRule {
     return ScheduleRule(
       id: id ?? this.id,
       appId: appId ?? this.appId,
+      name: name ?? this.name,
       enabled: enabled ?? this.enabled,
       mode: mode ?? this.mode,
       startTime: startTime ?? this.startTime,
@@ -137,6 +141,7 @@ class ScheduleRule {
     return {
       'id': id,
       'appId': appId,
+      if (name != null) 'name': name,
       'enabled': enabled,
       'mode': mode.toJson(),
       'startTime': startTime.toJson(),
@@ -153,6 +158,7 @@ class ScheduleRule {
     return ScheduleRule(
       id: json['id'] as String,
       appId: json['appId'] as String,
+      name: json['name'] as String?,
       enabled: json['enabled'] as bool? ?? true,
       mode: ScheduleMode.fromJson(json['mode'] as String),
       startTime: TimeOfDayValue.fromJson(json['startTime'] as Map<String, dynamic>),

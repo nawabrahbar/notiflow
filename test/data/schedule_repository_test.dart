@@ -183,4 +183,31 @@ void main() {
     expect(mockPlatform.syncCalled, true);
     expect(mockPlatform.lastSyncedApps.isEmpty, true);
   });
+
+  test('Global overrides (global_mute and global_allow) apply to all managed apps', () async {
+    final app = ManagedApp(
+      id: 'app_1',
+      packageName: 'com.example.app',
+      displayName: 'Example App',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await repository.addApp(app);
+
+    await repository.setTemporaryMute(
+      appId: 'global_mute',
+      duration: const Duration(minutes: 15),
+    );
+    expect(repository.evaluateApp(app).isBlocked, true);
+
+    await repository.setTemporaryAllow(
+      appId: 'global_allow',
+      duration: const Duration(minutes: 15),
+    );
+    expect(repository.evaluateApp(app).isAllowed, true);
+    expect(repository.overrides.length, 1);
+
+    await repository.clearOverride('global_allow');
+    expect(repository.overrides.isEmpty, true);
+  });
 }

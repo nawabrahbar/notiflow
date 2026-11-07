@@ -1,5 +1,6 @@
 package com.notificationhandler.notification_handler
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -18,15 +19,41 @@ import java.util.concurrent.Executors
 
 class AndroidNotificationBridge(
     private val context: Context,
-    channel: MethodChannel
+    channel: MethodChannel,
+    private val activity: Activity? = null
 ) : MethodChannel.MethodCallHandler {
+
+    companion object {
+        private const val REQUEST_CODE_PICK_BACKUP = 9104
+    }
 
     private val scheduleStore = NativeScheduleStore(context)
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var pendingPickResult: MethodChannel.Result? = null
 
     init {
         channel.setMethodCallHandler(this)
+    }
+
+    fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != REQUEST_CODE_PICK_BACKUP) return false
+        val pending = pendingPickResult
+        pendingPickResult = null
+        if (pending == null) return true
+
+        if (resultCode == Activity.RESULT_OK && data?.data != null) {
+            try {
+                val uri = data.data!!
+                val content = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                pending.success(content)
+            } catch (e: Exception) {
+                pending.error("PICK_ERROR", "Failed to read selected backup file: ${e.message}", null)
+            }
+        } else {
+            pending.success(null)
+        }
+        return true
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -105,6 +132,31 @@ class AndroidNotificationBridge(
                 } catch (e: Exception) {
                     result.error("EXPORT_ERROR", "Failed to export rules backup: ${e.message}", null)
                 }
+            }
+            "pickBackupFile" -> {
+                val hostActivity = activity
+                if (hostActivity != null) {
+                    try {
+                        pendingPickResult = result
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                        }
+                        hostActivity.startActivityForResult(intent, REQUEST_CODE_PICK_BACKUP)
+                    } catch (e: Exception) {
+                        pendingPickResult = null
+                        result.error("PICK_ERROR", "Could not open document picker: ${e.message}", null)
+                    }
+                } else {
+                    result.success(null)
+                }
+            }
+            "getActivityLog" -> {
+                result.success(scheduleStore.getActivityLogJson())
+            }
+            "clearActivityLog" -> {
+                scheduleStore.clearActivityLog()
+                result.success(null)
             }
             else -> {
                 result.notImplemented()

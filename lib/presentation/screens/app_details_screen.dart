@@ -391,12 +391,20 @@ class AppDetailsScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            rule.mode == ScheduleMode.blockDuring ? 'Block Schedule Window' : 'Allow Schedule Window',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: textMain,
+                          Flexible(
+                            child: Text(
+                              (rule.name != null && rule.name!.trim().isNotEmpty)
+                                  ? rule.name!
+                                  : (rule.mode == ScheduleMode.blockDuring
+                                      ? 'Block Schedule Window'
+                                      : 'Allow Schedule Window'),
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: textMain,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Container(
