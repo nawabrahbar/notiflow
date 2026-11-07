@@ -3,7 +3,6 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
-import '../widgets/restricted_settings_sheet.dart';
 import '../widgets/stitch_header.dart';
 import 'main_navigation_shell.dart';
 
@@ -124,15 +123,8 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
 
     return Scaffold(
       backgroundColor: AppTheme.surface,
-      appBar: StitchHeader(
+      appBar: const StitchHeader(
         title: 'Permission Required',
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline_rounded, color: AppTheme.tertiaryAmber),
-            tooltip: 'Restricted Settings Guide (Android 13+)',
-            onPressed: () => RestrictedSettingsSheet.show(context, _platform),
-          ),
-        ],
       ),
       body: SafeArea(
         child: ListView(

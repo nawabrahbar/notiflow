@@ -4,7 +4,6 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import 'import_rules_screen.dart';
-import '../widgets/restricted_settings_sheet.dart';
 
 /// 3-Step Onboarding Journey faithfully implemented from Stitch UX.
 /// Step 1: System Setup & Attention Ownership
