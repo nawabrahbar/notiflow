@@ -149,7 +149,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Removed $count ${count == 1 ? 'app and its rules' : 'apps and their rules'}'),
+            content: Text(
+              'Removed $count ${count == 1 ? 'app and its rules' : 'apps and their rules'}',
+              style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+            ),
             backgroundColor: const Color(0xFFF59E0B),
           ),
         );

@@ -353,7 +353,10 @@ class AppDetailsScreen extends StatelessWidget {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Removed "${currentApp.displayName}" from Rules page!'),
+                              content: Text(
+                                'Removed "${currentApp.displayName}" from Rules page!',
+                                style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                              ),
                               backgroundColor: const Color(0xFFF59E0B),
                             ),
                           );
@@ -494,6 +497,7 @@ class AppDetailsScreen extends StatelessWidget {
                               SnackBar(
                                 content: Text(
                                   'Rule deleted and "${currentApp.displayName}" removed from Rules page!',
+                                  style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
                                 ),
                                 backgroundColor: const Color(0xFFF59E0B),
                               ),

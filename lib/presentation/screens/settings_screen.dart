@@ -69,15 +69,21 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       if (!mounted || savedFile == null || savedFile.isEmpty) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Backup file saved: $savedFile'),
-          backgroundColor: const Color(0xFF16A34A),
+          content: Text(
+            'Backup file saved: $savedFile',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: const Color(0xFF22C55E),
         ),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to export backup file: $e'),
+            content: Text(
+              'Failed to export backup file: $e',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
             backgroundColor: const Color(0xFFEF4444),
           ),
         );
@@ -138,8 +144,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('All rules and schedules have been reset.'),
-                  backgroundColor: Color(0xFFEF4444),
+                  content: Text(
+                    'All rules and schedules have been reset.',
+                    style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                  ),
+                  backgroundColor: Color(0xFFF59E0B),
                 ),
               );
             },
