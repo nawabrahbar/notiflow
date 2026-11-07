@@ -37,14 +37,22 @@ class MockPlatformService implements NotificationPlatformInterface {
     lastSyncedRules = schedules;
   }
 
+  String? lastExportedFileName;
+  String? lastExportedContent;
+  String? mockPickedFileContent;
+
   @override
   Future<String?> exportBackupFile({
     required String fileName,
     required String content,
-  }) async => '/mock/path/$fileName';
+  }) async {
+    lastExportedFileName = fileName;
+    lastExportedContent = content;
+    return fileName;
+  }
 
   @override
-  Future<String?> pickBackupFile() async => null;
+  Future<String?> pickBackupFile() async => mockPickedFileContent;
 }
 
 void main() {
@@ -209,5 +217,48 @@ void main() {
 
     await repository.clearOverride('global_allow');
     expect(repository.overrides.isEmpty, true);
+  });
+
+  test('Exported .notiflow backup file is accepted and restored by pickRulesFromFile', () async {
+    final app = ManagedApp(
+      id: 'app_export_1',
+      packageName: 'com.slack',
+      displayName: 'Slack',
+      createdAt: DateTime(2026, 10, 5, 10, 0),
+      updatedAt: DateTime(2026, 10, 5, 10, 0),
+    );
+    await repository.addApp(app);
+    await repository.saveRule(ScheduleRule(
+      id: 'rule_export_1',
+      appId: app.id,
+      name: 'Work Focus',
+      mode: ScheduleMode.blockDuring,
+      startTime: const TimeOfDayValue(hour: 9, minute: 0),
+      endTime: const TimeOfDayValue(hour: 17, minute: 0),
+      daysOfWeek: {1, 2, 3, 4, 5},
+      createdAt: DateTime(2026, 10, 5, 10, 0),
+      updatedAt: DateTime(2026, 10, 5, 10, 0),
+    ));
+    await repository.setDefaultScheduleMode('block');
+
+    final exportedFileName = await repository.exportRulesToFile();
+    expect(exportedFileName, isNotNull);
+    expect(exportedFileName!.endsWith('.notiflow'), true);
+    expect(mockPlatform.lastExportedContent, isNotNull);
+
+    // Clear repository and restore from the exported .notiflow file content
+    await repository.resetAllRules();
+    await repository.setDefaultScheduleMode('allow');
+    expect(repository.managedApps, isEmpty);
+    expect(repository.schedules, isEmpty);
+
+    mockPlatform.mockPickedFileContent = mockPlatform.lastExportedContent;
+    final imported = await repository.pickRulesFromFile();
+    expect(imported, true);
+    expect(repository.managedApps.length, 1);
+    expect(repository.managedApps.first.packageName, 'com.slack');
+    expect(repository.schedules.length, 1);
+    expect(repository.schedules.first.name, 'Work Focus');
+    expect(repository.defaultScheduleMode, 'block');
   });
 }

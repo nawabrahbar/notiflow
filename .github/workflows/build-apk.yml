@@ -58,6 +58,7 @@ jobs:
           path: |
             notiflow-v${{ steps.meta.outputs.version }}.apk
             notiflow-latest.apk
+          retention-days: 3
           if-no-files-found: error
 
       - name: Publish APK to GitHub Releases

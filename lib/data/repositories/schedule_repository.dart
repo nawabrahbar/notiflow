@@ -376,7 +376,7 @@ class ScheduleRepository extends ChangeNotifier {
   String exportRulesJson() {
     final payload = {
       'app': 'Notiflow',
-      'version': '1.4.0',
+      'version': '1.5.0',
       'format': 'notiflow-backup-v1',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'managedApps': _managedApps.map((a) => a.toJson()).toList(),
@@ -388,7 +388,8 @@ class ScheduleRepository extends ChangeNotifier {
     return const JsonEncoder.withIndent('  ').convert(payload);
   }
 
-  /// Exports active rules to a local file and invokes system share sheet.
+  /// Exports active rules to a user-selected .notiflow file on device storage.
+  /// Returns the saved file name/path, or null if the user canceled the save dialog.
   Future<String?> exportRulesToFile() async {
     final jsonContent = exportRulesJson();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -400,19 +401,25 @@ class ScheduleRepository extends ChangeNotifier {
   }
 
   /// Prompts user to pick a backup file and imports it.
-  Future<bool> pickRulesFromFile({bool replaceAll = true}) async {
+  /// Returns `true` if imported, `false` if the selected file was invalid,
+  /// or `null` if the user canceled the file picker.
+  Future<bool?> pickRulesFromFile({bool replaceAll = true}) async {
     final fileContent = await _platformService.pickBackupFile();
-    if (fileContent != null && fileContent.isNotEmpty) {
-      return await importRulesJson(fileContent, replaceAll: replaceAll);
+    if (fileContent == null) {
+      return null;
     }
-    return false;
+    if (fileContent.trim().isEmpty) {
+      return false;
+    }
+    return await importRulesJson(fileContent, replaceAll: replaceAll);
   }
 
   /// Imports and validates a .notiflow JSON string.
   /// Returns true if rules were successfully restored.
   Future<bool> importRulesJson(String rawJson, {bool replaceAll = true}) async {
     try {
-      final decoded = jsonDecode(rawJson);
+      final sanitized = rawJson.trim().replaceFirst(RegExp(r'^\uFEFF'), '');
+      final decoded = jsonDecode(sanitized);
       if (decoded is! Map<String, dynamic>) {
         return false;
       }
@@ -425,11 +432,11 @@ class ScheduleRepository extends ChangeNotifier {
       }
 
       final importedApps = appsList != null
-          ? appsList.map((e) => ManagedApp.fromJson(e as Map<String, dynamic>)).toList()
+          ? appsList.map((e) => ManagedApp.fromJson(Map<String, dynamic>.from(e as Map))).toList()
           : <ManagedApp>[];
 
       final importedSchedules = schedulesList != null
-          ? schedulesList.map((e) => ScheduleRule.fromJson(e as Map<String, dynamic>)).toList()
+          ? schedulesList.map((e) => ScheduleRule.fromJson(Map<String, dynamic>.from(e as Map))).toList()
           : <ScheduleRule>[];
 
       if (replaceAll) {
@@ -454,6 +461,12 @@ class ScheduleRepository extends ChangeNotifier {
       }
       if (decoded.containsKey('vipEmergencyBypass')) {
         _vipEmergencyBypass = decoded['vipEmergencyBypass'] as bool? ?? true;
+      }
+      if (decoded.containsKey('defaultScheduleMode')) {
+        final mode = decoded['defaultScheduleMode'] as String?;
+        if (mode == 'allow' || mode == 'block') {
+          _defaultScheduleMode = mode!;
+        }
       }
 
       await _persist();
