@@ -374,8 +374,11 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                         if (!context.mounted) return;
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
-                                            content: Text('Added "${app.displayName}" to Focus Shield!'),
-                                            backgroundColor: amber,
+                                            content: Text(
+                                              'Added "${app.displayName}" to Focus Shield!',
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                            ),
+                                            backgroundColor: const Color(0xFF22C55E),
                                           ),
                                         );
                                         Navigator.push(

@@ -153,8 +153,11 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Schedule rule saved successfully!'),
-          backgroundColor: Color(0xFFF59E0B),
+          content: Text(
+            'Schedule rule saved successfully!',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: Color(0xFF22C55E),
         ),
       );
       Navigator.pop(context);

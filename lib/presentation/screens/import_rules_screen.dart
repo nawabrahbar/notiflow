@@ -62,11 +62,24 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     if (result) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Backup file restored successfully!'),
-          backgroundColor: Color(0xFF16A34A),
+          content: Text(
+            'Backup file restored successfully!',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: Color(0xFF22C55E),
         ),
       );
       await _finishFlow();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Invalid .notiflow backup file.',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
     }
   }
 
@@ -248,11 +261,25 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Backup restored successfully!'),
-            backgroundColor: Color(0xFF16A34A),
+            content: Text(
+              'Backup restored successfully!',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: Color(0xFF22C55E),
           ),
         );
         await _finishFlow();
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Invalid .notiflow backup format. Please verify JSON schema.',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
       }
     }
   }
@@ -277,8 +304,11 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Applied "${preset.title}" rules!'),
-        backgroundColor: const Color(0xFFF59E0B),
+        content: Text(
+          'Applied "${preset.title}" rules!',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: const Color(0xFF22C55E),
       ),
     );
     await _finishFlow();

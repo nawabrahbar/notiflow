@@ -199,7 +199,11 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
     if (_events.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Activity log is already empty.'),
+          content: Text(
+            'Activity log is already empty.',
+            style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: Color(0xFFF59E0B),
           duration: Duration(seconds: 2),
         ),
       );
@@ -246,8 +250,11 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
               });
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Triage activity log cleared.'),
-                  backgroundColor: Color(0xFFF59E0B),
+                  content: Text(
+                    'Triage activity log cleared.',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
+                  backgroundColor: Color(0xFF22C55E),
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -497,7 +504,18 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           Navigator.pop(ctx);
-                          await AndroidNotificationPlatform.openApp(packageName);
+                          final opened = await AndroidNotificationPlatform.openApp(packageName);
+                          if (!opened && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Could not open $appName.',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                                ),
+                                backgroundColor: const Color(0xFFEF4444),
+                              ),
+                            );
+                          }
                         },
                         icon: const Icon(Icons.open_in_new_rounded, size: 16),
                         label: Text(
