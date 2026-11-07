@@ -55,17 +55,18 @@ When installing an `.apk` outside the Play Store on Android 13 or newer, Android
 - **Per-App Instant Mute Pills**: Temporarily mute any individual app for **15m**, **30m**, **1h**, or **Today 24h** from the App Details screen without altering recurring schedules.
 
 ### 4. Rules Backup, Portability (`.notiflow`) & Curated Presets
-- **Export `.notiflow` Backups**: Serialize all managed apps, schedules, and preferences into a `.notiflow` JSON file and share or save via the Android system share sheet.
-- **Import from Storage or Clipboard**: Restore rules by picking a `.notiflow` file from device storage or pasting raw JSON directly.
+- **Export `.notiflow` Backup File**: Serialize all managed apps, schedules, and preferences into a `.notiflow` file (`notiflow_backup_<timestamp>.notiflow`) and save it directly to your chosen folder on device storage via Android's native Storage Access Framework (`Intent.ACTION_CREATE_DOCUMENT`).
+- **1-Tap Import from Storage or Clipboard**: Restore rules in a single tap by selecting an exported `.notiflow` file from device storage (`Intent.ACTION_OPEN_DOCUMENT`), or paste raw backup JSON text.
 - **3 Built-In Focus Protocols**:
   - **Deep Work Protocol**: Blocks Slack, Teams, and Gmail from `09:00 – 17:00` (Mon–Fri).
   - **Mindful Evening**: Blocks Instagram, X, and YouTube overnight from `20:00 – 08:00` (Everyday).
   - **Minimalist Default**: Holds WhatsApp notifications 24/7 while letting phone calls and SMS pass through.
 
-### 5. 100% On-Device Privacy & Zero Telemetry
+### 5. 100% On-Device Privacy, Semantic Feedback & Zero Telemetry
 - **Zero Network Access**: `android.permission.INTERNET` is completely omitted from [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml). It is physically impossible for the app to transmit data off your device.
+- **Privacy Policy**: View the official Play Store Privacy Policy at **[nawabrahbar.github.io/notiflow/privacy-policy.html](https://nawabrahbar.github.io/notiflow/privacy-policy.html)** (or [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md)).
 - **Unmanaged Apps Untouched**: Apps you haven't added to Notiflow pass through the OS untouched.
-- **Stitch Obsidian Signal Design**: High-contrast Dark (`#09090B`) and Crisp Light (`#F9F9FB`) themes with Signal Amber (`#F59E0B`) accents, custom 60/120fps animated vector emblems, and dynamic time-of-day greetings.
+- **Semantic State Toasts & Obsidian Signal Design**: High-contrast Dark (`#09090B`) and Crisp Light (`#F9F9FB`) themes with Signal Amber (`#F59E0B`) accents, semantic toast notifications (**Success Green** `#22C55E`, **Error Red** `#EF4444`, **Warning Orange** `#F59E0B`), custom 60/120fps animated vector emblems, and dynamic time-of-day greetings.
 
 ---
 
@@ -94,6 +95,21 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 ---
 
+## 📋 Changelog & Recent Updates
+
+- **v1.5.3 (`+8`) — Semantic Toast Colors by State**:
+  - Updated all `SnackBar` toasts across the app to match project state colors: **Success Green** (`#22C55E`), **Error Red** (`#EF4444`), and **Warning Orange** (`#F59E0B`).
+- **v1.5.2 (`+7`) — Google Play Store `.aab` Bundle & Release Signing**:
+  - Configured release upload keystore signing in [`android/app/build.gradle.kts`](android/app/build.gradle.kts) and updated [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) to publish signed `.aab` bundles alongside `.apk` installers on GitHub Releases.
+- **v1.5.1 (`+6`) — Real `.notiflow` Backup File Export/Import & Play Store Privacy Policy**:
+  - Fixed **Export Rules Backup** in [`AndroidNotificationBridge.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/AndroidNotificationBridge.kt) to save a real `.notiflow` file via Android's system file saver (`ACTION_CREATE_DOCUMENT`) instead of sharing plain text, and enabled direct 1-tap `.notiflow` file selection on [`ImportRulesScreen`](lib/presentation/screens/import_rules_screen.dart).
+  - Added Play Console-compliant [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md) and GitHub Pages [`docs/privacy-policy.html`](docs/privacy-policy.html).
+- **v1.5.0 (`+5`) — Muted Notification Activity Log & Automated GitHub Releases**:
+  - Added full muted notification capture (title, message body, subtext, rule reason, app icon, real-time feed updates, and interactive details bottom sheet with **Open App**).
+  - Added automated GitHub Actions CI/CD workflow for building and publishing release artifacts.
+
+---
+
 ## 🛠️ Local Development & Building from Source
 
 ### Prerequisites
@@ -108,9 +124,10 @@ flutter pub get
 # 2. Run Dart unit & widget tests
 flutter test
 
-# 3. Build release APK locally
+# 3. Build release APK & Play Store App Bundle (.aab)
 flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
+flutter build appbundle --release
 ```
 
-For detailed screen-by-screen specifications and flow diagrams, see [`APP_FEATURES.md`](APP_FEATURES.md) and the [`docs/`](docs/) directory.
+For detailed screen-by-screen specifications, future roadmap, and flow diagrams, see [`APP_FEATURES.md`](APP_FEATURES.md), [`plan.MD`](plan.MD), and the [`docs/`](docs/) directory.
+
