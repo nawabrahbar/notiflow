@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../domain/models/managed_app.dart';
 import '../domain/models/schedule_rule.dart';
@@ -109,7 +110,37 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
     }
   }
 
-  /// Fetches the privacy-safe triage activity log JSON from the native Android store.
+  static VoidCallback? _activityUpdatedListener;
+  static bool _isMethodCallHandlerRegistered = false;
+
+  /// Registers a listener that is invoked whenever the native Android layer
+  /// records or clears an activity log event in real time.
+  static void setActivityUpdatedListener(VoidCallback? listener) {
+    _activityUpdatedListener = listener;
+    if (!_isMethodCallHandlerRegistered) {
+      _isMethodCallHandlerRegistered = true;
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'onActivityUpdated') {
+          _activityUpdatedListener?.call();
+        }
+      });
+    }
+  }
+
+  /// Launches an installed application by its [packageName].
+  static Future<bool> openApp(String packageName) async {
+    try {
+      final bool? launched = await _channel.invokeMethod<bool>(
+        'openApp',
+        {'packageName': packageName},
+      );
+      return launched ?? false;
+    } on Exception {
+      return false;
+    }
+  }
+
+  /// Fetches the triage activity log JSON from the native Android store.
   static Future<List<Map<String, dynamic>>> fetchNativeActivityLog() async {
     try {
       final String? raw = await _channel.invokeMethod<String>('getActivityLog');

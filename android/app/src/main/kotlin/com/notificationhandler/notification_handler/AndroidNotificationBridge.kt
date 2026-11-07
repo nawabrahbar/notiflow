@@ -34,6 +34,14 @@ class AndroidNotificationBridge(
 
     init {
         channel.setMethodCallHandler(this)
+        NativeScheduleStore.onActivityUpdatedListener = {
+            mainHandler.post {
+                try {
+                    channel.invokeMethod("onActivityUpdated", null)
+                } catch (_: Exception) {
+                }
+            }
+        }
     }
 
     fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
@@ -157,6 +165,25 @@ class AndroidNotificationBridge(
             "clearActivityLog" -> {
                 scheduleStore.clearActivityLog()
                 result.success(null)
+            }
+            "openApp" -> {
+                val pkg = call.argument<String>("packageName")
+                if (pkg.isNullOrBlank()) {
+                    result.success(false)
+                    return
+                }
+                try {
+                    val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+                    if (launchIntent != null) {
+                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(launchIntent)
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                } catch (_: Exception) {
+                    result.success(false)
+                }
             }
             else -> {
                 result.notImplemented()

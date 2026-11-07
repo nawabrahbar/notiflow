@@ -33,6 +33,7 @@ class MainNavigationShell extends StatefulWidget {
 
 class MainNavigationShellState extends State<MainNavigationShell> {
   late int _currentIndex;
+  final GlobalKey<ActivityScreenState> _activityKey = GlobalKey<ActivityScreenState>();
 
   @override
   void initState() {
@@ -43,6 +44,9 @@ class MainNavigationShellState extends State<MainNavigationShell> {
   void switchTab(int index) {
     if (index >= 0 && index < 4) {
       setState(() => _currentIndex = index);
+      if (index == 2) {
+        _activityKey.currentState?.refreshLogs();
+      }
     }
   }
 
@@ -77,7 +81,11 @@ class MainNavigationShellState extends State<MainNavigationShell> {
             initialShowRestorationBanner: widget.showRestorationBanner,
           ),
           AddAppsScreen(repository: widget.repository, isEmbedded: true),
-          ActivityScreen(repository: widget.repository, isEmbedded: true),
+          ActivityScreen(
+            key: _activityKey,
+            repository: widget.repository,
+            isEmbedded: true,
+          ),
           SettingsScreen(repository: widget.repository),
         ],
       ),
@@ -99,7 +107,7 @@ class MainNavigationShellState extends State<MainNavigationShell> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: switchTab,
           backgroundColor: Colors.transparent,
           elevation: 0,
           selectedItemColor: AppTheme.primaryTeal,

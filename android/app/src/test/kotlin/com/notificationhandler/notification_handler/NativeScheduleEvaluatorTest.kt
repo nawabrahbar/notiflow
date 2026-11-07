@@ -154,5 +154,48 @@ class NativeScheduleEvaluatorTest {
             "Global mute override must block managed app even without rules",
             evaluator.shouldBlockNotification("com.whatsapp", testTime)
         )
+        assertTrue(
+            "Global mute override must also block unmanaged app when Mute All is active",
+            evaluator.shouldBlockNotification("com.other.app", testTime)
+        )
+    }
+
+    @Test
+    fun testEvaluateNotificationReturnsRuleNameAndTimeWindow() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload("""
+            {
+                "managedApps": [
+                    {"id": "app_slack", "packageName": "com.Slack", "enabled": true}
+                ],
+                "schedules": [
+                    {
+                        "id": "rule_work",
+                        "appId": "app_slack",
+                        "name": "Deep Work Shield",
+                        "enabled": true,
+                        "mode": "blockDuring",
+                        "startTime": {"hour": 9, "minute": 0},
+                        "endTime": {"hour": 17, "minute": 0},
+                        "daysOfWeek": [1, 2, 3, 4, 5, 6, 7],
+                        "isOvernight": false
+                    }
+                ],
+                "overrides": []
+            }
+        """.trimIndent())
+
+        val blockTime = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 11)
+            set(Calendar.MINUTE, 15)
+        }.timeInMillis
+
+        val decision = evaluator.evaluateNotification("com.Slack", blockTime)
+        assertTrue(decision.shouldBlock)
+        assertTrue(decision.isManagedOrOverridden)
+        org.junit.Assert.assertEquals("Deep Work Shield", decision.ruleName)
+        org.junit.Assert.assertEquals("09:00 - 17:00", decision.timeWindow)
+        assertTrue(decision.reason.contains("Deep Work Shield"))
+        assertTrue(decision.reason.contains("09:00 - 17:00"))
     }
 }
