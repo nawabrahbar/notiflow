@@ -24,6 +24,7 @@ data class NativeTimeOfDay(
 data class NativeScheduleRule(
     val id: String,
     val appId: String,
+    val name: String? = null,
     val enabled: Boolean,
     val mode: String, // allowDuring, blockDuring, allDayAllow, allDayBlock
     val startTime: NativeTimeOfDay,
@@ -38,6 +39,14 @@ data class NativeOverride(
     val mode: String, // allow, block
     val startMs: Long,
     val endMs: Long
+)
+
+data class NativeEvaluationDecision(
+    val shouldBlock: Boolean,
+    val isManagedOrOverridden: Boolean,
+    val reason: String,
+    val ruleName: String? = null,
+    val timeWindow: String? = null
 )
 
 /**
@@ -99,10 +108,12 @@ class NativeScheduleEvaluator {
 
                 val startTime = NativeTimeOfDay(startObj.getInt("hour"), startObj.getInt("minute"))
                 val endTime = NativeTimeOfDay(endObj.getInt("hour"), endObj.getInt("minute"))
+                val rawName = obj.optString("name", "").trim()
 
                 val rule = NativeScheduleRule(
                     id = obj.getString("id"),
                     appId = obj.getString("appId"),
+                    name = if (rawName.isNotEmpty()) rawName else null,
                     enabled = obj.optBoolean("enabled", true),
                     mode = obj.getString("mode"),
                     startTime = startTime,
@@ -140,21 +151,62 @@ class NativeScheduleEvaluator {
         }
     }
 
-    fun shouldBlockNotification(packageName: String, postTimeMs: Long): Boolean {
-        val app = cachedApps[packageName] ?: return false
-        if (!app.enabled) return false
+    fun evaluateNotification(packageName: String, postTimeMs: Long): NativeEvaluationDecision {
+        val app = cachedApps[packageName]
 
-        // Check active per-app temporary override first, then global overrides
-        val override = cachedOverrides[app.id]
-            ?: cachedOverrides["global_mute"]
+        // 1. Check active per-app override if the app is managed and enabled
+        if (app != null && app.enabled) {
+            val appOverride = cachedOverrides[app.id]
+            if (appOverride != null && postTimeMs >= appOverride.startMs && postTimeMs < appOverride.endMs) {
+                val blocked = appOverride.mode == "block"
+                return NativeEvaluationDecision(
+                    shouldBlock = blocked,
+                    isManagedOrOverridden = true,
+                    reason = if (blocked) "Muted by temporary app override" else "Allowed by temporary app override",
+                    ruleName = "Temporary Override"
+                )
+            }
+        }
+
+        // 2. Check active global override (applies to enabled managed apps, and global_mute applies if active)
+        val globalOverride = cachedOverrides["global_mute"]
             ?: cachedOverrides["global_allow"]
             ?: cachedOverrides["global"]
-        if (override != null && postTimeMs >= override.startMs && postTimeMs < override.endMs) {
-            return override.mode == "block"
+        if (globalOverride != null && postTimeMs >= globalOverride.startMs && postTimeMs < globalOverride.endMs) {
+            val blocked = globalOverride.mode == "block"
+            if (blocked && (app == null || app.enabled)) {
+                return NativeEvaluationDecision(
+                    shouldBlock = true,
+                    isManagedOrOverridden = true,
+                    reason = "Silenced by Global Mute override",
+                    ruleName = "Global Mute"
+                )
+            } else if (!blocked && app != null && app.enabled) {
+                return NativeEvaluationDecision(
+                    shouldBlock = false,
+                    isManagedOrOverridden = true,
+                    reason = "Allowed by Global Allow override",
+                    ruleName = "Global Allow"
+                )
+            }
+        }
+
+        if (app == null || !app.enabled) {
+            return NativeEvaluationDecision(
+                shouldBlock = false,
+                isManagedOrOverridden = false,
+                reason = "Unmanaged or paused app"
+            )
         }
 
         val activeRules = cachedRules.filter { it.appId == app.id && it.enabled }
-        if (activeRules.isEmpty()) return false
+        if (activeRules.isEmpty()) {
+            return NativeEvaluationDecision(
+                shouldBlock = false,
+                isManagedOrOverridden = true,
+                reason = "Allowed (no active schedule rules)"
+            )
+        }
 
         val cal = Calendar.getInstance().apply { timeInMillis = postTimeMs }
         val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
@@ -168,7 +220,15 @@ class NativeScheduleEvaluator {
         // Explicit block rules take priority
         for (rule in blockRules) {
             if (isRuleMatching(rule, todayIso, yesterdayIso, currentTime)) {
-                return true
+                val label = rule.name ?: "Block Schedule"
+                val window = formatRuleWindow(rule)
+                return NativeEvaluationDecision(
+                    shouldBlock = true,
+                    isManagedOrOverridden = true,
+                    reason = "Blocked by ‘$label’ rule ($window)",
+                    ruleName = label,
+                    timeWindow = window
+                )
             }
         }
 
@@ -176,18 +236,56 @@ class NativeScheduleEvaluator {
         if (allowRules.isNotEmpty()) {
             for (rule in allowRules) {
                 if (isRuleMatching(rule, todayIso, yesterdayIso, currentTime)) {
-                    return false
+                    val label = rule.name ?: "Allow Schedule"
+                    val window = formatRuleWindow(rule)
+                    return NativeEvaluationDecision(
+                        shouldBlock = false,
+                        isManagedOrOverridden = true,
+                        reason = "Allowed by ‘$label’ rule ($window)",
+                        ruleName = label,
+                        timeWindow = window
+                    )
                 }
             }
-            return true // Outside all allow windows -> BLOCK
+            val firstAllow = allowRules.first()
+            val label = firstAllow.name ?: "Allow Schedule"
+            val window = formatRuleWindow(firstAllow)
+            return NativeEvaluationDecision(
+                shouldBlock = true,
+                isManagedOrOverridden = true,
+                reason = "Blocked outside ‘$label’ allow window ($window)",
+                ruleName = label,
+                timeWindow = window
+            )
         }
 
-        return false
+        return NativeEvaluationDecision(
+            shouldBlock = false,
+            isManagedOrOverridden = true,
+            reason = "Outside active block schedule"
+        )
+    }
+
+    fun shouldBlockNotification(packageName: String, postTimeMs: Long): Boolean {
+        return evaluateNotification(packageName, postTimeMs).shouldBlock
     }
 
     fun isManagedPackage(packageName: String): Boolean {
         val app = cachedApps[packageName] ?: return false
         return app.enabled
+    }
+
+    private fun formatRuleWindow(rule: NativeScheduleRule): String {
+        if (rule.mode == "allDayAllow" || rule.mode == "allDayBlock") {
+            return "All Day"
+        }
+        return String.format(
+            "%02d:%02d - %02d:%02d",
+            rule.startTime.hour,
+            rule.startTime.minute,
+            rule.endTime.hour,
+            rule.endTime.minute
+        )
     }
 
     private fun isRuleMatching(
@@ -220,7 +318,11 @@ class NativeScheduleStore(context: Context) {
         const val PREF_NAME = "notification_handler_schedules"
         const val KEY_PAYLOAD = "payload"
         const val KEY_ACTIVITY_LOG = "activity_log"
-        private const val MAX_ACTIVITY_EVENTS = 100
+        private const val MAX_ACTIVITY_EVENTS = 150
+        private const val DEDUP_WINDOW_MS = 2000L
+
+        @Volatile
+        var onActivityUpdatedListener: (() -> Unit)? = null
     }
 
     private val prefs: SharedPreferences =
@@ -256,24 +358,103 @@ class NativeScheduleStore(context: Context) {
     }
 
     fun shouldBlockNotification(packageName: String, postTimeMs: Long): Boolean {
+        return evaluateAndRecordNotification(
+            packageName = packageName,
+            postTimeMs = postTimeMs
+        ).shouldBlock
+    }
+
+    fun evaluateAndRecordNotification(
+        packageName: String,
+        postTimeMs: Long,
+        appName: String = "",
+        title: String = "",
+        message: String = "",
+        subText: String = "",
+        category: String = "",
+        isGroupSummary: Boolean = false
+    ): NativeEvaluationDecision {
         reloadIfChanged()
-        val blocked = evaluator.shouldBlockNotification(packageName, postTimeMs)
-        if (evaluator.isManagedPackage(packageName)) {
-            recordTriageEvent(packageName, postTimeMs, blocked)
+        val decision = evaluator.evaluateNotification(packageName, postTimeMs)
+
+        // Record notification details when blocked (muted) or when from an actively managed app.
+        // Skip empty group summary container notifications so we don't duplicate real messages.
+        val hasContent = title.isNotBlank() || message.isNotBlank()
+        val shouldRecord = (decision.shouldBlock || decision.isManagedOrOverridden) &&
+            (!isGroupSummary || hasContent)
+
+        if (shouldRecord) {
+            recordTriageEvent(
+                packageName = packageName,
+                appName = appName,
+                title = title,
+                message = message,
+                subText = subText,
+                category = category,
+                postTimeMs = postTimeMs,
+                isBlocked = decision.shouldBlock,
+                reason = decision.reason,
+                ruleName = decision.ruleName,
+                timeWindow = decision.timeWindow,
+                isGroupSummary = isGroupSummary
+            )
         }
-        return blocked
+        return decision
     }
 
     @Synchronized
-    fun recordTriageEvent(packageName: String, postTimeMs: Long, isBlocked: Boolean) {
+    fun recordTriageEvent(
+        packageName: String,
+        postTimeMs: Long,
+        isBlocked: Boolean,
+        appName: String = "",
+        title: String = "",
+        message: String = "",
+        subText: String = "",
+        category: String = "",
+        reason: String? = null,
+        ruleName: String? = null,
+        timeWindow: String? = null,
+        isGroupSummary: Boolean = false
+    ) {
         try {
             val raw = prefs.getString(KEY_ACTIVITY_LOG, null)
             val currentArray = if (!raw.isNullOrBlank()) org.json.JSONArray(raw) else org.json.JSONArray()
+
+            // Deduplicate rapid consecutive updates of the exact same notification or group summary
+            if (currentArray.length() > 0) {
+                val latest = currentArray.optJSONObject(0)
+                if (latest != null) {
+                    val samePkg = latest.optString("packageName") == packageName
+                    val sameBlock = latest.optBoolean("isBlocked") == isBlocked
+                    val prevTs = latest.optLong("timestampMs", 0L)
+                    val withinWindow = kotlin.math.abs(postTimeMs - prevTs) <= DEDUP_WINDOW_MS
+                    val sameTitle = latest.optString("title") == title
+                    val sameMessage = latest.optString("message") == message
+
+                    if (samePkg && sameBlock && withinWindow) {
+                        if ((sameTitle && sameMessage) || isGroupSummary) {
+                            return
+                        }
+                    }
+                }
+            }
+
+            val effectiveReason = reason ?: if (isBlocked) "Silenced by schedule rule" else "Allowed by schedule window"
+
             val eventObj = JSONObject().apply {
+                put("id", "${postTimeMs}_${packageName.hashCode()}")
                 put("packageName", packageName)
+                if (appName.isNotBlank()) put("appName", appName)
+                put("title", title)
+                put("message", message)
+                if (subText.isNotBlank()) put("subText", subText)
+                if (category.isNotBlank()) put("category", category)
                 put("timestampMs", postTimeMs)
                 put("isBlocked", isBlocked)
-                put("reason", if (isBlocked) "Silenced by schedule rule" else "Allowed by schedule window")
+                put("reason", effectiveReason)
+                if (!ruleName.isNullOrBlank()) put("ruleName", ruleName)
+                if (!timeWindow.isNullOrBlank()) put("timeWindow", timeWindow)
             }
             val nextArray = org.json.JSONArray()
             nextArray.put(eventObj)
@@ -282,6 +463,7 @@ class NativeScheduleStore(context: Context) {
                 nextArray.put(currentArray.getJSONObject(i))
             }
             prefs.edit().putString(KEY_ACTIVITY_LOG, nextArray.toString()).apply()
+            onActivityUpdatedListener?.invoke()
         } catch (_: Exception) {
             // Ignore logging failures in background
         }
@@ -293,5 +475,6 @@ class NativeScheduleStore(context: Context) {
 
     fun clearActivityLog() {
         prefs.edit().remove(KEY_ACTIVITY_LOG).apply()
+        onActivityUpdatedListener?.invoke()
     }
 }

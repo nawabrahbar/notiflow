@@ -7,6 +7,7 @@ import '../../domain/models/schedule_decision.dart';
 import '../../domain/models/schedule_rule.dart';
 import '../../domain/models/temporary_override.dart';
 import '../../domain/models/rule_preset.dart';
+import '../../platform/android_notification_platform.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 
@@ -110,11 +111,12 @@ class ScheduleRepository extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Resets all managed apps, rules, and overrides.
+  /// Resets all managed apps, rules, overrides, and native activity logs.
   Future<void> resetAllRules() async {
     _managedApps.clear();
     _schedules.clear();
     _overrides.clear();
+    await AndroidNotificationPlatform.clearNativeActivityLog();
     await _persist();
   }
 
