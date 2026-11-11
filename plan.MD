@@ -106,6 +106,39 @@
 - Render inside an elegant squircle with a subtle Botanical border and background.
 - Never display generic fallback icons (like generic chat/mail glyphs) when the real native app icon (e.g., WhatsApp, Telegram, Slack, Gmail, Instagram, etc.) is available from the device.
 
+### 2.8. Smart Backup Import for Uninstalled Apps & Auto-Apply on Install
+- **The Problem**: When moving to a new device or restoring a `.notiflow` file, some managed apps from the backup may not yet be installed on the current phone.
+- **Pre-Import Device Inspection**:
+  - Compare package names in the `.notiflow` backup against device-installed packages via `PackageManager`.
+  - If all apps exist, proceed seamlessly.
+- **User Choice Bottom Sheet (When Uninstalled Apps Detected)**:
+  - Header: *"Uninstalled Apps Detected"*
+  - Content: *"Your backup includes rules for N apps not currently installed on this device (e.g. Telegram, Discord)."*
+  - **Option 1: Keep in Vault & Auto-Apply on Install (Recommended)**:
+    - Saves the apps and their schedule rules in local storage, marked with `pendingInstall: true`.
+    - **Hidden from Rules Page**: Prevents "ghost" apps from cluttering the active Rules (Dashboard) page.
+    - **Auto-Detection**: Whenever Notiflow opens or queries installed apps, it checks if any pending packages are now installed. When installed, Notiflow automatically loads the app's native icon, moves it to the active Rules page, and shows a gentle toast (*"Telegram installed: saved focus rules automatically applied!"*).
+  - **Option 2: Exclude Uninstalled Apps**:
+    - Discards uninstalled apps and imports only the apps currently present on the device.
+
+### 2.9. Urgent Repeated Call Escalation (< 3 Minutes) Bug Diagnosis & Native Fix
+- **Reported Bug**: WhatsApp calls ring through on the first attempt even when an app is in a muted focus schedule, failing the *"Allow repeated calls within 3 minutes"* policy.
+- **Deep-Check Root Causes Identified**:
+  1. **Premature Ongoing Filter in NLS**:
+     - In `NotificationHandlerListenerService.kt` (line 49): `if (sbn.isOngoing) return`.
+     - Incoming calls in Android (WhatsApp, Telegram, system dialer) are posted with `Notification.FLAG_ONGOING_EVENT` while the phone is ringing. This caused all incoming call notifications to immediately bypass Notiflow's evaluation engine without being checked.
+  2. **Missing `allowVipContacts` in Native Kotlin Engine**:
+     - `NativeScheduleStore.kt` does not parse or persist `allowVipContacts` on `NativeScheduleRule` from the sync payload JSON.
+  3. **No Caller Timestamp Tracking**:
+     - `NativeScheduleStore.kt` currently lacks a caller history map (`Map<String, Long>`) to differentiate between a 1st incoming call and a 2nd repeated call within 180 seconds (`3 minutes`).
+- **Target Native Architecture Fix**:
+  - Differentiate incoming calls from generic background services: inspect `sbn.notification.category == Notification.CATEGORY_CALL`, call styles, or caller extras before applying `sbn.isOngoing`.
+  - Parse `allowVipContacts: Boolean` in `NativeScheduleStore.kt`.
+  - Maintain a thread-safe `callerHistory: MutableMap<String, Long>` (keyed by `packageName + ":" + callerTitle`):
+    - **Call 1**: If inside an active block window and `allowVipContacts == true`, suppress the notification (`cancelNotification(key)`), record `callerHistory[callerKey] = postTimeMs`, and log event as *"Call 1 Silenced (Urgent escalation armed for 3m)"*.
+    - **Call 2 (within 180 seconds from same caller)**: Recognize repeated urgent call, bypass suppression, and allow the call to ring through!
+    - **Outside 3 minutes**: Reset timestamp and treat as Call 1.
+
 ---
 
 ## 3. Phased Roadmap
@@ -142,6 +175,8 @@
 4. `AddAppsScreen`: Live search, 5 category chips, "+ Add" / "Manage" buttons.
 5. `ActivityScreen`: 3 metric cards, filter pills (All, Silenced, Allowed), audit trail.
 6. `SettingsScreen`: Seamless styling, encrypted storage summary cards, update status tile.
+7. `Smart Backup Import`: Detection of uninstalled apps with user modal ("Keep in Vault & Auto-Apply on Install" vs "Exclude").
+8. `Urgent Call Escalation Fix`: Native fix in `NotificationHandlerListenerService.kt` and `NativeScheduleStore.kt` for repeated calls within 3 minutes.
 
 ### Phase 4: Onboarding Streamlining
 1. Step 1: 3 feature cards (RULES, OFFLINE, BYPASS).
