@@ -120,18 +120,20 @@
 7. Device target declaration in `AndroidManifest.xml` (Phone & Tablet only). [Done]
 8. Seamless header foundation (zero bottom border, continuous canvas flow). [Done]
 
-### Phase 2: Core Scheduling UI
-1. `BotanicalHeader`: zero bottom border, continuous page canvas.
+### Phase 2: Core Scheduling UI (COMPLETED ✅)
+1. `BotanicalHeader`: zero bottom border, continuous page canvas. [Done]
 2. `AppDetailsScreen`:
-   - Multi-schedule list (`Active Schedule Rules (N)`).
-   - Individual schedule switches, mode tags, and delete actions.
-   - Dashed `+ Add New Schedule` button.
+   - Multi-schedule list (`Active Schedule Rules (N)`). [Done]
+   - Individual schedule switches, mode tags, and delete actions. [Done]
+   - Dashed `+ Add New Schedule` button. [Done]
+   - Real native app icon from PackageManager. [Done]
 3. `ScheduleEditorScreen`:
-   - `"Choose a rule"` dropdown at the top with bookmark icon.
-   - Auto-fill logic upon selecting a saved template.
-   - Block vs Allow radio cards.
-   - Start / End time cards with duration math.
-   - Recurrence day preset chips + 7 day pills.
+   - `"Choose a rule"` dropdown at the top with bookmark icon. [Done]
+   - Auto-fill logic upon selecting a saved template. [Done]
+   - Block vs Allow radio cards. [Done]
+   - Start / End time cards with duration math. [Done]
+   - Recurrence day preset chips + 7 day pills. [Done]
+   - Automatic template caching on custom rule save with deduplication. [Done]
 
 ### Phase 3: Dashboard, Apps, Activity & Settings
 1. `SplashScreen`: Botanical emblem with rotating dashed ring & Newsreader branding.

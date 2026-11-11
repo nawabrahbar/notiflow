@@ -9,9 +9,13 @@ import '../widgets/stitch_switch.dart';
 import 'main_navigation_shell.dart';
 import 'schedule_editor_screen.dart';
 
-/// App Details Screen matching Stitch Obsidian Signal redesign.
-/// Features App profile, Master Switch, Real-Time Triage simulator card,
-/// Quick Temporary Block override pills, and Active Schedule Rules list.
+/// App Details Screen matching Botanical Sanctuary & Nocturne specifications:
+/// - Seamless header (no bottom border, integrated canvas)
+/// - Top App Profile card with real native app icon from PackageManager
+/// - Real-Time Triage simulator card (Silenced / Permitted status)
+/// - Quick temporary override mute pills (15m, 30m, 1h, Today 24h)
+/// - Multi-Schedule Rules support: Active Schedule Rules (N) with individual toggles & delete actions
+/// - Dashed "+ Add Schedule Rule" button to configure multiple schedules per app
 class AppDetailsScreen extends StatelessWidget {
   final ScheduleRepository repository;
   final ManagedApp app;
@@ -24,7 +28,10 @@ class AppDetailsScreen extends StatelessWidget {
 
   IconData _getDefaultIconForApp(String name) {
     final lower = name.toLowerCase();
-    if (lower.contains('chat') || lower.contains('whatsapp') || lower.contains('telegram') || lower.contains('message')) {
+    if (lower.contains('chat') ||
+        lower.contains('whatsapp') ||
+        lower.contains('telegram') ||
+        lower.contains('message')) {
       return Icons.chat_bubble_rounded;
     }
     if (lower.contains('slack') || lower.contains('team') || lower.contains('meet')) {
@@ -45,12 +52,16 @@ class AppDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF09090B) : const Color(0xFFF9F9FB);
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    final amber = const Color(0xFFF59E0B);
+    final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
+    final cardBg = isDark ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow;
+    final cardBgHighest = isDark ? AppTheme.darkSurfaceContainerHighest : AppTheme.lightSurfaceContainer;
+    final borderCol = isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final primaryCol = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final primaryContainerCol = isDark ? AppTheme.darkPrimaryContainer : AppTheme.lightPrimaryContainer;
+    final secondaryContainerCol = isDark ? AppTheme.darkSecondaryContainer : AppTheme.lightSecondaryContainer;
+    final onSecondaryContainerCol = isDark ? AppTheme.darkOnSecondaryContainer : AppTheme.lightOnSecondaryContainer;
 
     return ListenableBuilder(
       listenable: repository,
@@ -60,8 +71,8 @@ class AppDetailsScreen extends StatelessWidget {
           orElse: () => app,
         );
 
-        final rule = repository.getRuleForApp(app.id);
-        final override = repository.getOverrideForApp(app.id);
+        final rules = repository.getRulesForApp(currentApp.id);
+        final override = repository.getOverrideForApp(currentApp.id);
         final decision = repository.evaluateApp(currentApp);
         final isSilenced = decision.isBlocked;
 
@@ -81,464 +92,668 @@ class AppDetailsScreen extends StatelessWidget {
           },
           child: Scaffold(
             backgroundColor: bg,
-            appBar: const StitchHeader(title: 'App Details'),
-            body: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            children: [
-              // Top Profile Card: App Icon, Name, Category, Master Switch
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderCol),
+            appBar: PreferredSize(
+              preferredSize: const Size.fromHeight(60),
+              child: Container(
+                color: bg,
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top,
+                  left: 8,
+                  right: 16,
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: currentApp.iconBytes != null
-                          ? Image.memory(
-                              currentApp.iconBytes!,
-                              width: 52,
-                              height: 52,
-                              fit: BoxFit.cover,
-                            )
-                          : Icon(
-                              _getDefaultIconForApp(currentApp.displayName),
-                              color: textMain,
-                              size: 26,
+                    IconButton(
+                      onPressed: () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        } else {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => MainNavigationShell(repository: repository),
                             ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentApp.displayName,
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: textMain,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            currentApp.category ?? 'Applications',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11.5,
-                              color: textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    StitchSwitch(
-                      value: currentApp.enabled,
-                      onChanged: (val) {
-                        repository.toggleAppMonitoring(currentApp.id, val);
+                          );
+                        }
                       },
+                      icon: Icon(Icons.arrow_back_rounded, color: textMain),
+                      tooltip: 'Back',
                     ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Real-Time Triage Status Card
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: isSilenced
-                      ? (isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7))
-                      : (isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7)),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSilenced ? amber : const Color(0xFF22C55E),
-                    width: 1.2,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              isSilenced ? Icons.shield_rounded : Icons.check_circle_rounded,
-                              color: isSilenced ? amber : const Color(0xFF22C55E),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              isSilenced ? 'CURRENT STATUS: SILENCED' : 'CURRENT STATUS: ALLOWED',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.8,
-                                color: isSilenced ? amber : const Color(0xFF16A34A),
-                              ),
-                            ),
-                          ],
+                    Expanded(
+                      child: Text(
+                        'App Details',
+                        style: GoogleFonts.newsreader(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: textMain,
+                          letterSpacing: -0.3,
                         ),
-                        if (override != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: amber,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'OVERRIDE',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF09090B),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      isSilenced
-                          ? 'Alerts strictly held in offline vault. Reason: ${decision.reason}.'
-                          : 'Incoming notifications pass through. Reason: ${decision.reason}.',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D),
-                        height: 1.4,
                       ),
                     ),
+                    const StitchThemeSwitch(),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              // Quick Temporary Block (Instant Override Pills)
-              Text(
-                'QUICK TEMPORARY BLOCK · INSTANT OVERRIDE',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: textMuted,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              Row(
-                children: [
-                  _buildOverridePill(
-                    label: '15m Mute',
-                    isActive: override?.durationMinutes == 15,
-                    onTap: () => repository.setTemporaryMute(appId: currentApp.id, duration: const Duration(minutes: 15)),
-                    isDark: isDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildOverridePill(
-                    label: '30m Mute',
-                    isActive: override?.durationMinutes == 30,
-                    onTap: () => repository.setTemporaryMute(appId: currentApp.id, duration: const Duration(minutes: 30)),
-                    isDark: isDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildOverridePill(
-                    label: '1h Mute',
-                    isActive: override?.durationMinutes == 60,
-                    onTap: () => repository.setTemporaryMute(appId: currentApp.id, duration: const Duration(hours: 1)),
-                    isDark: isDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildOverridePill(
-                    label: 'Today 24h',
-                    isActive: override?.durationMinutes == 1440,
-                    onTap: () => repository.setTemporaryMute(appId: currentApp.id, duration: const Duration(hours: 24)),
-                    isDark: isDark,
-                  ),
-                ],
-              ),
-              if (override != null) ...[
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () => repository.clearOverride(currentApp.id),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Clear Temporary Override'),
-                  style: TextButton.styleFrom(foregroundColor: amber),
-                ),
-              ],
-
-              const SizedBox(height: 28),
-
-              // Active Schedule Rules Header & List
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    rule != null ? 'Active Schedule Rules (1)' : 'Active Schedule Rules (0)',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: textMain,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ScheduleEditorScreen(
-                            repository: repository,
-                            targetApp: currentApp,
-                            existingRule: rule,
-                          ),
-                        ),
-                      );
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (rule != null) ...[
-                          Icon(Icons.edit_rounded, size: 16, color: amber),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          rule != null ? 'Edit Rule' : '+ Add Schedule',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: amber, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              if (rule == null) ...[
+            ),
+            body: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              children: [
+                // Top Profile Card: App Icon, Name, Category, Master Switch
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+                  padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     color: cardBg,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: borderCol),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.event_busy_rounded, color: textMuted, size: 36),
-                      const SizedBox(height: 10),
-                      Text(
-                        'No schedule rules configured',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: textMain, fontSize: 15),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Set active focus hours to automatically quiet notifications.',
-                        style: GoogleFonts.inter(fontSize: 12.5, color: textMuted),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 14),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          await repository.deleteAppsAndRules([currentApp.id]);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Removed "${currentApp.displayName}" from Rules page!',
-                                  style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
-                                ),
-                                backgroundColor: AppTheme.signalWarning,
-                              ),
-                            );
-                          if (Navigator.of(context).canPop()) {
-                            Navigator.of(context).pop();
-                          } else {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => MainNavigationShell(repository: repository),
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
-                        label: const Text('Remove from Rules Page', style: TextStyle(color: Color(0xFFEF4444))),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFEF4444)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
-                ),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderCol),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              (rule.name != null && rule.name!.trim().isNotEmpty)
-                                  ? rule.name!
-                                  : (rule.mode == ScheduleMode.blockDuring
-                                      ? 'Block Schedule Window'
-                                      : 'Allow Schedule Window'),
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
+                      // Real native application icon inside rounded squircle
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.darkSurfaceContainer : AppTheme.lightSurfaceContainer,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderCol, width: 1.0),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: currentApp.iconBytes != null
+                            ? Image.memory(
+                                currentApp.iconBytes!,
+                                width: 52,
+                                height: 52,
+                                fit: BoxFit.cover,
+                              )
+                            : Icon(
+                                _getDefaultIconForApp(currentApp.displayName),
+                                color: textMain,
+                                size: 26,
+                              ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentApp.displayName,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 18,
                                 fontWeight: FontWeight.w700,
                                 color: textMain,
+                                letterSpacing: -0.3,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: rule.mode == ScheduleMode.blockDuring
-                                  ? (isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7))
-                                  : (isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7)),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              rule.mode == ScheduleMode.blockDuring ? 'BLOCK MODE' : 'ALLOW MODE',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: rule.mode == ScheduleMode.blockDuring ? amber : const Color(0xFF22C55E),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Time range
-                      Row(
-                        children: [
-                          Icon(Icons.schedule_rounded, size: 16, color: amber),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${rule.startTime.format12Hour()} — ${rule.endTime.format12Hour()}',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: textMain,
-                            ),
-                          ),
-                          if (rule.isOvernight) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '+1 DAY',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: amber,
-                                ),
+                            const SizedBox(height: 2),
+                            Text(
+                              currentApp.category ?? 'Applications',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: textMuted,
                               ),
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
-
-                      // Day pills
-                      Row(
-                        children: [
-                          _buildDayChip('M', rule.daysOfWeek.contains(1), isDark),
-                          const SizedBox(width: 6),
-                          _buildDayChip('T', rule.daysOfWeek.contains(2), isDark),
-                          const SizedBox(width: 6),
-                          _buildDayChip('W', rule.daysOfWeek.contains(3), isDark),
-                          const SizedBox(width: 6),
-                          _buildDayChip('T', rule.daysOfWeek.contains(4), isDark),
-                          const SizedBox(width: 6),
-                          _buildDayChip('F', rule.daysOfWeek.contains(5), isDark),
-                          const SizedBox(width: 6),
-                          _buildDayChip('S', rule.daysOfWeek.contains(6), isDark),
-                          const SizedBox(width: 6),
-                          _buildDayChip('S', rule.daysOfWeek.contains(7), isDark),
-                        ],
+                      StitchSwitch(
+                        value: currentApp.enabled,
+                        onChanged: (val) => repository.toggleAppMonitoring(currentApp.id, val),
                       ),
-                      const SizedBox(height: 14),
+                    ],
+                  ),
+                ),
 
-                      // Delete rule button
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: () async {
-                            await repository.deleteRule(rule.id);
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Rule deleted and "${currentApp.displayName}" removed from Rules page!',
-                                    style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
+                const SizedBox(height: 18),
+
+                // Real-Time Triage Status Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isSilenced
+                        ? (isDark
+                            ? AppTheme.signalHeld.withValues(alpha: 0.12)
+                            : const Color(0xFFFEE2E2))
+                        : (isDark
+                            ? AppTheme.signalSuccess.withValues(alpha: 0.12)
+                            : const Color(0xFFDCFCE7)),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSilenced
+                          ? AppTheme.signalHeld.withValues(alpha: 0.4)
+                          : AppTheme.signalSuccess.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSilenced ? Icons.do_not_disturb_on_rounded : Icons.check_circle_rounded,
+                        color: isSilenced ? AppTheme.signalHeld : AppTheme.signalSuccess,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  isSilenced ? 'Currently Silenced' : 'Currently Permitted',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: textMain,
                                   ),
-                                  backgroundColor: AppTheme.signalWarning,
                                 ),
-                              );
-                            if (Navigator.of(context).canPop()) {
-                              Navigator.of(context).pop();
-                            } else {
-                              Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(
-                                  builder: (_) => MainNavigationShell(repository: repository),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isSilenced
+                                        ? AppTheme.signalHeld.withValues(alpha: 0.2)
+                                        : AppTheme.signalSuccess.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    isSilenced ? 'MUTED' : 'ALERTS',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                      color: isSilenced ? AppTheme.signalHeld : AppTheme.signalSuccess,
+                                    ),
+                                  ),
                                 ),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
-                          label: Text(
-                            'Delete Rule',
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFEF4444),
+                              ],
                             ),
-                          ),
+                            const SizedBox(height: 3),
+                            Text(
+                              decision.reason,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12.5,
+                                color: textMuted,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-              const SizedBox(height: 24),
 
-              // Bottom Return / Done Action
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
+                const SizedBox(height: 22),
+
+                // Quick Temporary Override Pills
+                Text(
+                  'QUICK TEMPORARY OVERRIDE',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    color: textMuted,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _buildOverridePill(
+                      label: '15m Mute',
+                      isActive: override?.durationMinutes == 15,
+                      onTap: () => repository.setTemporaryMute(
+                        appId: currentApp.id,
+                        duration: const Duration(minutes: 15),
+                      ),
+                      isDark: isDark,
+                      primaryCol: primaryCol,
+                      cardBg: cardBg,
+                      borderCol: borderCol,
+                      textMain: textMain,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildOverridePill(
+                      label: '30m Mute',
+                      isActive: override?.durationMinutes == 30,
+                      onTap: () => repository.setTemporaryMute(
+                        appId: currentApp.id,
+                        duration: const Duration(minutes: 30),
+                      ),
+                      isDark: isDark,
+                      primaryCol: primaryCol,
+                      cardBg: cardBg,
+                      borderCol: borderCol,
+                      textMain: textMain,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildOverridePill(
+                      label: '1h Mute',
+                      isActive: override?.durationMinutes == 60,
+                      onTap: () => repository.setTemporaryMute(
+                        appId: currentApp.id,
+                        duration: const Duration(hours: 1),
+                      ),
+                      isDark: isDark,
+                      primaryCol: primaryCol,
+                      cardBg: cardBg,
+                      borderCol: borderCol,
+                      textMain: textMain,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildOverridePill(
+                      label: 'Today 24h',
+                      isActive: override?.durationMinutes == 1440,
+                      onTap: () => repository.setTemporaryMute(
+                        appId: currentApp.id,
+                        duration: const Duration(hours: 24),
+                      ),
+                      isDark: isDark,
+                      primaryCol: primaryCol,
+                      cardBg: cardBg,
+                      borderCol: borderCol,
+                      textMain: textMain,
+                    ),
+                  ],
+                ),
+                if (override != null) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () => repository.clearOverride(currentApp.id),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('Clear Temporary Override'),
+                    style: TextButton.styleFrom(foregroundColor: primaryCol),
+                  ),
+                ],
+
+                const SizedBox(height: 28),
+
+                // Active Schedule Rules (N) Section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Active Schedule Rules (${rules.length})',
+                      style: GoogleFonts.newsreader(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: textMain,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ScheduleEditorScreen(
+                              repository: repository,
+                              targetApp: currentApp,
+                              existingRule: null,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.add_rounded, size: 18, color: primaryCol),
+                      label: Text(
+                        'Add Rule',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          color: primaryCol,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // Multi-Schedule Rules List
+                if (rules.isEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderCol),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.event_busy_rounded, color: textMuted, size: 36),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No schedule rules configured',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Define custom quiet hours to automatically silence notifications.',
+                          style: GoogleFonts.plusJakartaSans(fontSize: 13, color: textMuted),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  ...rules.map((rule) {
+                    final isBlock = rule.mode == ScheduleMode.blockDuring ||
+                        rule.mode == ScheduleMode.allDayBlock;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderCol),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Time & Rule Switch Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ScheduleEditorScreen(
+                                        repository: repository,
+                                        targetApp: currentApp,
+                                        existingRule: rule,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                behavior: HitTestBehavior.opaque,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.schedule_rounded,
+                                      size: 18,
+                                      color: primaryCol,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${rule.startTime.format12Hour()} → ${rule.endTime.format12Hour()}',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: textMain,
+                                      ),
+                                    ),
+                                    if (rule.isOvernight) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: cardBgHighest,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '+1 DAY',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: primaryCol,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              StitchSwitch(
+                                value: rule.enabled,
+                                onChanged: (val) => repository.toggleRuleEnabled(rule.id, val),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 10),
+
+                          // Rule Tags & Actions Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  // Mode tag: Silent Hold or Allow Window
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: isBlock
+                                          ? secondaryContainerCol
+                                          : (isDark
+                                              ? const Color(0xFF052E16)
+                                              : const Color(0xFFDCFCE7)),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 5,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: isBlock
+                                                ? onSecondaryContainerCol
+                                                : const Color(0xFF22C55E),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          isBlock ? 'Silent Hold' : 'Allow Window',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: isBlock
+                                                ? onSecondaryContainerCol
+                                                : const Color(0xFF16A34A),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Days indicator
+                                  Text(
+                                    _formatDaysSummary(rule.daysOfWeek),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.edit_outlined, size: 18, color: textMuted),
+                                    tooltip: 'Edit Schedule',
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ScheduleEditorScreen(
+                                            repository: repository,
+                                            targetApp: currentApp,
+                                            existingRule: rule,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                      size: 18,
+                                      color: Color(0xFFEF4444),
+                                    ),
+                                    tooltip: 'Delete Rule',
+                                    onPressed: () async {
+                                      await repository.deleteRule(rule.id);
+                                      if (!context.mounted) return;
+                                      ScaffoldMessenger.of(context)
+                                        ..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Schedule rule removed.',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            backgroundColor: AppTheme.signalSuccess,
+                                          ),
+                                        );
+                                    },
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+
+                const SizedBox(height: 12),
+
+                // Dashed "+ Add Schedule Rule" Card Button
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ScheduleEditorScreen(
+                          repository: repository,
+                          targetApp: currentApp,
+                          existingRule: null,
+                        ),
+                      ),
+                    );
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: primaryCol.withValues(alpha: 0.5),
+                        style: BorderStyle.solid,
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: primaryCol.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.add_circle_outline_rounded,
+                            color: primaryCol,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Add Schedule Rule',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: textMain,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Define custom quiet hours & focus',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded, color: textMuted, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // Destructive "Remove from Rules Page" Button
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await repository.deleteAppsAndRules([currentApp.id]);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Removed "${currentApp.displayName}" from Rules page!',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          backgroundColor: AppTheme.signalWarning,
+                        ),
+                      );
                     if (Navigator.of(context).canPop()) {
                       Navigator.of(context).pop();
                     } else {
@@ -549,39 +764,50 @@ class AppDetailsScreen extends StatelessWidget {
                       );
                     }
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: amber,
-                    foregroundColor: const Color(0xFF09090B),
+                  icon: const Icon(Icons.delete_sweep_rounded, size: 18, color: Color(0xFFEF4444)),
+                  label: const Text('Remove from Rules Page', style: TextStyle(color: Color(0xFFEF4444))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    'Done',
-                    style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
+
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
+
+  String _formatDaysSummary(Set<int> days) {
+    if (days.length == 7) return 'Everyday';
+    if (days.length == 5 &&
+        days.contains(1) &&
+        days.contains(2) &&
+        days.contains(3) &&
+        days.contains(4) &&
+        days.contains(5)) {
+      return 'Mon-Fri';
+    }
+    if (days.length == 2 && days.contains(6) && days.contains(7)) {
+      return 'Weekends';
+    }
+    return '${days.length} days/wk';
+  }
 
   Widget _buildOverridePill({
     required String label,
     required bool isActive,
     required VoidCallback onTap,
     required bool isDark,
+    required Color primaryCol,
+    required Color cardBg,
+    required Color borderCol,
+    required Color textMain,
   }) {
-    final amber = const Color(0xFFF59E0B);
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -589,46 +815,23 @@ class AppDetailsScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
             color: isActive
-                ? (isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7))
+                ? (isDark ? primaryCol.withValues(alpha: 0.25) : primaryCol.withValues(alpha: 0.15))
                 : cardBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isActive ? amber : borderCol,
+              color: isActive ? primaryCol : borderCol,
               width: isActive ? 1.5 : 1,
             ),
           ),
           alignment: Alignment.center,
           child: Text(
             label,
-            style: GoogleFonts.inter(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: isActive ? amber : textMain,
+              color: isActive ? primaryCol : textMain,
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDayChip(String label, bool isSelected, bool isDark) {
-    final amber = const Color(0xFFF59E0B);
-    return Container(
-      width: 26,
-      height: 26,
-      decoration: BoxDecoration(
-        color: isSelected
-            ? amber
-            : (isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0)),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: GoogleFonts.jetBrainsMono(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          color: isSelected ? const Color(0xFF09090B) : (isDark ? const Color(0xFFA1A1AA) : const Color(0xFF77767B)),
         ),
       ),
     );
