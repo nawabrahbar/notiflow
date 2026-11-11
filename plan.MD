@@ -97,6 +97,15 @@
   - In Google Play Console:
     - Under **Release > Device catalog** and **Device categories**, uncheck / opt out of **ChromeOS / Desktop** and **XR**.
 
+### 2.7. Real Application Icons Across Entire Project
+- Display each app's **real native installed application icon** (`iconBytes` loaded from Android's `PackageManager`) everywhere in the app:
+  - **Dashboard**: Managed Apps cards list.
+  - **App Details**: Top App Identity profile squircle.
+  - **Add Apps**: App discovery list rows.
+  - **Activity Log**: Event audit trail cards.
+- Render inside an elegant squircle with a subtle Botanical border and background.
+- Never display generic fallback icons (like generic chat/mail glyphs) when the real native app icon (e.g., WhatsApp, Telegram, Slack, Gmail, Instagram, etc.) is available from the device.
+
 ---
 
 ## 3. Phased Roadmap
