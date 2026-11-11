@@ -110,14 +110,15 @@
 
 ## 3. Phased Roadmap
 
-### Phase 1: Foundation & Data Architecture
-1. AppTheme update (`Botanical Nocturne` & `Botanical Sanctuary` tokens).
-2. Typography integration (`Newsreader` display serif + `Plus Jakarta Sans` UI sans).
-3. `RuleTemplate` model and storage in `ScheduleRepository` with the single pre-seeded `"Work Focus Hours"` template.
-4. Deduplication logic on rule save.
-5. Single `.notiflow` schema update (exporting and importing custom rule templates).
-6. Google Play In-App Updates integration (`in_app_update`).
-7. Device target declaration in `AndroidManifest.xml` (Phone & Tablet only).
+### Phase 1: Foundation & Data Architecture (COMPLETED ✅)
+1. AppTheme update (`Botanical Nocturne` & `Botanical Sanctuary` tokens). [Done]
+2. Typography integration (`Newsreader` display serif + `Plus Jakarta Sans` UI sans). [Done]
+3. `RuleTemplate` model and storage in `ScheduleRepository` with the single pre-seeded `"Work Focus Hours"` template. [Done]
+4. Deduplication logic on rule save. [Done]
+5. Single `.notiflow` schema update (exporting and importing custom rule templates). [Done]
+6. Google Play In-App Updates integration (`in_app_update` & `InAppUpdateService`). [Done]
+7. Device target declaration in `AndroidManifest.xml` (Phone & Tablet only). [Done]
+8. Seamless header foundation (zero bottom border, continuous canvas flow). [Done]
 
 ### Phase 2: Core Scheduling UI
 1. `BotanicalHeader`: zero bottom border, continuous page canvas.

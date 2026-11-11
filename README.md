@@ -91,6 +91,14 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 ## 📋 Changelog & Recent Updates
 
+- **v1.6.0 (`+10`) — Botanical Sanctuary Redesign, Rule Templates & Play In-App Updates**:
+  - **Botanical Sanctuary & Nocturne Redesign**: Warm Canvas (`#FEF8F6`) / Deep Forest (`#101412`), Terracotta (`#7D562D` / `#FCBC76`), and Sage Green (`#5A6242` / `#BECCA3`) with elegant Newsreader display serifs and Plus Jakarta Sans body typography.
+  - **Seamless Canvas Flow**: Completely eliminated header bottom borders and dividers for a unified single-page aesthetic.
+  - **Quick Load Rule Templates**: Reusable schedule rule dropdown with deduplication, pre-seeded with `"Work Focus Hours"` (09:00 AM – 05:00 PM, Mon–Fri).
+  - **Multiple Schedules per App**: Full support for attaching multiple active schedules to a single app with independent monitoring switches.
+  - **Unified `.notiflow` Backup**: Single backup file format bundling rule templates alongside managed apps and schedules with 100% backward compatibility.
+  - **Google Play In-App Updates**: Added zero-network In-App Update checker via Play Core IPC (`in_app_update`), maintaining strict 100% on-device privacy with **zero `INTERNET` permission** in [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml).
+  - **Phone & Tablet Form Factors**: Restricted supported screen targets exclusively to Phone and Tablet devices.
 - **v1.5.4 (`+9`) — Direct Permission Deep-Link, Auto-Return & Clean Play Store Onboarding**:
   - Removed the *"Sideloaded APK blocked on Android 13+?"* and *"Allow Restricted Settings"* cards from [`onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) and [`permission_screen.dart`](lib/presentation/screens/permission_screen.dart) for a clean Play Store onboarding experience.
   - Updated [`AndroidNotificationBridge.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/AndroidNotificationBridge.kt) to deep-link directly to Notiflow's `Allow notification access` switch (`Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS`) on Android 11+, skipping the all-apps list.

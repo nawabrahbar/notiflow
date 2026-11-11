@@ -7,15 +7,17 @@ import '../../domain/models/schedule_decision.dart';
 import '../../domain/models/schedule_rule.dart';
 import '../../domain/models/temporary_override.dart';
 import '../../domain/models/rule_preset.dart';
+import '../../domain/models/rule_template.dart';
 import '../../platform/android_notification_platform.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 
-/// Central repository managing active applications, schedules, and overrides.
+/// Central repository managing active applications, schedules, saved templates, and overrides.
 /// Extends [ChangeNotifier] for reactive Flutter UI state updates.
 class ScheduleRepository extends ChangeNotifier {
   static const String _keyManagedApps = 'pref_managed_apps';
   static const String _keySchedules = 'pref_schedule_rules';
+  static const String _keyRuleTemplates = 'pref_rule_templates';
   static const String _keyOverrides = 'pref_temporary_overrides';
   static const String _keyUnmanagedUntouched = 'pref_unmanaged_untouched';
   static const String _keyVipBypass = 'pref_vip_bypass';
@@ -26,6 +28,7 @@ class ScheduleRepository extends ChangeNotifier {
 
   List<ManagedApp> _managedApps = [];
   List<ScheduleRule> _schedules = [];
+  List<RuleTemplate> _ruleTemplates = [];
   Map<String, TemporaryOverride> _overrides = {}; // appId -> override
 
   bool _unmanagedAppsUntouched = true;
@@ -44,6 +47,9 @@ class ScheduleRepository extends ChangeNotifier {
   String get defaultScheduleMode => _defaultScheduleMode;
   List<ManagedApp> get managedApps => List.unmodifiable(_managedApps);
   List<ScheduleRule> get schedules => List.unmodifiable(_schedules);
+  List<RuleTemplate> get ruleTemplates => List.unmodifiable(_ruleTemplates);
+  List<RuleTemplate> get savedTemplates => ruleTemplates;
+
   List<TemporaryOverride> get overrides {
     final now = DateTime.now();
     _overrides.removeWhere((_, o) => !o.endDateTime.isAfter(now));
@@ -64,6 +70,25 @@ class ScheduleRepository extends ChangeNotifier {
     if (rulesJson != null) {
       final List<dynamic> decoded = jsonDecode(rulesJson);
       _schedules = decoded.map((e) => ScheduleRule.fromJson(e as Map<String, dynamic>)).toList();
+    }
+
+    final templatesJson = prefs.getString(_keyRuleTemplates);
+    if (templatesJson != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(templatesJson);
+        _ruleTemplates = decoded
+            .map((e) => RuleTemplate.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+      } catch (e) {
+        debugPrint('Failed to decode saved rule templates: $e');
+        _ruleTemplates = [RuleTemplate.defaultWorkFocus];
+      }
+    }
+
+    // Ensure the pre-seeded default template (Work Focus Hours 9am-5pm Mon-Fri) is always present
+    if (_ruleTemplates.isEmpty ||
+        !_ruleTemplates.any((t) => t.id == RuleTemplate.defaultWorkFocus.id)) {
+      _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
     }
 
     final overridesJson = prefs.getString(_keyOverrides);
@@ -116,6 +141,7 @@ class ScheduleRepository extends ChangeNotifier {
     _managedApps.clear();
     _schedules.clear();
     _overrides.clear();
+    _ruleTemplates = [RuleTemplate.defaultWorkFocus];
     await AndroidNotificationPlatform.clearNativeActivityLog();
     await _persist();
   }
@@ -186,14 +212,80 @@ class ScheduleRepository extends ChangeNotifier {
     return rules.isNotEmpty ? rules.first : null;
   }
 
-  /// Adds or updates a schedule rule.
-  Future<void> saveRule(ScheduleRule rule) async {
+  /// Adds or updates a schedule rule, and automatically evaluates caching it as a saved template.
+  Future<void> saveRule(ScheduleRule rule, {bool autoSaveTemplate = true}) async {
     final index = _schedules.indexWhere((r) => r.id == rule.id);
     if (index != -1) {
       _schedules[index] = rule;
     } else {
       _schedules.add(rule);
     }
+
+    if (autoSaveTemplate) {
+      _maybeCacheRuleAsTemplate(rule);
+    }
+
+    await _persist();
+  }
+
+  /// Saves a new rule template with deduplication.
+  /// If a template with matching mode, start time, end time, and days already exists,
+  /// returns the existing template. Otherwise adds and persists the new template.
+  Future<RuleTemplate> saveRuleTemplate(RuleTemplate template) async {
+    final existingIndex = _ruleTemplates.indexWhere((t) =>
+        t.id == template.id ||
+        t.matchesConfiguration(
+          targetMode: template.mode,
+          targetStartTime: template.startTime,
+          targetEndTime: template.endTime,
+          targetDaysOfWeek: template.daysOfWeek,
+        ));
+
+    if (existingIndex != -1) {
+      return _ruleTemplates[existingIndex];
+    }
+
+    _ruleTemplates.add(template);
+    await _persist();
+    return template;
+  }
+
+  /// Helper to cache a custom schedule rule into saved templates if not already present.
+  bool _maybeCacheRuleAsTemplate(ScheduleRule rule) {
+    final isDuplicate = _ruleTemplates.any((t) => t.matchesConfiguration(
+          targetMode: rule.mode,
+          targetStartTime: rule.startTime,
+          targetEndTime: rule.endTime,
+          targetDaysOfWeek: rule.daysOfWeek,
+        ));
+
+    if (isDuplicate) {
+      return false;
+    }
+
+    final String name = (rule.name != null && rule.name!.trim().isNotEmpty)
+        ? rule.name!.trim()
+        : '${rule.startTime.format12Hour()} - ${rule.endTime.format12Hour()}';
+
+    final newTemplate = RuleTemplate(
+      id: 'template_${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      mode: rule.mode,
+      startTime: rule.startTime,
+      endTime: rule.endTime,
+      daysOfWeek: rule.daysOfWeek,
+      allowVipContacts: rule.allowVipContacts,
+      createdAt: DateTime.now(),
+    );
+
+    _ruleTemplates.add(newTemplate);
+    return true;
+  }
+
+  /// Deletes a custom rule template by [templateId] (cannot delete pre-seeded default).
+  Future<void> deleteRuleTemplate(String templateId) async {
+    if (templateId == RuleTemplate.defaultWorkFocus.id) return;
+    _ruleTemplates.removeWhere((t) => t.id == templateId);
     await _persist();
   }
 
@@ -298,41 +390,35 @@ class ScheduleRepository extends ChangeNotifier {
   }
 
   /// Gets any active temporary override for [appId] (checking per-app first, then global).
-  TemporaryOverride? getOverrideForApp(String appId, [DateTime? targetDateTime]) {
-    final dt = targetDateTime ?? DateTime.now();
-    final appOverride = _overrides[appId];
-    if (appOverride != null) {
-      if (appOverride.isActiveAt(dt)) {
-        return appOverride;
-      } else if (appOverride.endDateTime.isBefore(dt)) {
-        _overrides.remove(appId);
-      }
+  TemporaryOverride? getActiveOverride(String appId) {
+    final now = DateTime.now();
+
+    final appOv = _overrides[appId];
+    if (appOv != null && appOv.isActiveAt(now)) {
+      return appOv;
     }
 
-    for (final globalKey in _globalOverrideKeys) {
-      final globalOverride = _overrides[globalKey];
-      if (globalOverride != null) {
-        if (globalOverride.isActiveAt(dt)) {
-          return globalOverride;
-        } else if (globalOverride.endDateTime.isBefore(dt)) {
-          _overrides.remove(globalKey);
-        }
-      }
+    final globalMute = _overrides['global_mute'];
+    if (globalMute != null && globalMute.isActiveAt(now)) {
+      return globalMute;
     }
+
+    final globalAllow = _overrides['global_allow'];
+    if (globalAllow != null && globalAllow.isActiveAt(now)) {
+      return globalAllow;
+    }
+
+    final globalGeneric = _overrides['global'];
+    if (globalGeneric != null && globalGeneric.isActiveAt(now)) {
+      return globalGeneric;
+    }
+
     return null;
   }
 
-  /// Evaluates the current state of an application.
-  ScheduleDecision evaluateApp(ManagedApp app, [DateTime? targetDateTime]) {
-    final dt = targetDateTime ?? DateTime.now();
-    final override = getOverrideForApp(app.id, dt);
-    final appRules = getRulesForApp(app.id);
-    return _evaluator.evaluate(
-      app: app,
-      schedules: appRules,
-      override: override,
-      currentDateTime: dt,
-    );
+  /// Alias for getActiveOverride with optional targetDateTime support.
+  TemporaryOverride? getOverrideForApp(String appId, [DateTime? targetDateTime]) {
+    return getActiveOverride(appId);
   }
 
   /// Evaluates an application by its [appId].
@@ -350,9 +436,21 @@ class ScheduleRepository extends ChangeNotifier {
     return evaluateApp(app, targetDateTime);
   }
 
-  /// Calculates counts of currently managed, blocked, and allowed apps.
-  ({int total, int blocked, int allowed}) getSummary([DateTime? targetDateTime]) {
-    final dt = targetDateTime ?? DateTime.now();
+  /// Evaluates the decision for [app] at [dateTime].
+  ScheduleDecision evaluateApp(ManagedApp app, [DateTime? dateTime]) {
+    final dt = dateTime ?? DateTime.now();
+    final override = getActiveOverride(app.id);
+    return _evaluator.evaluate(
+      app: app,
+      schedules: _schedules,
+      override: override,
+      currentDateTime: dt,
+    );
+  }
+
+  /// Helper to calculate current active focus metrics.
+  ({int total, int blocked, int allowed}) getMetrics([DateTime? dateTime]) {
+    final dt = dateTime ?? DateTime.now();
     int blockedCount = 0;
     int allowedCount = 0;
 
@@ -372,15 +470,21 @@ class ScheduleRepository extends ChangeNotifier {
     return (total: _managedApps.length, blocked: blockedCount, allowed: allowedCount);
   }
 
-  /// Exports active rules and managed applications as a formatted .notiflow JSON payload.
+  /// Alias for getMetrics.
+  ({int total, int blocked, int allowed}) getSummary([DateTime? targetDateTime]) {
+    return getMetrics(targetDateTime);
+  }
+
+  /// Exports active rules, templates, and managed applications as a formatted .notiflow JSON payload.
   String exportRulesJson() {
     final payload = {
       'app': 'Notiflow',
-      'version': '1.5.0',
+      'version': '1.6.0',
       'format': 'notiflow-backup-v1',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'managedApps': _managedApps.map((a) => a.toJson()).toList(),
       'schedules': _schedules.map((r) => r.toJson()).toList(),
+      'ruleTemplates': _ruleTemplates.map((t) => t.toJson()).toList(),
       'unmanagedAppsUntouched': _unmanagedAppsUntouched,
       'vipEmergencyBypass': _vipEmergencyBypass,
       'defaultScheduleMode': _defaultScheduleMode,
@@ -415,7 +519,7 @@ class ScheduleRepository extends ChangeNotifier {
   }
 
   /// Imports and validates a .notiflow JSON string.
-  /// Returns true if rules were successfully restored.
+  /// Restores apps, schedules, and ruleTemplates seamlessly with backward compatibility.
   Future<bool> importRulesJson(String rawJson, {bool replaceAll = true}) async {
     try {
       final sanitized = rawJson.trim().replaceFirst(RegExp(r'^\uFEFF'), '');
@@ -426,8 +530,9 @@ class ScheduleRepository extends ChangeNotifier {
 
       final List<dynamic>? appsList = decoded['managedApps'] as List<dynamic>?;
       final List<dynamic>? schedulesList = decoded['schedules'] as List<dynamic>?;
+      final List<dynamic>? templatesList = decoded['ruleTemplates'] as List<dynamic>?;
 
-      if (appsList == null && schedulesList == null) {
+      if (appsList == null && schedulesList == null && templatesList == null) {
         return false;
       }
 
@@ -439,9 +544,16 @@ class ScheduleRepository extends ChangeNotifier {
           ? schedulesList.map((e) => ScheduleRule.fromJson(Map<String, dynamic>.from(e as Map))).toList()
           : <ScheduleRule>[];
 
+      final importedTemplates = templatesList != null
+          ? templatesList.map((e) => RuleTemplate.fromJson(Map<String, dynamic>.from(e as Map))).toList()
+          : <RuleTemplate>[];
+
       if (replaceAll) {
         _managedApps = importedApps;
         _schedules = importedSchedules;
+        if (importedTemplates.isNotEmpty) {
+          _ruleTemplates = importedTemplates;
+        }
         _overrides.clear();
       } else {
         for (final app in importedApps) {
@@ -454,6 +566,24 @@ class ScheduleRepository extends ChangeNotifier {
             _schedules.add(rule);
           }
         }
+        for (final tmpl in importedTemplates) {
+          if (!_ruleTemplates.any((t) =>
+              t.id == tmpl.id ||
+              t.matchesConfiguration(
+                targetMode: tmpl.mode,
+                targetStartTime: tmpl.startTime,
+                targetEndTime: tmpl.endTime,
+                targetDaysOfWeek: tmpl.daysOfWeek,
+              ))) {
+            _ruleTemplates.add(tmpl);
+          }
+        }
+      }
+
+      // Always ensure the default pre-seeded template exists
+      if (_ruleTemplates.isEmpty ||
+          !_ruleTemplates.any((t) => t.id == RuleTemplate.defaultWorkFocus.id)) {
+        _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
       }
 
       if (decoded.containsKey('unmanagedAppsUntouched')) {
@@ -509,6 +639,9 @@ class ScheduleRepository extends ChangeNotifier {
 
     final rulesJson = jsonEncode(_schedules.map((r) => r.toJson()).toList());
     await prefs.setString(_keySchedules, rulesJson);
+
+    final templatesJson = jsonEncode(_ruleTemplates.map((t) => t.toJson()).toList());
+    await prefs.setString(_keyRuleTemplates, templatesJson);
 
     final overridesJson = jsonEncode(_overrides.values.map((o) => o.toJson()).toList());
     await prefs.setString(_keyOverrides, overridesJson);
