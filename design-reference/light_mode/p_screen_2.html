@@ -1,0 +1,162 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Notiflow - Notification Access Required</title>
+<!-- Google Fonts: Newsreader (Editorial Serif) & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS CDN with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              bg: '#fcf8f5',
+              terracotta: '#b85d19',
+              'terracotta-dark': '#9e4e13',
+              'terracotta-light': '#fceddf',
+              text: '#1f2421',
+              muted: '#606462',
+              border: '#f0e8e2',
+              pill: '#f5ebe1',
+              warning: '#fff9ed',
+              'warning-border': '#fae8c8'
+            }
+          },
+          fontFamily: {
+            serif: ['Newsreader', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          boxShadow: {
+            'warm-sm': '0 2px 8px -2px rgba(184, 93, 25, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03)',
+            'warm-card': '0 8px 24px -4px rgba(130, 80, 40, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+            'warm-btn': '0 6px 20px -2px rgba(184, 93, 25, 0.35)',
+          }
+        }
+      }
+    }
+  </script>
+<!-- Typography and baseline styles -->
+<style data-purpose="typography">
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: #fcf8f5;
+      color: #1f2421;
+    }
+    .font-editorial {
+      font-family: 'Newsreader', Georgia, serif;
+      letter-spacing: -0.02em;
+    }
+  </style>
+</head>
+<body class="bg-[#fcf8f5] text-[#1f2421] min-h-screen flex justify-center selection:bg-[#fceddf]">
+<!-- Mobile Viewport Container -->
+<div class="w-full max-w-md min-h-screen flex flex-col justify-between px-6 pb-8 sm:py-10 pt-6">
+<!-- Top Content Area -->
+<div class="flex flex-col">
+<!-- BEGIN: HeaderSection -->
+<header class="flex items-center justify-between mb-4" data-purpose="brand-and-step-header">
+<!-- Brand Identity: Icon + App Name & Tagline -->
+<div class="flex items-center gap-3">
+<!-- Squircle Shield Brand Icon -->
+
+<div class="flex flex-col">
+<span class="text-xl font-bold tracking-tight text-[#1a1c1e] leading-none">Notiflow</span>
+
+</div>
+</div>
+<!-- Step Indicator Pill -->
+<div class="px-3 py-1.5 rounded-full bg-[#f4e8dc] text-[#a45d25] text-xs font-semibold tracking-wider uppercase border border-[#ebd8c6]">
+          Step 2 of 3
+        </div>
+</header>
+<!-- END: HeaderSection -->
+<!-- BEGIN: TitleAndIntro -->
+<section class="mb-6" data-purpose="title-and-description">
+<h1 class="font-editorial text-[38px] leading-[1.12] font-medium text-[#181a1b] mb-3">
+          Notification Access is required
+        </h1>
+<p class="text-[15px] leading-relaxed text-[#595e5b] font-normal">
+          To silently filter notifications outside your chosen schedules, Android requires Notification Access permission for Notiflow.
+        </p>
+</section>
+<!-- END: TitleAndIntro -->
+<!-- BEGIN: InstructionsCard -->
+<section class="bg-white rounded-3xl p-5 border border-[#eee4dc] shadow-warm-card mb-4" data-purpose="instruction-steps">
+<div class="space-y-4">
+<!-- Step 1 -->
+<div class="flex items-start gap-4">
+<div class="w-8 h-8 rounded-full bg-[#faedd9] text-[#b85d19] border border-[#f3d9b8] flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+              1
+            </div>
+<div class="flex-1 min-w-0">
+<h2 class="text-base font-bold text-[#1f2421] leading-snug">Open Android Settings</h2>
+<p class="text-sm text-[#666c68] leading-normal mt-0.5">Directs to phone's Device &amp; app notifications</p>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-[1px] bg-[#f5ece5] ml-12"></div>
+<!-- Step 2 -->
+<div class="flex items-start gap-4">
+<div class="w-8 h-8 rounded-full bg-[#faedd9] text-[#b85d19] border border-[#f3d9b8] flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+              2
+            </div>
+<div class="flex-1 min-w-0">
+<h2 class="text-base font-bold text-[#1f2421] leading-snug">Find “Notiflow”</h2>
+<p class="text-sm text-[#666c68] leading-normal mt-0.5">Locate Notiflow in the listener list</p>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-[1px] bg-[#f5ece5] ml-12"></div>
+<!-- Step 3 -->
+<div class="flex items-start gap-4">
+<div class="w-8 h-8 rounded-full bg-[#faedd9] text-[#b85d19] border border-[#f3d9b8] flex items-center justify-center font-bold text-sm shrink-0 mt-0.5">
+              3
+            </div>
+<div class="flex-1 min-w-0">
+<h2 class="text-base font-bold text-[#1f2421] leading-snug">Switch Toggle to ON</h2>
+<p class="text-sm text-[#666c68] leading-normal mt-0.5">Accept the Android system dialog</p>
+</div>
+</div>
+</div>
+</section>
+<!-- END: InstructionsCard -->
+<!-- BEGIN: RestrictedSettingsWarning -->
+
+<!-- END: RestrictedSettingsWarning -->
+</div>
+<!-- BEGIN: ActionButtons -->
+<footer class="pt-6 flex flex-col items-center gap-3 w-full" data-purpose="navigation-actions">
+<!-- Primary Open Settings Button -->
+<button class="w-full py-4 px-6 rounded-2xl bg-brand-terracotta hover:bg-brand-terracotta-dark text-white font-semibold text-base flex items-center justify-center gap-2 shadow-warm-btn active:scale-[0.98] transition-all duration-150" type="button" style="background-color: rgb(211, 163, 115); color: rgb(91, 58, 18);">
+<span>Open Android Settings</span>
+<!-- Slanted Arrow Icon -->
+<svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<path d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Secondary Skip / Rule Setup Link -->
+<button class="py-2.5 px-4 text-sm font-semibold text-[#5a5f5c] hover:text-[#2a2d2c] transition-colors" type="button">
+        Continue to Rule Setup
+      </button>
+</footer>
+<!-- END: ActionButtons -->
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>

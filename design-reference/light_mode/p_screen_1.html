@@ -1,0 +1,244 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<title>Notiflow - Sovereign Protocol Onboarding</title>
+<!-- Google Fonts: Newsreader & Plus Jakarta Sans -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS CDN with Forms & Container Queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['Newsreader', 'Georgia', 'serif'],
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            earth: {
+              50: '#fdfbf9',
+              100: '#faf6f0',
+              200: '#f4ede4',
+              300: '#e8ded2',
+              400: '#d7c4af',
+              500: '#c2a487',
+              600: '#b86e3b', // Deep terracotta accent
+              700: '#9d5a2d',
+              800: '#7e4825',
+              900: '#643920',
+            },
+            terracotta: {
+              DEFAULT: '#b86e3b',
+              light: '#f5ebe2',
+              hover: '#a35f30',
+              pill: '#faede3',
+            },
+            sage: {
+              50: '#f6f7f3',
+              100: '#ecf0e6',
+              200: '#dbe3d2',
+              300: '#c5d3b8',
+              400: '#a6bc94',
+            },
+            charcoal: {
+              DEFAULT: '#272320',
+              muted: '#625c56',
+              subtle: '#8f8880',
+            }
+          },
+          boxShadow: {
+            'botanical': '0 4px 20px -2px rgba(184, 110, 59, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03)',
+            'btn-shadow': '0 8px 24px -4px rgba(184, 110, 59, 0.35)',
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Styling -->
+<style data-purpose="base-styling">
+    body {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: #faf7f2;
+      color: #272320;
+    }
+    /* iOS Momentum Scrolling & safe areas */
+    .ios-scroll {
+      -webkit-overflow-scrolling: touch;
+    }
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 24px);
+    }
+    .pt-safe {
+      padding-top: env(safe-area-inset-top, 16px);
+    }
+  </style>
+<!-- END: Custom Styling -->
+</head>
+<body class="bg-[#faf7f2] text-charcoal font-sans antialiased min-h-screen flex justify-center selection:bg-terracotta/20">
+<!-- Mobile iOS Frame Wrapper -->
+<div class="w-full max-w-md bg-[#faf7f2] min-h-screen flex flex-col justify-between relative shadow-2xl overflow-hidden border-x border-[#f0e8de]/60">
+<!-- Top Status Bar Simulation on iOS -->
+
+<!-- Main Scrollable Content Area -->
+<main class="flex-1 ios-scroll overflow-y-auto px-6 pb-6 pt-6">
+<!-- BEGIN: AppHeader -->
+<header class="flex items-center justify-between mb-8">
+<!-- Logo Squircle & Brand Info -->
+<div class="flex items-center gap-3">
+
+<div>
+<h1 class="text-lg font-bold tracking-tight text-charcoal leading-tight">Notiflow</h1>
+
+</div>
+</div>
+<!-- Step Indicator Pill -->
+<div class="px-3 py-1 rounded-full bg-[#f3eae0] border border-[#e8ded2]/80 text-[11px] font-bold text-terracotta tracking-wider uppercase">
+          Step 1 of 3
+        </div>
+</header>
+<!-- END: AppHeader -->
+<!-- BEGIN: HeroHeadlineSection -->
+<section class="mb-6">
+<h2 class="font-serif text-[34px] leading-[1.12] text-charcoal font-medium tracking-tight mb-3">
+          Take back control <br class="hidden xs:inline">of your attention
+        </h2>
+<p class="text-[15px] leading-relaxed text-charcoal-muted font-normal">
+          Silence distracting notifications on your schedule while letting critical alerts reach you.
+        </p>
+</section>
+<!-- END: HeroHeadlineSection -->
+<!-- BEGIN: ProtocolMetricsBar -->
+
+<!-- END: ProtocolMetricsBar -->
+<!-- BEGIN: FeatureCardsList -->
+<section class="space-y-3.5" data-purpose="core-features"><!-- Feature Card 1: Precision Scheduling -->
+<article class="group relative rounded-2xl p-[1px] bg-gradient-to-b from-white via-[#f4ece3] to-[#e8ded2] shadow-[0_10px_25px_-5px_rgba(184,110,59,0.12),0_4px_10px_-2px_rgba(0,0,0,0.03)] transition-all duration-200 active:scale-[0.99] overflow-hidden">
+  <div class="rounded-[15px] p-4 bg-gradient-to-br from-white via-[#fdfbf9] to-[#faf5ee] relative overflow-hidden">
+    <!-- Subtle ambient warm background glow -->
+    <div class="absolute -left-6 -top-6 w-28 h-28 bg-[#f0bd8b]/20 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-gradient-to-br from-[#edd5c0]/30 to-transparent rounded-full blur-xl pointer-events-none"></div>
+    <div class="flex items-start gap-3.5 relative">
+      <!-- Sculpted 3D Medallion Icon -->
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#faf0e6] via-[#f7e4d2] to-[#edd0b8] border border-white/80 flex items-center justify-center shrink-0 text-[#b86e3b] shadow-[0_4px_12px_rgba(184,110,59,0.18),inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_2px_rgba(184,110,59,0.2)] mt-0.5">
+        <svg class="w-5 h-5 stroke-[2] fill-none stroke-current drop-shadow-sm" viewBox="0 0 24 24">
+          <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"></path>
+          <circle cx="8" cy="6" fill="#faede3" r="2"></circle>
+          <circle cx="16" cy="12" fill="#faede3" r="2"></circle>
+          <circle cx="10" cy="18" fill="#faede3" r="2"></circle>
+        </svg>
+      </div>
+      <!-- Content & Tag -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <h3 class="font-bold text-[15px] text-[#272320] tracking-tight leading-snug">Precision Scheduling</h3>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-[0.08em] uppercase bg-[#faede3] text-[#b86e3b] border border-[#eedbcc] shadow-[0_1px_2px_rgba(184,110,59,0.08)]">
+            RULES
+          </span>
+        </div>
+        <p class="text-[13px] leading-relaxed text-[#625c56]">
+          Set custom silent windows for specific distracting apps. Overnights, weekdays, or weekend shifts handled automatically.
+        </p>
+      </div>
+    </div>
+  </div>
+</article>
+
+<!-- Feature Card 2: 100% On-Device Privacy -->
+<article class="group relative rounded-2xl p-[1px] bg-gradient-to-b from-white via-[#eaf0e4] to-[#dde5d6] shadow-[0_10px_25px_-5px_rgba(85,113,64,0.12),0_4px_10px_-2px_rgba(0,0,0,0.03)] transition-all duration-200 active:scale-[0.99] overflow-hidden">
+  <div class="rounded-[15px] p-4 bg-gradient-to-br from-white via-[#fbfdfa] to-[#f4f7f1] relative overflow-hidden">
+    <!-- Subtle ambient botanical sage glow -->
+    <div class="absolute -left-6 -top-6 w-28 h-28 bg-[#c2cba4]/25 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-gradient-to-br from-[#cedec3]/30 to-transparent rounded-full blur-xl pointer-events-none"></div>
+    <div class="flex items-start gap-3.5 relative">
+      <!-- Sculpted 3D Medallion Icon -->
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#f2f7ef] via-[#e5ede0] to-[#d6e2cf] border border-white/80 flex items-center justify-center shrink-0 text-[#557140] shadow-[0_4px_12px_rgba(85,113,64,0.18),inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_2px_rgba(85,113,64,0.2)] mt-0.5">
+        <svg class="w-5 h-5 stroke-[2] fill-none stroke-current drop-shadow-sm" viewBox="0 0 24 24">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </div>
+      <!-- Content & Tag -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <h3 class="font-bold text-[15px] text-[#272320] tracking-tight leading-snug">100% On-Device Privacy</h3>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-[0.08em] uppercase bg-[#eff4eb] text-[#557140] border border-[#d6e0ce] shadow-[0_1px_2px_rgba(85,113,64,0.08)]">
+            OFFLINE
+          </span>
+        </div>
+        <p class="text-[13px] leading-relaxed text-[#625c56]">
+          Zero cloud servers, zero analytics. Notiflow operates without an internet permission manifest, keeping all data on your phone.
+        </p>
+      </div>
+    </div>
+  </div>
+</article>
+
+<!-- Feature Card 3: Unmanaged Apps Untouched -->
+<article class="group relative rounded-2xl p-[1px] bg-gradient-to-b from-white via-[#f5ede4] to-[#e8ded2] shadow-[0_10px_25px_-5px_rgba(184,110,59,0.12),0_4px_10px_-2px_rgba(0,0,0,0.03)] transition-all duration-200 active:scale-[0.99] overflow-hidden">
+  <div class="rounded-[15px] p-4 bg-gradient-to-br from-white via-[#fdfbf9] to-[#faf5ee] relative overflow-hidden">
+    <!-- Subtle ambient golden radiant glow -->
+    <div class="absolute -left-6 -top-6 w-28 h-28 bg-[#f0bd8b]/20 rounded-full blur-2xl pointer-events-none"></div>
+    <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-gradient-to-br from-[#edd5c0]/30 to-transparent rounded-full blur-xl pointer-events-none"></div>
+    <div class="flex items-start gap-3.5 relative">
+      <!-- Sculpted 3D Medallion Icon -->
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-b from-[#faf0e6] via-[#f7e2ce] to-[#edd0b8] border border-white/80 flex items-center justify-center shrink-0 text-[#b86e3b] shadow-[0_4px_12px_rgba(184,110,59,0.18),inset_0_1px_1px_rgba(255,255,255,0.9),inset_0_-1px_2px_rgba(184,110,59,0.2)] mt-0.5">
+        <svg class="w-5 h-5 stroke-[2] fill-none stroke-current drop-shadow-sm" viewBox="0 0 24 24">
+          <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </div>
+      <!-- Content & Tag -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2 mb-1.5">
+          <h3 class="font-bold text-[15px] text-[#272320] tracking-tight leading-snug">Unmanaged Apps Untouched</h3>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-[0.08em] uppercase bg-[#faede3] text-[#b86e3b] border border-[#eedbcc] shadow-[0_1px_2px_rgba(184,110,59,0.08)]">
+            BYPASS
+          </span>
+        </div>
+        <p class="text-[13px] leading-relaxed text-[#625c56]">
+          Non-configured apps bypass the gate instantly without interference, delay, or battery drain.
+        </p>
+      </div>
+    </div>
+  </div>
+</article></section>
+<!-- END: FeatureCardsList -->
+</main>
+<!-- BEGIN: BottomCTA -->
+<footer class="p-6 pt-3 bg-gradient-to-t from-[#faf7f2] via-[#faf7f2] to-transparent pb-safe">
+<button class="w-full hover:bg-[#a65f2f] active:bg-[#945227] font-medium text-[16px] py-4 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-btn-shadow transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-terracotta/40 focus:ring-offset-2" data-purpose="continue-action-button" type="button" style="background-color: rgb(211, 163, 115); color: rgb(91, 58, 18);">
+<span class="font-semibold tracking-wide">Get Started</span>
+<!-- Right Arrow Icon -->
+<svg class="w-4 h-4 stroke-[2.5] stroke-current fill-none transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24">
+<path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Home Indicator bar on modern iOS devices -->
+
+</footer>
+<!-- END: BottomCTA -->
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>
