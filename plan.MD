@@ -146,6 +146,19 @@
 - **App-Wide Adoption**: Dynamically updates the time representation on App Details schedule cards, Rule Editor pickers, and Activity logs.
 - **Persistence & Portability**: Saved in `SharedPreferences` (`pref_use_24_hour_format`) and bundled into single `.notiflow` backup files.
 
+### 2.11. Material You Themed App Icon for Device Home Screen & App Drawer
+- **Implementation**: Configure `<monochrome android:drawable="@drawable/ic_launcher_monochrome" />` in Android's adaptive icon XML (`mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml`).
+- **Dynamic Behavior**: On Android 13+ (API 33+) devices, the launcher icon in the home screen and app drawer dynamically switches between Light Mode (light background with dark emblem) and Dark Mode (dark background with light emblem) automatically following system appearance.
+
+### 2.12. First-Launch Theme Sync & Explicit User Preference Retention
+- **Initial Install / First Launch**:
+  - No user preference stored yet (`pref_theme_mode == null`).
+  - The app strictly follows the **device's current system appearance** (`ThemeMode.system`).
+  - If the user's device is in Light Mode, Notiflow opens in Botanical Sanctuary (Light). If in Dark Mode, it opens in Botanical Nocturne (Dark).
+- **Subsequent Sessions (Explicit User Preference)**:
+  - The moment the user explicitly taps the header theme switch, Notiflow records an explicit preference (`'light'` or `'dark'`) in `SharedPreferences`.
+  - From the second session onward, the app strictly obeys the **user's explicit choice** across all app restarts, ignoring subsequent device system theme changes until changed again by the user.
+
 ---
 
 ## 3. Phased Roadmap
@@ -184,6 +197,8 @@
 6. `SettingsScreen`: Seamless styling, encrypted storage summary cards, update status tile.
 7. `Smart Backup Import`: Detection of uninstalled apps with user modal ("Keep in Vault & Auto-Apply on Install" vs "Exclude").
 8. `Urgent Call Escalation Fix`: Native fix in `NotificationHandlerListenerService.kt` and `NativeScheduleStore.kt` for repeated calls within 3 minutes.
+9. `Material You Themed App Icon`: Add `<monochrome>` adaptive icon layer so the Android home screen & app drawer launcher icon dynamically switches between Light and Dark mode on Android 13+.
+10. `First-Launch Theme Sync & User Override`: Initial launch strictly follows device system appearance, but once the user toggles a theme, persist the explicit preference to always override device theme.
 
 ### Phase 4: Onboarding Streamlining
 1. Step 1: 3 feature cards (RULES, OFFLINE, BYPASS).
