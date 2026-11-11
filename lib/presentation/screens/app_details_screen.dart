@@ -503,7 +503,7 @@ class AppDetailsScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      '${rule.startTime.format12Hour()} → ${rule.endTime.format12Hour()}',
+                                      '${repository.formatTime(rule.startTime)} → ${repository.formatTime(rule.endTime)}',
                                       style: GoogleFonts.plusJakartaSans(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w700,

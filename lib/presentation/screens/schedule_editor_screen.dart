@@ -203,9 +203,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   }
 
   String _formatTimeDisplay(int hour, int minute) {
-    final h = hour.toString().padLeft(2, '0');
-    final m = minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    return widget.repository.formatTimeOfDay(hour, minute);
   }
 
   @override
@@ -333,7 +331,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '${tmpl.startTime.format24Hour()}-${tmpl.endTime.format24Hour()}',
+                                    '${widget.repository.formatTime(tmpl.startTime)} - ${widget.repository.formatTime(tmpl.endTime)}',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 12,
                                       color: textMuted,

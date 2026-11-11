@@ -873,6 +873,119 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                         ],
                       ),
                     ),
+                    Divider(height: 1, color: borderCol),
+
+                    // Time Format Preference (12-Hour vs 24-Hour)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: cardBgLow,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(Icons.schedule_rounded, size: 20, color: amber),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Time Display Format',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: textMain,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Display schedules and activity in 12-hour or 24-hour time.',
+                                      style: GoogleFonts.inter(fontSize: 12, color: textMuted, height: 1.3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => widget.repository.setUse24HourFormat(false),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    padding: const EdgeInsets.symmetric(vertical: 9),
+                                    decoration: BoxDecoration(
+                                      color: !widget.repository.use24HourFormat
+                                          ? (isDark ? amber.withValues(alpha: 0.2) : amber.withValues(alpha: 0.15))
+                                          : cardBgLow,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: !widget.repository.use24HourFormat ? amber : borderCol,
+                                        width: !widget.repository.use24HourFormat ? 1.5 : 1.0,
+                                      ),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '12-Hour (09:00 AM)',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        fontWeight: !widget.repository.use24HourFormat
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
+                                        color: !widget.repository.use24HourFormat ? amber : textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => widget.repository.setUse24HourFormat(true),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    padding: const EdgeInsets.symmetric(vertical: 9),
+                                    decoration: BoxDecoration(
+                                      color: widget.repository.use24HourFormat
+                                          ? (isDark ? amber.withValues(alpha: 0.2) : amber.withValues(alpha: 0.15))
+                                          : cardBgLow,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: widget.repository.use24HourFormat ? amber : borderCol,
+                                        width: widget.repository.use24HourFormat ? 1.5 : 1.0,
+                                      ),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      '24-Hour (09:00)',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        fontWeight: widget.repository.use24HourFormat
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
+                                        color: widget.repository.use24HourFormat ? amber : textMuted,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

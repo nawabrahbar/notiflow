@@ -98,6 +98,7 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
   - **Multiple Schedules per App**: Full support for attaching multiple active schedules to a single app with independent monitoring switches.
   - **Unified `.notiflow` Backup**: Single backup file format bundling rule templates alongside managed apps and schedules with 100% backward compatibility.
   - **Google Play In-App Updates**: Added zero-network In-App Update checker via Play Core IPC (`in_app_update`), maintaining strict 100% on-device privacy with **zero `INTERNET` permission** in [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml).
+  - **12-Hour vs 24-Hour Time Format Option**: Added configurable time display preference under Settings, instantly updating schedule cards, dropdown templates, and activity logs across the entire app.
   - **Phone & Tablet Form Factors**: Restricted supported screen targets exclusively to Phone and Tablet devices.
 - **v1.5.4 (`+9`) — Direct Permission Deep-Link, Auto-Return & Clean Play Store Onboarding**:
   - Removed the *"Sideloaded APK blocked on Android 13+?"* and *"Allow Restricted Settings"* cards from [`onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) and [`permission_screen.dart`](lib/presentation/screens/permission_screen.dart) for a clean Play Store onboarding experience.

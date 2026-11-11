@@ -139,6 +139,13 @@
     - **Call 2 (within 180 seconds from same caller)**: Recognize repeated urgent call, bypass suppression, and allow the call to ring through!
     - **Outside 3 minutes**: Reset timestamp and treat as Call 1.
 
+### 2.10. 12-Hour vs 24-Hour Time Display Preference
+- **Feature**: Under Settings > Triage & Automation Preferences, users can toggle between:
+  - **12-Hour format** (e.g. `09:00 AM`, `05:00 PM`)
+  - **24-Hour format** (e.g. `09:00`, `17:00`)
+- **App-Wide Adoption**: Dynamically updates the time representation on App Details schedule cards, Rule Editor pickers, and Activity logs.
+- **Persistence & Portability**: Saved in `SharedPreferences` (`pref_use_24_hour_format`) and bundled into single `.notiflow` backup files.
+
 ---
 
 ## 3. Phased Roadmap

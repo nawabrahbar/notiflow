@@ -22,6 +22,7 @@ class ScheduleRepository extends ChangeNotifier {
   static const String _keyUnmanagedUntouched = 'pref_unmanaged_untouched';
   static const String _keyVipBypass = 'pref_vip_bypass';
   static const String _keyDefaultScheduleMode = 'pref_default_schedule_mode';
+  static const String _keyUse24HourFormat = 'pref_use_24_hour_format';
 
   final NotificationPlatformInterface _platformService;
   final ScheduleEvaluator _evaluator;
@@ -34,6 +35,7 @@ class ScheduleRepository extends ChangeNotifier {
   bool _unmanagedAppsUntouched = true;
   bool _vipEmergencyBypass = true;
   String _defaultScheduleMode = 'allow';
+  bool _use24HourFormat = false;
   bool _isInitialized = false;
 
   ScheduleRepository({
@@ -45,10 +47,21 @@ class ScheduleRepository extends ChangeNotifier {
   bool get unmanagedAppsUntouched => _unmanagedAppsUntouched;
   bool get vipEmergencyBypass => _vipEmergencyBypass;
   String get defaultScheduleMode => _defaultScheduleMode;
+  bool get use24HourFormat => _use24HourFormat;
   List<ManagedApp> get managedApps => List.unmodifiable(_managedApps);
   List<ScheduleRule> get schedules => List.unmodifiable(_schedules);
   List<RuleTemplate> get ruleTemplates => List.unmodifiable(_ruleTemplates);
   List<RuleTemplate> get savedTemplates => ruleTemplates;
+
+  /// Formats a [TimeOfDayValue] adhering to the user's 12h or 24h preference.
+  String formatTime(TimeOfDayValue time) {
+    return _use24HourFormat ? time.format24Hour() : time.format12Hour();
+  }
+
+  /// Formats raw hour and minute adhering to the user's 12h or 24h preference.
+  String formatTimeOfDay(int hour, int minute) {
+    return formatTime(TimeOfDayValue(hour: hour, minute: minute));
+  }
 
   List<TemporaryOverride> get overrides {
     final now = DateTime.now();
@@ -103,11 +116,20 @@ class ScheduleRepository extends ChangeNotifier {
     _unmanagedAppsUntouched = prefs.getBool(_keyUnmanagedUntouched) ?? true;
     _vipEmergencyBypass = prefs.getBool(_keyVipBypass) ?? true;
     _defaultScheduleMode = prefs.getString(_keyDefaultScheduleMode) ?? 'allow';
+    _use24HourFormat = prefs.getBool(_keyUse24HourFormat) ?? false;
 
     _isInitialized = true;
     notifyListeners();
 
     await _syncToNative();
+  }
+
+  /// Updates whether 24-hour time format is used across the app.
+  Future<void> setUse24HourFormat(bool value) async {
+    _use24HourFormat = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyUse24HourFormat, value);
+    notifyListeners();
   }
 
   /// Updates whether unmanaged apps pass through untouched.
@@ -488,6 +510,7 @@ class ScheduleRepository extends ChangeNotifier {
       'unmanagedAppsUntouched': _unmanagedAppsUntouched,
       'vipEmergencyBypass': _vipEmergencyBypass,
       'defaultScheduleMode': _defaultScheduleMode,
+      'use24HourFormat': _use24HourFormat,
     };
     return const JsonEncoder.withIndent('  ').convert(payload);
   }
@@ -597,6 +620,9 @@ class ScheduleRepository extends ChangeNotifier {
         if (mode == 'allow' || mode == 'block') {
           _defaultScheduleMode = mode!;
         }
+      }
+      if (decoded.containsKey('use24HourFormat')) {
+        _use24HourFormat = decoded['use24HourFormat'] as bool? ?? false;
       }
 
       await _persist();
