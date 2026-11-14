@@ -498,7 +498,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
-                                  '${summary.interceptedCount}',
+                                  '${summary.blocked}',
                                   style: GoogleFonts.newsreader(
                                     fontSize: 32,
                                     fontWeight: FontWeight.w600,
@@ -571,7 +571,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
-                                  '${summary.permittedCount}',
+                                  '${summary.allowed}',
                                   style: GoogleFonts.newsreader(
                                     fontSize: 32,
                                     fontWeight: FontWeight.w600,
