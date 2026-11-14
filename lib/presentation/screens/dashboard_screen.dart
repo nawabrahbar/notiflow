@@ -452,7 +452,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                         // Intercepted (Muted)
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 14),
                             decoration: BoxDecoration(
                               color: container,
                               borderRadius: BorderRadius.circular(16),
@@ -466,28 +467,28 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Container(
-                                      width: 36,
-                                      height: 36,
+                                      width: 32,
+                                      height: 32,
                                       decoration: BoxDecoration(
                                         color: containerHigh,
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(Icons.notifications_off_rounded,
-                                          size: 18, color: textMuted),
+                                          size: 16, color: textMuted),
                                     ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
+                                          horizontal: 6, vertical: 2.5),
                                       decoration: BoxDecoration(
                                         color: primary.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
                                             color: primary.withOpacity(0.2)),
                                       ),
                                       child: Text(
                                         'MUTED',
                                         style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 10,
+                                          fontSize: 9.5,
                                           fontWeight: FontWeight.w800,
                                           color: primary,
                                           letterSpacing: 0.5,
@@ -523,7 +524,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                         // Permitted (Alerts)
                         Expanded(
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 14),
                             decoration: BoxDecoration(
                               color: container,
                               borderRadius: BorderRadius.circular(16),
@@ -537,30 +539,30 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Container(
-                                      width: 36,
-                                      height: 36,
+                                      width: 32,
+                                      height: 32,
                                       decoration: BoxDecoration(
                                         color: secContainer,
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
                                           Icons.notifications_active_rounded,
-                                          size: 18,
+                                          size: 16,
                                           color: onSecContainer),
                                     ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
+                                          horizontal: 6, vertical: 2.5),
                                       decoration: BoxDecoration(
                                         color: secContainer,
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
                                             color: secondary.withOpacity(0.2)),
                                       ),
                                       child: Text(
                                         'ALERTS',
                                         style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 10,
+                                          fontSize: 9.5,
                                           fontWeight: FontWeight.w800,
                                           color: onSecContainer,
                                           letterSpacing: 0.5,

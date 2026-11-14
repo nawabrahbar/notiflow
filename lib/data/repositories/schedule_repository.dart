@@ -418,26 +418,26 @@ class ScheduleRepository extends ChangeNotifier {
   }
 
   /// Gets any active temporary override for [appId] (checking per-app first, then global).
-  TemporaryOverride? getActiveOverride(String appId) {
-    final now = DateTime.now();
+  TemporaryOverride? getActiveOverride(String appId, [DateTime? targetDateTime]) {
+    final checkTime = targetDateTime ?? DateTime.now();
 
     final appOv = _overrides[appId];
-    if (appOv != null && appOv.isActiveAt(now)) {
+    if (appOv != null && appOv.isActiveAt(checkTime)) {
       return appOv;
     }
 
     final globalMute = _overrides['global_mute'];
-    if (globalMute != null && globalMute.isActiveAt(now)) {
+    if (globalMute != null && globalMute.isActiveAt(checkTime)) {
       return globalMute;
     }
 
     final globalAllow = _overrides['global_allow'];
-    if (globalAllow != null && globalAllow.isActiveAt(now)) {
+    if (globalAllow != null && globalAllow.isActiveAt(checkTime)) {
       return globalAllow;
     }
 
     final globalGeneric = _overrides['global'];
-    if (globalGeneric != null && globalGeneric.isActiveAt(now)) {
+    if (globalGeneric != null && globalGeneric.isActiveAt(checkTime)) {
       return globalGeneric;
     }
 
@@ -446,7 +446,7 @@ class ScheduleRepository extends ChangeNotifier {
 
   /// Alias for getActiveOverride with optional targetDateTime support.
   TemporaryOverride? getOverrideForApp(String appId, [DateTime? targetDateTime]) {
-    return getActiveOverride(appId);
+    return getActiveOverride(appId, targetDateTime);
   }
 
   /// Evaluates an application by its [appId].
@@ -467,7 +467,7 @@ class ScheduleRepository extends ChangeNotifier {
   /// Evaluates the decision for [app] at [dateTime].
   ScheduleDecision evaluateApp(ManagedApp app, [DateTime? dateTime]) {
     final dt = dateTime ?? DateTime.now();
-    final override = getActiveOverride(app.id);
+    final override = getActiveOverride(app.id, dt);
     return _evaluator.evaluate(
       app: app,
       schedules: _schedules,
@@ -661,17 +661,19 @@ class ScheduleRepository extends ChangeNotifier {
       final installed = await _platformService.getInstalledApplications();
       final installedPkgs = installed.map((a) => a.packageName).toSet();
 
-      if (excludeUninstalled) {
-        // Exclude uninstalled apps and their rules completely
-        importedApps.removeWhere((a) => !installedPkgs.contains(a.packageName));
-        final remainingAppIds = importedApps.map((a) => a.id).toSet();
-        importedSchedules.removeWhere((r) => !remainingAppIds.contains(r.appId));
-      } else if (vaultUninstalled) {
-        // Keep in vault & auto-apply when installed: mark isDormantVault: true so they are not shown on Rules page
-        for (int i = 0; i < importedApps.length; i++) {
-          final a = importedApps[i];
-          if (!installedPkgs.contains(a.packageName)) {
-            importedApps[i] = a.copyWith(isDormantVault: true);
+      if (installed.isNotEmpty) {
+        if (excludeUninstalled) {
+          // Exclude uninstalled apps and their rules completely
+          importedApps.removeWhere((a) => !installedPkgs.contains(a.packageName));
+          final remainingAppIds = importedApps.map((a) => a.id).toSet();
+          importedSchedules.removeWhere((r) => !remainingAppIds.contains(r.appId));
+        } else if (vaultUninstalled) {
+          // Keep in vault & auto-apply when installed: mark isDormantVault: true so they are not shown on Rules page
+          for (int i = 0; i < importedApps.length; i++) {
+            final a = importedApps[i];
+            if (!installedPkgs.contains(a.packageName)) {
+              importedApps[i] = a.copyWith(isDormantVault: true);
+            }
           }
         }
       }

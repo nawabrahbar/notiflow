@@ -250,12 +250,16 @@ class AppDetailsScreen extends StatelessWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Text(
-                                      isSilenced ? 'Currently Silenced' : 'Currently Permitted',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: textMain,
+                                    Flexible(
+                                      child: Text(
+                                        isSilenced ? 'Currently Silenced' : 'Currently Permitted',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: textMain,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -307,64 +311,67 @@ class AppDetailsScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _buildOverridePill(
-                          label: '15m Mute',
-                          isActive: override?.durationMinutes == 15,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(minutes: 15),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildOverridePill(
+                            label: '15m Mute',
+                            isActive: override?.durationMinutes == 15,
+                            onTap: () => repository.setTemporaryMute(
+                              appId: currentApp.id,
+                              duration: const Duration(minutes: 15),
+                            ),
+                            isDark: isDark,
+                            primaryCol: primaryCol,
+                            cardBg: cardBg,
+                            borderCol: borderCol,
+                            textMain: textMain,
                           ),
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildOverridePill(
-                          label: '30m Mute',
-                          isActive: override?.durationMinutes == 30,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(minutes: 30),
+                          const SizedBox(width: 8),
+                          _buildOverridePill(
+                            label: '30m Mute',
+                            isActive: override?.durationMinutes == 30,
+                            onTap: () => repository.setTemporaryMute(
+                              appId: currentApp.id,
+                              duration: const Duration(minutes: 30),
+                            ),
+                            isDark: isDark,
+                            primaryCol: primaryCol,
+                            cardBg: cardBg,
+                            borderCol: borderCol,
+                            textMain: textMain,
                           ),
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildOverridePill(
-                          label: '1h Mute',
-                          isActive: override?.durationMinutes == 60,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(hours: 1),
+                          const SizedBox(width: 8),
+                          _buildOverridePill(
+                            label: '1h Mute',
+                            isActive: override?.durationMinutes == 60,
+                            onTap: () => repository.setTemporaryMute(
+                              appId: currentApp.id,
+                              duration: const Duration(hours: 1),
+                            ),
+                            isDark: isDark,
+                            primaryCol: primaryCol,
+                            cardBg: cardBg,
+                            borderCol: borderCol,
+                            textMain: textMain,
                           ),
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildOverridePill(
-                          label: 'Today 24h',
-                          isActive: override?.durationMinutes == 1440,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(hours: 24),
+                          const SizedBox(width: 8),
+                          _buildOverridePill(
+                            label: 'Today 24h',
+                            isActive: override?.durationMinutes == 1440,
+                            onTap: () => repository.setTemporaryMute(
+                              appId: currentApp.id,
+                              duration: const Duration(hours: 24),
+                            ),
+                            isDark: isDark,
+                            primaryCol: primaryCol,
+                            cardBg: cardBg,
+                            borderCol: borderCol,
+                            textMain: textMain,
                           ),
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     if (override != null) ...[
                       const SizedBox(height: 8),
@@ -425,15 +432,20 @@ class AppDetailsScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Active Schedule Rules (${rules.length})',
-                          style: GoogleFonts.newsreader(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: textMain,
-                            letterSpacing: -0.2,
+                        Expanded(
+                          child: Text(
+                            'Active Schedule Rules (${rules.length})',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.newsreader(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: textMain,
+                              letterSpacing: -0.2,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         TextButton(
                           onPressed: () {
                             Navigator.push(
