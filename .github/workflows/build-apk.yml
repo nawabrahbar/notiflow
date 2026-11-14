@@ -38,15 +38,21 @@ jobs:
         run: flutter pub get
 
       - name: Run Flutter unit & widget tests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
-          flutter test --reporter expanded 2>&1 | tee test_log.txt
-          TEST_STATUS=${PIPESTATUS[0]}
-          if [ $TEST_STATUS -ne 0 ]; then
-            FAIL_SUMMARY=$(grep -E "(FAILED|══╡ EXCEPTION|Expected:|Actual:|Which:)" test_log.txt | head -n 30 | tr '\n' ' ' | cut -c 1-1000)
-            echo "::error title=Flutter Test Details::$FAIL_SUMMARY"
+          OUTPUT=$(flutter test --reporter expanded 2>&1)
+          STATUS=$?
+          if [ $STATUS -ne 0 ]; then
+            echo "$OUTPUT"
+            FAIL_SUMMARY=$(echo "$OUTPUT" | tail -n 80)
+            gh pr comment ${{ github.event.pull_request.number }} --body "### CI Test Failure Log
+\`\`\`
+$FAIL_SUMMARY
+\`\`\`" || true
+            exit $STATUS
           fi
-          exit $TEST_STATUS
 
       - name: Configure Release Signing Keystore
         env:
