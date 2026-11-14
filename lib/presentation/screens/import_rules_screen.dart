@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/schedule_repository.dart';
+import '../../domain/models/managed_app.dart';
 import '../../domain/models/rule_preset.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
@@ -354,10 +355,21 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
-        final sheetBg = isDark ? const Color(0xFF18181B) : Colors.white;
-        final textColor = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-        final subTextColor = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-        final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
+        final sheetBg = isDark
+            ? AppTheme.darkSurfaceContainerLow
+            : AppTheme.lightSurfaceContainerLow;
+        final textColor =
+            isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+        final subTextColor = isDark
+            ? AppTheme.darkOnSurfaceVariant
+            : AppTheme.lightOnSurfaceVariant;
+        final borderCol = isDark
+            ? AppTheme.darkOutlineVariant.withOpacity(0.3)
+            : AppTheme.lightOutlineVariant.withOpacity(0.35);
+        final primary =
+            isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+        final onPrimary =
+            isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnPrimary;
 
         return Padding(
           padding: EdgeInsets.only(
@@ -379,7 +391,9 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF3F3F46) : const Color(0xFFCBD5E1),
+                      color: isDark
+                          ? AppTheme.darkSurfaceContainerHigh
+                          : AppTheme.lightSurfaceContainerHigh,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -387,16 +401,16 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                 const SizedBox(height: 20),
                 Text(
                   'Import .notiflow Backup',
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                  style: GoogleFonts.newsreader(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
                     color: textColor,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Select a .notiflow file from device storage or paste your backup JSON content below.',
-                  style: GoogleFonts.inter(
+                  style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     color: subTextColor,
                     height: 1.4,
@@ -409,10 +423,13 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                     onPressed: () {
                       Navigator.pop(context, '__PICK_FILE__');
                     },
-                    icon: const Icon(Icons.folder_open_rounded, size: 18, color: Color(0xFFF59E0B)),
+                    icon: Icon(Icons.folder_open_rounded, size: 18, color: primary),
                     label: Text(
                       'Select .notiflow File from Storage',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: textColor),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: borderCol),
@@ -432,18 +449,20 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                   decoration: InputDecoration(
                     hintText: '{\n  "app": "Notiflow",\n  "schedules": [...]\n}',
                     hintStyle: GoogleFonts.jetBrainsMono(
-                      color: isDark ? const Color(0xFF52525B) : const Color(0xFF94A3B8),
+                      color: subTextColor.withOpacity(0.6),
                       fontSize: 12,
                     ),
                     filled: true,
-                    fillColor: isDark ? const Color(0xFF09090B) : const Color(0xFFF9F9FB),
+                    fillColor: isDark
+                        ? AppTheme.darkSurfaceContainerLowest
+                        : AppTheme.lightSurfaceContainerLowest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: borderCol),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+                      borderSide: BorderSide(color: primary, width: 1.5),
                     ),
                   ),
                 ),
@@ -461,7 +480,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                         ),
                         child: Text(
                           'Cancel',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
@@ -475,14 +494,14 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF59E0B),
-                          foregroundColor: const Color(0xFF09090B),
+                          backgroundColor: primary,
+                          foregroundColor: onPrimary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
                         child: Text(
                           'Restore JSON',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
                         ),
                       ),
                     ),
@@ -501,51 +520,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     }
 
     if (result != null && result.isNotEmpty) {
-      setState(() {
-        _isProcessing = true;
-        _statusMessage = null;
-      });
-
-      final success = await widget.repository.importRulesJson(result);
-      setState(() {
-        _isProcessing = false;
-        if (success) {
-          _statusMessage = 'Rules successfully restored from .notiflow backup!';
-          _isSuccessMessage = true;
-        } else {
-          _statusMessage = 'Invalid .notiflow backup format. Please verify JSON schema.';
-          _isSuccessMessage = false;
-        }
-      });
-
-      if (success) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Backup restored successfully!',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-              backgroundColor: AppTheme.signalSuccess,
-            ),
-          );
-        await _finishFlow();
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Invalid .notiflow backup format. Please verify JSON schema.',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-              backgroundColor: AppTheme.signalError,
-            ),
-          );
-      }
+      await _processBackupContent(result);
     }
   }
 

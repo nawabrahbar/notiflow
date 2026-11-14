@@ -91,9 +91,21 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 ## 📋 Changelog & Recent Updates
 
-- **v1.6.0 (`+10`) — Botanical Sanctuary Redesign, Rule Templates & Play In-App Updates**:
+- **v1.6.0 (`+10`) — Botanical Sanctuary Redesign, Rule Templates, Tablet Expansion & Native Hardening**:
   - **Botanical Sanctuary & Nocturne Redesign**: Warm Canvas (`#FEF8F6`) / Deep Forest (`#101412`), Terracotta (`#7D562D` / `#FCBC76`), and Sage Green (`#5A6242` / `#BECCA3`) with elegant Newsreader display serifs and Plus Jakarta Sans body typography.
-  - **Seamless Canvas Flow**: Completely eliminated header bottom borders and dividers for a unified single-page aesthetic.
+  - **Seamless Canvas Flow**: Completely eliminated header bottom borders and dividers across all screens for a unified, tranquil surface.
+  - **Urgent Repeated Call Bypass (< 3 Minutes) Native Fix**: Fixed incoming call interception in native Kotlin (`NotificationHandlerListenerService.kt` & `NativeScheduleStore.kt`). Ringing calls are no longer skipped as ongoing foreground events; a 1st call during quiet hours is silenced while arming a 3-minute window, and a 2nd call from the same caller within 180 seconds immediately rings through.
+  - **Material You Dynamic Themed App Icon**: Added monochrome adaptive launcher icon layer (`<monochrome>`), enabling Android 13+ device home screens and app drawers to dynamically theme Notiflow in light or dark mode following system appearance.
+  - **First-Launch Theme Sync & Explicit User Preference**: Opens strictly following device system appearance on initial launch, then retains explicit user preference across subsequent sessions once toggled.
+  - **Responsive Phone & Tablet Architecture**:
+    - **Adaptive Navigation**: Bottom navigation bar on phones (<600dp), 88dp left Navigation Rail with emblem and 4 tabs on tablets (≥600dp).
+    - **Dashboard Bento**: 5:7 two-column responsive bento on tablet.
+    - **Add Apps Screen**: 2-column responsive grid on tablet with 5 category filter chips.
+    - **App Details Screen**: 5:7 two-column split on tablet.
+    - **Schedule Editor Screen**: 7:5 two-column split on tablet.
+    - **Settings Screen**: 6:6 two-column bento on tablet with storage audit and diagnostic cards.
+    - **Onboarding & Permission Centers**: Centered editorial cards (max 680dp) on tablet.
+  - **Smart Backup Import & Dormant Vault**: Detects uninstalled apps in `.notiflow` backups and offers to *"Keep in Vault & Auto-Apply on Install"* (safely parked in local DB and auto-applied when installed) or *"Exclude These Apps"*.
   - **Quick Load Rule Templates**: Reusable schedule rule dropdown with deduplication, pre-seeded with `"Work Focus Hours"` (09:00 AM – 05:00 PM, Mon–Fri).
   - **Multiple Schedules per App**: Full support for attaching multiple active schedules to a single app with independent monitoring switches.
   - **Unified `.notiflow` Backup**: Single backup file format bundling rule templates alongside managed apps and schedules with 100% backward compatibility.

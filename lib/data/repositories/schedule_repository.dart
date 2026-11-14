@@ -482,7 +482,8 @@ class ScheduleRepository extends ChangeNotifier {
     int blockedCount = 0;
     int allowedCount = 0;
 
-    for (final app in _managedApps) {
+    final activeApps = managedApps;
+    for (final app in activeApps) {
       if (!app.enabled) {
         allowedCount++;
         continue;
@@ -495,7 +496,7 @@ class ScheduleRepository extends ChangeNotifier {
       }
     }
 
-    return (total: _managedApps.length, blocked: blockedCount, allowed: allowedCount);
+    return (total: activeApps.length, blocked: blockedCount, allowed: allowedCount);
   }
 
   /// Alias for getMetrics.
@@ -782,7 +783,7 @@ class ScheduleRepository extends ChangeNotifier {
 
   Future<void> _syncToNative() async {
     await _platformService.syncSchedules(
-      managedApps: _managedApps,
+      managedApps: managedApps,
       schedules: _schedules,
       overrides: _overrides.values.toList(),
     );

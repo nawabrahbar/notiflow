@@ -578,7 +578,7 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                 ),
               ),
               onPressed: () async {
-                final managedApp = await widget.repository.addApp(
+                final managedApp = await widget.repository.addAppFromPackage(
                   displayName: app.displayName,
                   packageName: app.packageName,
                   iconBytes: app.iconBytes,

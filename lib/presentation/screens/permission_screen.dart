@@ -129,9 +129,12 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
         title: 'Permission Required',
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-          children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+              children: [
             const SizedBox(height: 12),
 
             // Status Hero & Emblem
@@ -483,7 +486,9 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildReconnectionStep(String step, String title, String desc) {

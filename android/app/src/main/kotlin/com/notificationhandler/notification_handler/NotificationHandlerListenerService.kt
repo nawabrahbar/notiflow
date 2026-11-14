@@ -53,8 +53,7 @@ class NotificationHandlerListenerService : NotificationListenerService() {
 
         val isCall = category.equals(Notification.CATEGORY_CALL, ignoreCase = true) ||
                      category.equals("call", ignoreCase = true) ||
-                     extras?.containsKey("android.callType") == true ||
-                     extras?.containsKey(Notification.EXTRA_CALL_TYPE) == true
+                     extras?.containsKey("android.callType") == true
 
         // Skip ongoing persistent foreground service notifications UNLESS it is an incoming call
         if (sbn.isOngoing && !isCall) return

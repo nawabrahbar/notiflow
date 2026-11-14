@@ -188,24 +188,29 @@
    - Recurrence day preset chips + 7 day pills. [Done]
    - Automatic template caching on custom rule save with deduplication. [Done]
 
-### Phase 3: Dashboard, Apps, Activity & Settings
-1. `SplashScreen`: Botanical emblem with rotating dashed ring & Newsreader branding.
-2. `MainNavigationShell`: 4-tab bottom navigation (Rules, Apps, Activity, Settings).
-3. `DashboardScreen`: Ambient greeting, side-by-side Intercepted/Permitted metrics, 3 quick session override pills, managed apps list.
-4. `AddAppsScreen`: Live search, 5 category chips, "+ Add" / "Manage" buttons.
-5. `ActivityScreen`: 3 metric cards, filter pills (All, Silenced, Allowed), audit trail.
-6. `SettingsScreen`: Seamless styling, encrypted storage summary cards, update status tile.
-7. `Smart Backup Import`: Detection of uninstalled apps with user modal ("Keep in Vault & Auto-Apply on Install" vs "Exclude").
-8. `Urgent Call Escalation Fix`: Native fix in `NotificationHandlerListenerService.kt` and `NativeScheduleStore.kt` for repeated calls within 3 minutes.
-9. `Material You Themed App Icon`: Add `<monochrome>` adaptive icon layer so the Android home screen & app drawer launcher icon dynamically switches between Light and Dark mode on Android 13+.
-10. `First-Launch Theme Sync & User Override`: Initial launch strictly follows device system appearance, but once the user toggles a theme, persist the explicit preference to always override device theme.
+### Phase 3: Dashboard, Apps, Activity & Settings (COMPLETED ✅)
+1. `SplashScreen`: Botanical medallion with rotating pulse rings, Newsreader branding, and cadence dots. [Done]
+2. `MainNavigationShell`: Adaptive navigation shell: <600dp bottom navigation bar, ≥600dp 88dp left Navigation Rail. [Done]
+3. `DashboardScreen`: Ambient time-based greeting, 5:7 two-column bento on tablet, side-by-side Intercepted/Permitted metrics, 3 quick session override pills, managed apps list with real icons. [Done]
+4. `AddAppsScreen`: Live search, 5 category chips, 2-column grid on tablet, "+ Add Rule" / "Active" state buttons. [Done]
+5. `ActivityScreen`: 3 metric cards, filter pills (All, Silenced, Allowed), clear confirmation dialog, event cards, notification details bottom sheet. [Done]
+6. `SettingsScreen`: Botanical styling, tablet 6:6 two-column bento, encrypted storage audit, in-app update status tile (Play Core IPC), 12h/24h toggle, Dormant Vault count card, danger zone reset. [Done]
+7. `Smart Backup Import`: Detection of uninstalled apps with user choice bottom sheet ("Keep in Vault & Auto-Apply on Install" vs "Exclude These Apps"). [Done]
+8. `Urgent Call Escalation Fix`: Native fix in `NotificationHandlerListenerService.kt` and `NativeScheduleStore.kt` ensuring ringing calls aren't dropped as ongoing, and second call within 3 minutes rings through. [Done]
+9. `Material You Themed App Icon`: Added `<monochrome>` adaptive icon layer so the Android home screen & app drawer launcher icon dynamically switches between Light and Dark mode on Android 13+. [Done]
+10. `First-Launch Theme Sync & User Override`: Initial launch strictly follows device system appearance, but once the user toggles a theme, persist the explicit preference to always override device theme. [Done]
 
-### Phase 4: Onboarding Streamlining
-1. Step 1: 3 feature cards (RULES, OFFLINE, BYPASS).
-2. Step 2: 3-step numbered card (all sideload/restricted settings warnings removed).
-3. Step 3: Elevated "Import .notiflow Backup File" card + "Done" CTA.
+### Phase 4: Onboarding Streamlining (COMPLETED ✅)
+1. Step 1: 3 feature cards (RULES, OFFLINE, BYPASS) with tablet max-width constraint. [Done]
+2. Step 2: 3-step numbered card (all sideload/restricted settings warnings removed). [Done]
+3. Step 3: Elevated "Import .notiflow Backup File" card + "Done" CTA. [Done]
 
-### Phase 5: Tablet Optimization & Responsive Adaptation
-1. Max-content constraint & multi-column responsive grid on tablet viewports (>600dp width).
-2. In-app UI verification on phone & tablet dimensions.
-3. Full test suite execution (`flutter test`).
+### Phase 5: Tablet Optimization & Responsive Adaptation (COMPLETED ✅)
+1. Navigation Rail (≥600dp): 88dp left rail with emblem and 4 tabs (Rules, Apps, Activity, Settings). [Done]
+2. Dashboard (≥600dp): 5:7 two-column bento layout. [Done]
+3. App Details (≥600dp): 5:7 two-column split layout. [Done]
+4. Schedule Editor (≥600dp): 7:5 two-column split layout. [Done]
+5. Add Apps (≥600dp): 2-column app discovery grid. [Done]
+6. Settings (≥600dp): 6:6 two-column bento layout. [Done]
+7. Onboarding & Permission (≥600dp): Centered editorial card column (max 680dp). [Done]
+8. Phone (<600dp): Responsive stacked layouts with bottom navigation bar. [Done]

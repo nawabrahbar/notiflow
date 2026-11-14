@@ -13,6 +13,9 @@ class AppTheme {
   static const Color signalError = Color(0xFFEF4444);
   static const Color signalWarning = Color(0xFFF59E0B);
   static const Color signalHeld = Color(0xFFF87171);
+  static const Color toastSuccess = signalSuccess;
+  static const Color toastWarning = signalWarning;
+  static const Color toastError = signalError;
 
   // Botanical Sanctuary (Light Mode) Tokens
   static const Color lightBackground = Color(0xFFFEF8F6);

@@ -62,16 +62,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: switch (_currentStep) {
-            1 => _buildStepOne(isDark),
-            2 => _buildStepTwo(isDark),
-            _ => ImportRulesScreen(
-                repository: widget.repository,
-                isFromOnboarding: true,
-              ),
-          },
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: switch (_currentStep) {
+                1 => _buildStepOne(isDark),
+                2 => _buildStepTwo(isDark),
+                _ => ImportRulesScreen(
+                    repository: widget.repository,
+                    isFromOnboarding: true,
+                  ),
+              },
+            ),
+          ),
         ),
       ),
     );

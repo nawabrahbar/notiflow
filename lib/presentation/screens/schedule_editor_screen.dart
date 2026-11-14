@@ -257,13 +257,14 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        children: [
-          // QUICK LOAD TEMPLATE / SAVED RULE Dropdown
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 600;
+
+          final templateAndNameColumn = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // QUICK LOAD TEMPLATE / SAVED RULE Dropdown
               Text(
                 'QUICK LOAD TEMPLATE / SAVED RULE',
                 style: GoogleFonts.plusJakartaSans(
@@ -363,15 +364,10 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   ),
                 ),
               ),
-            ],
-          ),
 
-          const SizedBox(height: 22),
+              const SizedBox(height: 22),
 
-          // Rule Name Input
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+              // Rule Name Input
               Text(
                 'RULE NAME',
                 style: GoogleFonts.plusJakartaSans(
@@ -419,15 +415,10 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   },
                 ),
               ),
-            ],
-          ),
 
-          const SizedBox(height: 24),
+              const SizedBox(height: 22),
 
-          // Interception Behavior (BLOCK vs ALLOW)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+              // Interception Behavior (BLOCK vs ALLOW)
               Text(
                 'INTERCEPTION BEHAVIOR',
                 style: GoogleFonts.plusJakartaSans(
@@ -601,15 +592,110 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   ),
                 ],
               ),
+
+              const SizedBox(height: 22),
+
+              // Priority Urgent Call Exception Card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderCol),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: secondaryContainerCol,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.emergency_rounded,
+                        color: onSecondaryContainerCol,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Urgent Call Escalation',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: textMain,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Allow repeated calls within 3 minutes',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    StitchSwitch(
+                      value: _allowUrgent,
+                      onChanged: (val) => setState(() => _allowUrgent = val),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Save Action Button
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _handleSave,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryCol,
+                    foregroundColor: isDark ? const Color(0xFF482900) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          widget.existingRule != null ? 'Update Schedule Rule' : 'Save Schedule Rule',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                ),
+              ),
             ],
-          ),
+          );
 
-          const SizedBox(height: 24),
-
-          // Time Window · Daily Schedule
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          final timingAndRecurrenceColumn = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Time Window · Daily Schedule
               Text(
                 'TIME WINDOW · DAILY SCHEDULE',
                 style: GoogleFonts.plusJakartaSans(
@@ -780,15 +866,10 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   ],
                 ],
               ),
-            ],
-          ),
 
-          const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-          // Recurrence Days
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+              // Recurrence Days
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -874,106 +955,35 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                 ],
               ),
             ],
-          ),
+          );
 
-          const SizedBox(height: 24),
-
-          // Priority Urgent Call Exception Card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: borderCol),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Row(
+          if (isTablet) {
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: secondaryContainerCol,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.emergency_rounded,
-                    color: onSecondaryContainerCol,
-                    size: 20,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 7, child: templateAndNameColumn),
+                    const SizedBox(width: 24),
+                    Expanded(flex: 5, child: timingAndRecurrenceColumn),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Urgent Call Escalation',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: textMain,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Allow repeated calls within 3 minutes',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          color: textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                StitchSwitch(
-                  value: _allowUrgent,
-                  onChanged: (val) => setState(() => _allowUrgent = val),
-                ),
+                const SizedBox(height: 32),
               ],
-            ),
-          ),
+            );
+          }
 
-          const SizedBox(height: 32),
-
-          // Save Action Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _handleSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryCol,
-                foregroundColor: isDark ? const Color(0xFF482900) : Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(
-                      'Save Schedule Rule',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
+          return ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            children: [
+              templateAndNameColumn,
+              const SizedBox(height: 24),
+              timingAndRecurrenceColumn,
+              const SizedBox(height: 32),
+            ],
+          );
+        },
       ),
     );
   }
