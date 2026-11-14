@@ -412,6 +412,16 @@ class ScheduleRepository extends ChangeNotifier {
         if (_overrides.remove(key) != null) removed = true;
       }
     }
+
+    // Also check if this appId maps to a managed app id or packageName
+    for (final app in _managedApps) {
+      if (app.id == appId) {
+        if (_overrides.remove(app.packageName) != null) removed = true;
+      } else if (app.packageName == appId) {
+        if (_overrides.remove(app.id) != null) removed = true;
+      }
+    }
+
     if (removed) {
       await _persist();
     }
@@ -424,6 +434,17 @@ class ScheduleRepository extends ChangeNotifier {
     final appOv = _overrides[appId];
     if (appOv != null && appOv.isActiveAt(checkTime)) {
       return appOv;
+    }
+
+    // Also check by package name / app id alternate key
+    for (final app in _managedApps) {
+      if (app.id == appId && app.packageName.isNotEmpty) {
+        final alt = _overrides[app.packageName];
+        if (alt != null && alt.isActiveAt(checkTime)) return alt;
+      } else if (app.packageName == appId && app.id.isNotEmpty) {
+        final alt = _overrides[app.id];
+        if (alt != null && alt.isActiveAt(checkTime)) return alt;
+      }
     }
 
     final globalMute = _overrides['global_mute'];

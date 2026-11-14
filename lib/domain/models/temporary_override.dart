@@ -45,9 +45,9 @@ class TemporaryOverride {
 
   /// Checks if this override is currently active at [targetDateTime].
   bool isActiveAt(DateTime targetDateTime) {
-    return (targetDateTime.isAfter(startDateTime) ||
-            targetDateTime.isAtSameMomentAs(startDateTime)) &&
-        targetDateTime.isBefore(endDateTime);
+    final targetMs = targetDateTime.millisecondsSinceEpoch;
+    return targetMs >= startDateTime.millisecondsSinceEpoch &&
+        targetMs < endDateTime.millisecondsSinceEpoch;
   }
 
   Map<String, dynamic> toJson() {
@@ -55,20 +55,34 @@ class TemporaryOverride {
       'id': id,
       'appId': appId,
       'mode': mode.toJson(),
-      'startDateTime': startDateTime.toIso8601String(),
-      'endDateTime': endDateTime.toIso8601String(),
-      'createdAt': createdAt.toIso8601String(),
+      'startDateTime': startDateTime.toUtc().toIso8601String(),
+      'endDateTime': endDateTime.toUtc().toIso8601String(),
+      'createdAt': createdAt.toUtc().toIso8601String(),
+      'startMs': startDateTime.millisecondsSinceEpoch,
+      'endMs': endDateTime.millisecondsSinceEpoch,
     };
   }
 
   factory TemporaryOverride.fromJson(Map<String, dynamic> json) {
+    DateTime parseDateTime(dynamic rawIso, dynamic rawMs) {
+      if (rawMs is num && rawMs > 0) {
+        return DateTime.fromMillisecondsSinceEpoch(rawMs.toInt());
+      }
+      if (rawIso is String && rawIso.isNotEmpty) {
+        return DateTime.parse(rawIso).toLocal();
+      }
+      return DateTime.now();
+    }
+
     return TemporaryOverride(
       id: json['id'] as String,
       appId: json['appId'] as String,
       mode: OverrideMode.fromJson(json['mode'] as String),
-      startDateTime: DateTime.parse(json['startDateTime'] as String),
-      endDateTime: DateTime.parse(json['endDateTime'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      startDateTime: parseDateTime(json['startDateTime'], json['startMs']),
+      endDateTime: parseDateTime(json['endDateTime'], json['endMs']),
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String).toLocal()
+          : DateTime.now(),
     );
   }
 }

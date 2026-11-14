@@ -12,8 +12,8 @@ class ScheduleEvaluator {
   /// Evaluates an incoming notification at [currentDateTime].
   ///
   /// Priority:
-  /// 1. Unmanaged or disabled app -> ALLOW
-  /// 2. Temporary override -> ALLOW or BLOCK (strict precedence)
+  /// 1. Temporary override -> ALLOW or BLOCK (strict precedence over all states)
+  /// 2. Unmanaged or disabled app -> ALLOW
   /// 3. Recurring schedules -> Evaluated by rule modes and intervals
   /// 4. Default fallback -> ALLOW
   ScheduleDecision evaluate({
@@ -22,7 +22,30 @@ class ScheduleEvaluator {
     TemporaryOverride? override,
     required DateTime currentDateTime,
   }) {
-    // 1. Unmanaged or disabled app
+    // 1. Temporary Override (Takes absolute precedence over normal schedules and disabled state)
+    if (override != null && override.isActiveAt(currentDateTime)) {
+      final localEnd = override.endDateTime.toLocal();
+      final h = localEnd.hour.toString().padLeft(2, '0');
+      final m = localEnd.minute.toString().padLeft(2, '0');
+      final timeStr = '$h:$m';
+      if (override.mode == OverrideMode.allow) {
+        return ScheduleDecision(
+          decision: NotificationDecisionType.allow,
+          reason: 'Temporary allow override active until $timeStr',
+          overrideId: override.id,
+          nextTransitionTime: override.endDateTime,
+        );
+      } else {
+        return ScheduleDecision(
+          decision: NotificationDecisionType.block,
+          reason: 'Temporary mute override active until $timeStr',
+          overrideId: override.id,
+          nextTransitionTime: override.endDateTime,
+        );
+      }
+    }
+
+    // 2. Unmanaged or disabled app
     if (app == null) {
       return const ScheduleDecision(
         decision: NotificationDecisionType.allow,
@@ -35,25 +58,6 @@ class ScheduleEvaluator {
         decision: NotificationDecisionType.allow,
         reason: 'App scheduling is disabled (default allow)',
       );
-    }
-
-    // 2. Temporary Override (Takes precedence over normal schedules)
-    if (override != null && override.isActiveAt(currentDateTime)) {
-      if (override.mode == OverrideMode.allow) {
-        return ScheduleDecision(
-          decision: NotificationDecisionType.allow,
-          reason: 'Temporary allow override active until ${override.endDateTime.toLocal()}',
-          overrideId: override.id,
-          nextTransitionTime: override.endDateTime,
-        );
-      } else {
-        return ScheduleDecision(
-          decision: NotificationDecisionType.block,
-          reason: 'Temporary block override active until ${override.endDateTime.toLocal()}',
-          overrideId: override.id,
-          nextTransitionTime: override.endDateTime,
-        );
-      }
     }
 
     // 3. Filter active rules for this app

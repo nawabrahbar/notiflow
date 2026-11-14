@@ -336,5 +336,87 @@ void main() {
     // Ensure no redundant Icons.add_rounded is placed inside this TextButton
     expect(find.descendant(of: addScheduleButton, matching: find.byIcon(Icons.add_rounded)), findsNothing);
   });
+
+  testWidgets('AppDetailsScreen displays Quick Temporary Block · Instant Override section, mutes on tap, and toggles off', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final now = DateTime.now();
+    final testApp = ManagedApp(
+      id: 'com.example.quicktest',
+      packageName: 'com.example.quicktest',
+      displayName: 'Quick Test App',
+      createdAt: now,
+      updatedAt: now,
+    );
+    await repository.addApp(testApp);
+
+    await tester.pumpWidget(wrapWithTheme(AppDetailsScreen(
+      app: testApp,
+      repository: repository,
+    )));
+    await tester.pumpAndSettle();
+
+    // Verify section header exists
+    expect(find.text('QUICK TEMPORARY BLOCK · INSTANT OVERRIDE'), findsOneWidget);
+    expect(find.text('15m Mute'), findsOneWidget);
+    expect(find.text('30m Mute'), findsOneWidget);
+    expect(find.text('1h Mute'), findsOneWidget);
+    expect(find.text('+ Custom'), findsOneWidget);
+    expect(find.text('Clear Temporary Override'), findsNothing);
+
+    // Tap 15m Mute pill
+    await tester.tap(find.text('15m Mute'));
+    await tester.pumpAndSettle();
+
+    // Override should now be active
+    expect(repository.getActiveOverride(testApp.id), isNotNull);
+    expect(find.text('Clear Temporary Override'), findsOneWidget);
+    expect(find.textContaining('LEFT'), findsOneWidget);
+
+    // Tap 15m Mute again to toggle off
+    await tester.tap(find.text('15m Mute'));
+    await tester.pumpAndSettle();
+
+    // Override should be cleared
+    expect(repository.getActiveOverride(testApp.id), isNull);
+    expect(find.text('Clear Temporary Override'), findsNothing);
+
+    // Tap + Custom pill to open custom mute dialog
+    await tester.tap(find.text('+ Custom'));
+    await tester.pumpAndSettle();
+
+    // Dialog should be open
+    expect(find.text('Custom Mute Duration'), findsOneWidget);
+    expect(find.text('QUICK SELECT'), findsOneWidget);
+    expect(find.text('3h'), findsOneWidget);
+
+    // Select 3h preset and confirm
+    await tester.tap(find.text('3h'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mute for 3 hrs'));
+    await tester.pumpAndSettle();
+
+    // Override should now be active for 3 hours and pill should dynamically display '3h Mute'
+    expect(repository.getActiveOverride(testApp.id), isNotNull);
+    expect(repository.getActiveOverride(testApp.id)!.durationMinutes, 180);
+    expect(find.text('3h Mute'), findsOneWidget);
+    expect(find.text('+ Custom'), findsNothing);
+    expect(find.text('Clear Temporary Override'), findsOneWidget);
+
+    // Tap Clear Temporary Override button
+    await tester.tap(find.text('Clear Temporary Override'));
+    await tester.pumpAndSettle();
+
+    // Custom timer should now be cleared and pill should reset back to + Custom
+    expect(repository.getActiveOverride(testApp.id), isNull);
+    expect(find.text('Clear Temporary Override'), findsNothing);
+    expect(find.text('+ Custom'), findsOneWidget);
+    expect(find.text('3h Mute'), findsNothing);
+  });
 }
 
