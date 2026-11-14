@@ -79,8 +79,33 @@ jobs:
 
       - name: Build Android Release APK & Play Store App Bundle (.aab)
         run: |
-          flutter build apk --release
-          flutter build appbundle --release
+          set +e
+          flutter build apk --release > build_apk.log 2>&1
+          APK_CODE=$?
+          flutter build appbundle --release > build_aab.log 2>&1
+          AAB_CODE=$?
+          set -e
+          mkdir -p /tmp/ci-logs-repo-2
+          cd /tmp/ci-logs-repo-2
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git checkout -b ci-logs
+          cp $GITHUB_WORKSPACE/build_apk.log ./
+          cp $GITHUB_WORKSPACE/build_aab.log ./
+          git add build_apk.log build_aab.log
+          git commit -m "ci build logs [skip ci]" || true
+          git push -f origin ci-logs || true
+          cd $GITHUB_WORKSPACE
+          if [ $APK_CODE -ne 0 ]; then
+            cat build_apk.log | tail -n 100
+            exit $APK_CODE
+          fi
+          if [ $AAB_CODE -ne 0 ]; then
+            cat build_aab.log | tail -n 100
+            exit $AAB_CODE
+          fi
 
       - name: Prepare APK & AAB artifacts
         id: meta
