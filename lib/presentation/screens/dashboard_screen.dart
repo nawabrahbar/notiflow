@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
+import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
@@ -10,10 +11,12 @@ import 'add_apps_screen.dart';
 import 'app_details_screen.dart';
 import 'permission_screen.dart';
 
-/// Dashboard Screen faithfully matching the Stitch Obsidian Signal redesign.
-/// Features dynamic time greetings, Intercepted/Permitted metrics cards,
-/// quick session overrides, managed apps with amber status chips,
-/// and batch delivery status.
+/// Dashboard Screen (Rules Page) adhering strictly to Botanical Sanctuary / Nocturne design:
+/// - Responsive layout: Single column on phone (< 600dp), 2-Column Bento Split (5 : 7) on tablet (>= 600dp)
+/// - Editorial Greeting card with Newsreader serif typography and curated quotes
+/// - Bento metrics (Intercepted & Permitted)
+/// - Quick Overrides panel (15m, 1h, and call bypass info pill)
+/// - Managed Apps catalog with real native app icons from PackageManager
 class DashboardScreen extends StatefulWidget {
   final ScheduleRepository repository;
   final VoidCallback? onAddAppTap;
@@ -30,7 +33,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   late final NotificationPlatformInterface _platform;
   bool _isPermissionGranted = true;
   late bool _showRestorationBanner;
@@ -68,7 +72,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   String _getTimeBasedQuote() {
     final hour = DateTime.now().hour;
     final minute = DateTime.now().minute;
-    // Curated pool of 10 quotes switched according to time of day
     if (hour >= 5 && hour < 12) {
       const morningQuotes = [
         'Guard your attention — clarity lives in the quiet.',
@@ -98,29 +101,94 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     }
   }
 
+  ({String text, IconData icon, String sessionTag}) _getGreetingData() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) {
+      return (
+        text: 'Good morning',
+        icon: Icons.light_mode_rounded,
+        sessionTag: 'Botanical Calm · Morning Session',
+      );
+    } else if (hour >= 12 && hour < 17) {
+      return (
+        text: 'Good afternoon',
+        icon: Icons.wb_sunny_rounded,
+        sessionTag: 'Botanical Calm · Afternoon Session',
+      );
+    } else if (hour >= 17 && hour < 21) {
+      return (
+        text: 'Good evening',
+        icon: Icons.bedtime_rounded,
+        sessionTag: 'Botanical Calm · Evening Session',
+      );
+    } else {
+      return (
+        text: 'Good night',
+        icon: Icons.nights_stay_rounded,
+        sessionTag: 'Botanical Calm · Night Session',
+      );
+    }
+  }
+
+  IconData _getDefaultIconForApp(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('chat') ||
+        lower.contains('whatsapp') ||
+        lower.contains('telegram') ||
+        lower.contains('message')) {
+      return Icons.chat_bubble_rounded;
+    }
+    if (lower.contains('slack') ||
+        lower.contains('team') ||
+        lower.contains('meet')) {
+      return Icons.workspaces_rounded;
+    }
+    if (lower.contains('mail') ||
+        lower.contains('gmail') ||
+        lower.contains('outlook')) {
+      return Icons.mail_rounded;
+    }
+    if (lower.contains('insta') ||
+        lower.contains('photo') ||
+        lower.contains('camera')) {
+      return Icons.photo_camera_rounded;
+    }
+    if (lower.contains('tweet') ||
+        lower.contains('twitter') ||
+        lower.contains('x')) {
+      return Icons.tag_rounded;
+    }
+    return Icons.widgets_rounded;
+  }
+
   Future<void> _deleteSelectedApps() async {
     final count = _selectedAppIds.length;
     if (count == 0) return;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF18181B) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: isDark
+              ? AppTheme.darkSurfaceContainerLow
+              : AppTheme.lightSurfaceContainerLow,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
             'Delete $count ${count == 1 ? 'Rule' : 'Rules'}?',
-            style: GoogleFonts.inter(
+            style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.w700,
-              color: isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D),
+              color: isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface,
             ),
           ),
           content: Text(
-            'This will stop monitoring the selected ${count == 1 ? 'app' : 'apps'} and remove all associated schedule rules.',
-            style: GoogleFonts.inter(
+            'This will stop monitoring the selected ${count == 1 ? 'app' : 'apps'} and remove associated schedule rules from the Rules Page.',
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 13,
-              color: isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B),
+              color: isDark
+                  ? AppTheme.darkOnSurfaceVariant
+                  : AppTheme.lightOnSurfaceVariant,
             ),
           ),
           actions: [
@@ -130,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
+                backgroundColor: isDark ? AppTheme.darkError : AppTheme.lightError,
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
@@ -144,83 +212,48 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     if (confirmed == true) {
       final ids = _selectedAppIds.toList();
       await widget.repository.deleteAppsAndRules(ids);
-      setState(() {
-        _selectedAppIds.clear();
-      });
+      setState(() => _selectedAppIds.clear());
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(
-              content: Text(
-                'Removed $count ${count == 1 ? 'app and its rules' : 'apps and their rules'}',
-                style: const TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
-              ),
-              backgroundColor: AppTheme.signalWarning,
+              content: Text('Removed $count apps from Rules page'),
+              backgroundColor: AppTheme.toastWarning,
             ),
           );
       }
     }
   }
 
-  ({String text, IconData icon, Color color}) _getGreetingData() {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) {
-      return (
-        text: 'Good morning',
-        icon: Icons.wb_twilight_rounded,
-        color: const Color(0xFFF59E0B),
-      );
-    } else if (hour >= 12 && hour < 17) {
-      return (
-        text: 'Good afternoon',
-        icon: Icons.wb_sunny_rounded,
-        color: const Color(0xFFEAB308),
-      );
-    } else if (hour >= 17 && hour < 21) {
-      return (
-        text: 'Good evening',
-        icon: Icons.brightness_medium_rounded,
-        color: const Color(0xFFF97316),
-      );
-    } else {
-      return (
-        text: 'Good night',
-        icon: Icons.bedtime_rounded,
-        color: const Color(0xFF38BDF8),
-      );
-    }
-  }
-
-  IconData _getDefaultIconForApp(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('chat') || lower.contains('whatsapp') || lower.contains('telegram') || lower.contains('message')) {
-      return Icons.chat_bubble_rounded;
-    }
-    if (lower.contains('slack') || lower.contains('team') || lower.contains('meet')) {
-      return Icons.workspaces_rounded;
-    }
-    if (lower.contains('mail') || lower.contains('gmail') || lower.contains('outlook')) {
-      return Icons.mail_rounded;
-    }
-    if (lower.contains('insta') || lower.contains('photo') || lower.contains('camera')) {
-      return Icons.photo_camera_rounded;
-    }
-    if (lower.contains('tweet') || lower.contains('twitter') || lower.contains('x')) {
-      return Icons.tag_rounded;
-    }
-    return Icons.apps_rounded;
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF09090B) : const Color(0xFFF9F9FB);
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    final amber = const Color(0xFFF59E0B);
+    final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
+    final container = isDark
+        ? AppTheme.darkSurfaceContainer
+        : AppTheme.lightSurfaceContainer;
+    final containerLow = isDark
+        ? AppTheme.darkSurfaceContainerLow
+        : AppTheme.lightSurfaceContainerLow;
+    final containerHigh = isDark
+        ? AppTheme.darkSurfaceContainerHigh
+        : AppTheme.lightSurfaceContainerHigh;
+    final borderCol = isDark
+        ? AppTheme.darkOutlineVariant.withOpacity(0.3)
+        : AppTheme.lightOutlineVariant.withOpacity(0.35);
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final secondary = isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary;
+    final secContainer = isDark
+        ? AppTheme.darkSecondaryContainer
+        : AppTheme.lightSecondaryContainer;
+    final onSecContainer = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : AppTheme.lightOnSecondaryContainer;
 
     return ListenableBuilder(
       listenable: widget.repository,
@@ -234,818 +267,962 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         return Scaffold(
           backgroundColor: bg,
           body: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              children: [
-                // Dynamic Time-Based Greeting
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isTablet = constraints.maxWidth >= 600;
+
+                // LEFT PANEL WIDGET (Greeting + Metrics + Overrides)
+                final leftColumnContent = Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(greeting.icon, size: 28, color: greeting.color),
-                    const SizedBox(width: 10),
-                    Text(
-                      greeting.text,
-                      style: GoogleFonts.inter(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: textMain,
-                        letterSpacing: -0.6,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _getTimeBasedQuote(),
-                  style: GoogleFonts.inter(
-                    fontSize: 13.5,
-                    color: textMuted,
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Restoration Banner (if access restored)
-                if (_showRestorationBanner) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 24),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Focus Shield Online',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: textMain,
-                                ),
-                              ),
-                              Text(
-                                'ACCESS RESTORED',
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF22C55E),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => setState(() => _showRestorationBanner = false),
-                          child: const Text('Audit Health'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                // Permission Recovery Banner (if access lost)
-                if (!_isPermissionGranted) ...[
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: amber.withValues(alpha: 0.5)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.warning_amber_rounded, color: amber, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Notification Access Required',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: textMain,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Schedules are currently paused until Android Notification Access is reconnected.',
-                          style: GoogleFonts.inter(fontSize: 12, color: textMuted),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: amber,
-                              foregroundColor: const Color(0xFF09090B),
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => PermissionScreen(
-                                    repository: widget.repository,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'Reconnect Permission',
-                              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12.5),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                // -------------------------------------------------------------
-                // 2 Metric Cards: Intercepted & Permitted
-                // -------------------------------------------------------------
-                Row(
-                  children: [
-                    // Intercepted Card
-                    Expanded(
-                      child: Container(
+                    // Restoration Banner (if access restored)
+                    if (_showRestorationBanner) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: cardBg,
+                          color: secContainer.withOpacity(0.5),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: borderCol),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Intercepted',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: textMuted,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(Icons.notifications_off_outlined, size: 16, color: amber),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  '${summary.blocked}',
-                                  style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w800,
-                                    color: textMain,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: amber.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'MUTED',
-                                    style: GoogleFonts.jetBrainsMono(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: amber,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Permitted Card
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: borderCol),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Permitted',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: textMuted,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.notifications_active_outlined, size: 16, color: Color(0xFF22C55E)),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  '${summary.allowed}',
-                                  style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w800,
-                                    color: textMain,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF22C55E).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'ALERTS',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF22C55E),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // -------------------------------------------------------------
-                // Quick Session Overrides
-                // -------------------------------------------------------------
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'QUICK SESSION OVERRIDES · Tap to engage',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Overrides Horizontal Actions
-                if (activeOverride != null) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: amber),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.hourglass_top_rounded, color: amber, size: 18),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            activeOverride.type == 'mute_all'
-                                ? 'Mute All Active (${activeOverride.remainingMinutes}m left)'
-                                : 'Pass Calls Active',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: textMain,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => widget.repository.clearOverride(activeOverride.appId),
-                          style: TextButton.styleFrom(
-                            foregroundColor: amber,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          ),
-                          child: Text(
-                            'Restore',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            widget.repository.setTemporaryMute(
-                              appId: 'global_mute',
-                              duration: const Duration(minutes: 15),
-                            );
-                          },
-                          icon: const Icon(Icons.volume_off_rounded, size: 16),
-                          label: Text(
-                            'Mute All (15m)',
-                            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: textMain,
-                            side: BorderSide(color: borderCol),
-                            backgroundColor: cardBg,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            widget.repository.setTemporaryMute(
-                              appId: 'global_mute',
-                              duration: const Duration(hours: 1),
-                            );
-                          },
-                          icon: const Icon(Icons.volume_off_rounded, size: 16),
-                          label: Text(
-                            'Mute All (1h)',
-                            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: textMain,
-                            side: BorderSide(color: borderCol),
-                            backgroundColor: cardBg,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            widget.repository.setTemporaryAllow(
-                              appId: 'global_allow',
-                              duration: const Duration(hours: 1),
-                            );
-                          },
-                          icon: const Icon(Icons.phone_in_talk_rounded, size: 16),
-                          label: Text(
-                            'Pass Calls',
-                            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: textMain,
-                            side: BorderSide(color: borderCol),
-                            backgroundColor: cardBg,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 28),
-
-                // -------------------------------------------------------------
-                // Managed Apps Section
-                // -------------------------------------------------------------
-                if (_selectedAppIds.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: amber.withValues(alpha: 0.5)),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.close_rounded, size: 20, color: textMain),
-                          onPressed: () => setState(() => _selectedAppIds.clear()),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          '${_selectedAppIds.length} Selected',
-                          style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: textMain,
-                          ),
-                        ),
-                        const Spacer(),
-                        Tooltip(
-                          message: _selectedAppIds.length == apps.length ? 'Deselect all' : 'Select all',
-                          child: Checkbox(
-                            key: const Key('select_all_checkbox'),
-                            value: _selectedAppIds.length == apps.length,
-                            activeColor: amber,
-                            checkColor: const Color(0xFF09090B),
-                            side: BorderSide(
-                              color: isDark ? const Color(0xFFA1A1AA) : const Color(0xFF71717A),
-                              width: 1.5,
-                            ),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                            onChanged: (bool? checked) {
-                              setState(() {
-                                if (_selectedAppIds.length == apps.length) {
-                                  _selectedAppIds.clear();
-                                } else {
-                                  _selectedAppIds.addAll(apps.map((a) => a.id));
-                                }
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: _deleteSelectedApps,
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                          label: const Text('Delete'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFEF4444),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'MANAGED APPS',
-                          style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.0,
-                            color: textMuted,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '${apps.length}',
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: amber,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    TextButton(
-                      onPressed: widget.onAddAppTap ??
-                          () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => AddAppsScreen(repository: widget.repository),
-                              ),
-                            );
-                          },
-                      child: Text(
-                        '+ Add App',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: amber,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-
-                // Managed Apps List
-                if (apps.isEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderCol),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.schedule_rounded,
-                          size: 40,
-                          color: textMuted,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No apps managed yet',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: textMain,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Select installed apps to apply quiet schedules and silence distractions.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(fontSize: 13, color: textMuted),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.add_rounded, size: 18),
-                          label: const Text('Add Apps'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: amber,
-                            foregroundColor: const Color(0xFF09090B),
-                          ),
-                          onPressed: widget.onAddAppTap ??
-                              () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => AddAppsScreen(repository: widget.repository),
-                                  ),
-                                );
-                              },
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  ...apps.map((app) {
-                    final rule = widget.repository.getRuleForApp(app.id);
-                    final decision = widget.repository.evaluateApp(app);
-                    final isBlocked = decision.isBlocked;
-                    final isSelected = _selectedAppIds.contains(app.id);
-                    final isSelectionMode = _selectedAppIds.isNotEmpty;
-
-                    String statusText;
-                    Color statusColor;
-                    if (!app.enabled) {
-                      statusText = 'PAUSED';
-                      statusColor = textMuted;
-                    } else if (isBlocked) {
-                      statusText = 'MUTED';
-                      statusColor = amber;
-                    } else {
-                      statusText = 'ALLOWED';
-                      statusColor = const Color(0xFF22C55E);
-                    }
-
-                    String detailText;
-                    if (!app.enabled) {
-                      detailText = 'Monitoring disabled';
-                    } else if (rule != null) {
-                      final mode = rule.mode == ScheduleMode.blockDuring ? 'Block' : 'Allow';
-                      detailText = '$mode · ${rule.startTime.format12Hour()} - ${rule.endTime.format12Hour()}';
-                    } else {
-                      detailText = 'No active schedule rule';
-                    }
-
-                    return InkWell(
-                      onLongPress: () {
-                        setState(() {
-                          if (_selectedAppIds.contains(app.id)) {
-                            _selectedAppIds.remove(app.id);
-                          } else {
-                            _selectedAppIds.add(app.id);
-                          }
-                        });
-                      },
-                      onTap: () {
-                        if (isSelectionMode) {
-                          setState(() {
-                            if (_selectedAppIds.contains(app.id)) {
-                              _selectedAppIds.remove(app.id);
-                            } else {
-                              _selectedAppIds.add(app.id);
-                            }
-                          });
-                        } else {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => AppDetailsScreen(
-                                repository: widget.repository,
-                                app: app,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? (isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7))
-                              : cardBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isSelected ? amber : borderCol,
-                            width: isSelected ? 1.5 : 1,
-                          ),
+                          border: Border.all(color: secondary.withOpacity(0.4)),
                         ),
                         child: Row(
                           children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: app.iconBytes != null
-                                  ? Image.memory(
-                                      app.iconBytes!,
-                                      width: 44,
-                                      height: 44,
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Icon(
-                                      _getDefaultIconForApp(app.displayName),
-                                      color: textMain,
-                                      size: 22,
-                                    ),
-                            ),
+                            Icon(Icons.check_circle_rounded,
+                                color: secondary, size: 24),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          app.displayName,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: textMain,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(5),
-                                        ),
-                                        child: Text(
-                                          statusText,
-                                          style: GoogleFonts.jetBrainsMono(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            color: statusColor,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 3),
                                   Text(
-                                    detailText,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: textMuted,
+                                    'Focus Shield Online',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: textMain,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    'ACCESS RESTORED',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: secondary,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            if (isSelectionMode)
-                              Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: isSelected ? amber : Colors.transparent,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected ? amber : textMuted,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: isSelected
-                                    ? const Icon(Icons.check, size: 16, color: Colors.black)
-                                    : null,
-                              )
-                            else
-                              StitchSwitch(
-                                value: app.enabled,
-                                onChanged: (val) {
-                                  widget.repository.toggleAppMonitoring(app.id, val);
-                                },
-                              ),
+                            TextButton(
+                              onPressed: () => setState(
+                                  () => _showRestorationBanner = false),
+                              child: const Text('Audit Health'),
+                            ),
                           ],
                         ),
                       ),
-                    );
-                  }),
-                ],
+                    ],
 
-                const SizedBox(height: 24),
-
-                // Zero-Leak Guarantee Footer Card
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF121214) : const Color(0xFFF3F3F5),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: borderCol),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.verified_user_rounded, size: 16, color: amber),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Zero-Leak Guarantee · 100% On-Device Protection',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: textMuted,
+                    // Permission Recovery Banner (if access lost)
+                    if (!_isPermissionGranted) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF2E1A11)
+                              : const Color(0xFFFFF1EB),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: primary.withOpacity(0.5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded,
+                                    color: primary, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Notification Access Required',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: textMain,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Schedules are paused until Android Notification Access is reconnected.',
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12, color: textMuted),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primary,
+                                  foregroundColor: isDark
+                                      ? AppTheme.darkOnPrimary
+                                      : AppTheme.lightOnPrimary,
+                                ),
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => PermissionScreen(
+                                        repository: widget.repository,
+                                        isInitialSetup: false,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: const Text('Reconnect Access'),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
+
+                    // Sanctuary Editorial Greeting Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: containerLow,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderCol, width: 1.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(greeting.icon, size: 22, color: primary),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  greeting.sessionTag,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: textMuted,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            greeting.text,
+                            style: GoogleFonts.newsreader(
+                              fontSize: isTablet ? 32 : 28,
+                              fontWeight: FontWeight.w600,
+                              color: textMain,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _getTimeBasedQuote(),
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13.5,
+                              color: textMuted,
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Key Metrics (Stacked Bento Split)
+                    Row(
+                      children: [
+                        // Intercepted (Muted)
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: container,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: borderCol, width: 1.0),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: containerHigh,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(Icons.notifications_off_rounded,
+                                          size: 16, color: textMuted),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2.5),
+                                      decoration: BoxDecoration(
+                                        color: primary.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: primary.withOpacity(0.2)),
+                                      ),
+                                      child: Text(
+                                        'MUTED',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: primary,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  '${summary.blocked}',
+                                  style: GoogleFonts.newsreader(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w600,
+                                    color: textMain,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Intercepted',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Permitted (Alerts)
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: container,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: borderCol, width: 1.0),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: secContainer,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                          Icons.notifications_active_rounded,
+                                          size: 16,
+                                          color: onSecContainer),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2.5),
+                                      decoration: BoxDecoration(
+                                        color: secContainer,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: secondary.withOpacity(0.2)),
+                                      ),
+                                      child: Text(
+                                        'ALERTS',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: onSecContainer,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  '${summary.allowed}',
+                                  style: GoogleFonts.newsreader(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w600,
+                                    color: textMain,
+                                    letterSpacing: -0.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Permitted',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Quick Session Overrides Panel
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: containerLow,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderCol, width: 1.0),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'OVERRIDES',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.0,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Tap to engage',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: textMain,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Icon(Icons.touch_app_outlined,
+                                  size: 18, color: textMuted),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          if (activeOverride != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: primary),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.hourglass_top_rounded,
+                                      color: primary, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Mute All Active (${activeOverride.remainingMinutes}m left)',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: textMain,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => widget.repository
+                                        .clearOverride(activeOverride.appId),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: primary,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                    ),
+                                    child: const Text('Restore'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      widget.repository.setTemporaryMute(
+                                        appId: 'global_mute',
+                                        duration: const Duration(minutes: 15),
+                                      );
+                                    },
+                                    icon: Icon(Icons.hourglass_top_rounded,
+                                        size: 16, color: primary),
+                                    label: Text(
+                                      'Mute All (15m)',
+                                      style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: textMain),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: container,
+                                      side: BorderSide(color: borderCol),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      widget.repository.setTemporaryMute(
+                                        appId: 'global_mute',
+                                        duration: const Duration(hours: 1),
+                                      );
+                                    },
+                                    icon: Icon(Icons.bedtime_rounded,
+                                        size: 16, color: primary),
+                                    label: Text(
+                                      'Mute All (1h)',
+                                      style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: textMain),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: container,
+                                      side: BorderSide(color: borderCol),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+
+                          // Permitted exception pill
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: secContainer.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: secondary.withOpacity(0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.call_rounded,
+                                    size: 16, color: onSecContainer),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Phone calls allowed unconditionally',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: onSecContainer,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+
+                // RIGHT PANEL WIDGET (Managed Apps List)
+                final rightColumnContent = Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Selection Action Bar (when multiselect active)
+                    if (_selectedAppIds.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: primary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: primary.withOpacity(0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              key: const Key('select_all_checkbox'),
+                              value: _selectedAppIds.length == widget.repository.managedApps.length,
+                              onChanged: (val) {
+                                setState(() {
+                                  if (val == true) {
+                                    _selectedAppIds.addAll(widget.repository.managedApps.map((a) => a.id));
+                                  } else {
+                                    _selectedAppIds.clear();
+                                  }
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_selectedAppIds.length} Selected',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: textMain,
+                              ),
+                            ),
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              onPressed: _deleteSelectedApps,
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  size: 16),
+                              label: const Text('Delete'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isDark
+                                    ? AppTheme.darkError
+                                    : AppTheme.lightError,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Managed Apps Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'MANAGED APPS',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.0,
+                                color: textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: secContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${apps.length}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: onSecContainer,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextButton(
+                          onPressed: widget.onAddAppTap ??
+                              () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => AddAppsScreen(
+                                        repository: widget.repository),
+                                  ),
+                                );
+                              },
+                          style: TextButton.styleFrom(
+                            foregroundColor: primary,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            '+ Add App',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Managed Apps Cards
+                    if (apps.isEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 36, horizontal: 20),
+                        decoration: BoxDecoration(
+                          color: containerLow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderCol),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(Icons.schedule_rounded,
+                                size: 40, color: textMuted),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No apps managed yet',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: textMain,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Select installed apps to apply quiet schedules and silence distractions.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13, color: textMuted),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text('Add Apps'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: primary,
+                                foregroundColor: isDark
+                                    ? AppTheme.darkOnPrimary
+                                    : AppTheme.lightOnPrimary,
+                              ),
+                              onPressed: widget.onAddAppTap ??
+                                  () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => AddAppsScreen(
+                                            repository: widget.repository),
+                                      ),
+                                    );
+                                  },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      ...apps.map((app) {
+                        return _buildManagedAppCard(
+                          context,
+                          app: app,
+                          isDark: isDark,
+                          container: container,
+                          containerHigh: containerHigh,
+                          borderCol: borderCol,
+                          textMain: textMain,
+                          textMuted: textMuted,
+                          primary: primary,
+                          secondary: secondary,
+                          secContainer: secContainer,
+                          onSecContainer: onSecContainer,
+                        );
+                      }),
+                    ],
+                  ],
+                );
+
+                if (isTablet) {
+                  // Tablet Mode: 2-Column Bento Split Grid (5 : 7)
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left Column (5 cols / ~42%)
+                        Expanded(
+                          flex: 5,
+                          child: leftColumnContent,
+                        ),
+                        const SizedBox(width: 24),
+                        // Right Column (7 cols / ~58%)
+                        Expanded(
+                          flex: 7,
+                          child: rightColumnContent,
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                // Phone Mode (< 600dp): Single column linear stack
+                return ListView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  children: [
+                    leftColumnContent,
+                    const SizedBox(height: 24),
+                    rightColumnContent,
+                    const SizedBox(height: 32),
+                  ],
+                );
+              },
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildManagedAppCard(
+    BuildContext context, {
+    required ManagedApp app,
+    required bool isDark,
+    required Color container,
+    required Color containerHigh,
+    required Color borderCol,
+    required Color textMain,
+    required Color textMuted,
+    required Color primary,
+    required Color secondary,
+    required Color secContainer,
+    required Color onSecContainer,
+  }) {
+    final rule = widget.repository.getRuleForApp(app.id);
+    final decision = widget.repository.evaluateApp(app);
+    final isBlocked = decision.isBlocked;
+    final isSelected = _selectedAppIds.contains(app.id);
+    final isSelectionMode = _selectedAppIds.isNotEmpty;
+
+    String statusText;
+    Color statusBg;
+    Color statusFg;
+    if (!app.enabled) {
+      statusText = 'PAUSED';
+      statusBg = containerHigh;
+      statusFg = textMuted;
+    } else if (isBlocked) {
+      statusText = 'MUTED';
+      statusBg = primary.withOpacity(0.18);
+      statusFg = primary;
+    } else {
+      statusText = 'ALLOWED';
+      statusBg = secContainer;
+      statusFg = onSecContainer;
+    }
+
+    String detailText;
+    if (!app.enabled) {
+      detailText = 'Monitoring paused';
+    } else if (rule != null) {
+      final mode = rule.mode == ScheduleMode.blockDuring ? 'Block' : 'Allow';
+      detailText =
+          '$mode · ${widget.repository.formatTime(rule.startTime)} - ${widget.repository.formatTime(rule.endTime)}';
+    } else {
+      detailText = 'No active schedule rule';
+    }
+
+    return InkWell(
+      onLongPress: () {
+        setState(() {
+          if (_selectedAppIds.contains(app.id)) {
+            _selectedAppIds.remove(app.id);
+          } else {
+            _selectedAppIds.add(app.id);
+          }
+        });
+      },
+      onTap: () {
+        if (isSelectionMode) {
+          setState(() {
+            if (_selectedAppIds.contains(app.id)) {
+              _selectedAppIds.remove(app.id);
+            } else {
+              _selectedAppIds.add(app.id);
+            }
+          });
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => AppDetailsScreen(
+                repository: widget.repository,
+                app: app,
+              ),
+            ),
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? primary.withOpacity(0.12) : container,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? primary : borderCol,
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.15 : 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Native App Icon from PackageManager
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: containerHigh,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: app.iconBytes != null
+                  ? Image.memory(
+                      app.iconBytes!,
+                      width: 46,
+                      height: 46,
+                      fit: BoxFit.cover,
+                    )
+                  : Icon(
+                      _getDefaultIconForApp(app.displayName),
+                      color: textMain,
+                      size: 24,
+                    ),
+            ),
+            const SizedBox(width: 14),
+
+            // App Name & Detail Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          app.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: statusBg,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: statusFg,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Icon(Icons.schedule_rounded,
+                          size: 13, color: textMuted),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          detailText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            color: textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // Toggle Master Monitoring Switch
+            StitchSwitch(
+              value: app.enabled,
+              onChanged: (val) {
+                widget.repository.toggleApp(app.id, val);
+              },
+            ),
+            const SizedBox(width: 4),
+
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: textMuted.withOpacity(0.6),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -7,11 +7,11 @@ import '../../platform/android_notification_platform.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 
-/// Activity Log Screen matching Stitch Obsidian Signal redesign.
-/// Displays audit trail of triaged and muted notifications with full details
-/// (app icon, app name, notification title/sender, message body, subtext/channel,
-/// timestamp, and rule/override reason), 3 key metrics cards,
-/// filter pills (All, Silenced, Allowed), and interactive detail inspector.
+/// Activity Screen (Audit Trail) adhering strictly to Botanical Sanctuary / Nocturne design:
+/// - Responsive: Multi-column tablet layout (>= 600dp) with top 3-metric bento spread and wide audit cards
+/// - Filter bar (All, Silenced, Allowed) with count badges & Clear Log action
+/// - Real native app icons from PackageManager
+/// - Notification details inspector bottom sheet
 class ActivityScreen extends StatefulWidget {
   final ScheduleRepository repository;
   final bool isEmbedded;
@@ -26,7 +26,8 @@ class ActivityScreen extends StatefulWidget {
   State<ActivityScreen> createState() => ActivityScreenState();
 }
 
-class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObserver {
+class ActivityScreenState extends State<ActivityScreen>
+    with WidgetsBindingObserver {
   String _selectedFilter = 'all'; // 'all', 'silenced', 'allowed'
   final List<Map<String, dynamic>> _events = [];
 
@@ -58,7 +59,6 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
     }
   }
 
-  /// Refreshes recorded notification events from the native store.
   Future<void> refreshLogs() => _loadNativeEvents();
 
   IconData _getDefaultIconForApp(String name) {
@@ -74,7 +74,7 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
         lower.contains('team') ||
         lower.contains('meet') ||
         lower.contains('discord')) {
-      return Icons.tag_rounded;
+      return Icons.workspaces_rounded;
     }
     if (lower.contains('mail') ||
         lower.contains('gmail') ||
@@ -86,7 +86,9 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
         lower.contains('camera')) {
       return Icons.photo_camera_rounded;
     }
-    if (lower.contains('phone') || lower.contains('call') || lower.contains('dialer')) {
+    if (lower.contains('phone') ||
+        lower.contains('call') ||
+        lower.contains('dialer')) {
       return Icons.call_rounded;
     }
     return Icons.notifications_paused_rounded;
@@ -100,28 +102,57 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
 
     final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
     final period = dt.hour >= 12 ? 'PM' : 'AM';
-    final hm = '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $period';
+    final hm =
+        '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $period';
 
     if (diffDays == 0) {
       return hm;
     } else if (diffDays == 1) {
       return 'Yesterday · $hm';
     } else {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
+      ];
       return '${months[dt.month - 1]} ${dt.day} · $hm';
     }
   }
 
   String _formatFullDateTime(DateTime dt) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
     final period = dt.hour >= 12 ? 'PM' : 'AM';
-    final hm = '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')} $period';
+    final hm =
+        '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')} $period';
     return '${months[dt.month - 1]} ${dt.day}, ${dt.year} at $hm';
   }
 
   Future<void> _loadNativeEvents() async {
-    final nativeLogs = await AndroidNotificationPlatform.fetchNativeActivityLog();
+    final nativeLogs =
+        await AndroidNotificationPlatform.fetchNativeActivityLog();
     if (!mounted) return;
 
     final Map<String, ManagedApp> appsByPkg = {
@@ -149,7 +180,9 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
           final notifMessage = (raw['message'] as String?)?.trim() ?? '';
           final subText = (raw['subText'] as String?)?.trim() ?? '';
           final reason = (raw['reason'] as String?)?.trim() ??
-              (isBlocked ? 'Silenced while app was muted' : 'Allowed by schedule');
+              (isBlocked
+                  ? 'Silenced while app was muted'
+                  : 'Allowed by schedule');
 
           return <String, dynamic>{
             'packageName': pkg,
@@ -169,15 +202,6 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
     });
   }
 
-  void clearActivity([BuildContext? targetContext]) {
-    final ctx = targetContext ?? context;
-    final isDark = Theme.of(ctx).brightness == Brightness.dark;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    _confirmClearActivity(ctx, isDark, borderCol, textMain, textMuted);
-  }
-
   int get _silencedCount => _events.where((e) => e['isBlocked'] == true).length;
   int get _allowedCount => _events.where((e) => e['isBlocked'] == false).length;
 
@@ -190,77 +214,67 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
     return _events;
   }
 
-  void _confirmClearActivity(
-    BuildContext context,
-    bool isDark,
-    Color borderCol,
-    Color textMain,
-    Color textMuted,
-  ) {
+  void _confirmClearActivity() {
     if (_events.isEmpty) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Activity log is already empty.',
-              style: TextStyle(color: Color(0xFF09090B), fontWeight: FontWeight.w700),
-            ),
-            backgroundColor: AppTheme.signalWarning,
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('Activity log is already empty.'),
+            backgroundColor: AppTheme.toastWarning,
           ),
         );
       return;
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF18181B) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: borderCol),
-        ),
+        backgroundColor: isDark
+            ? AppTheme.darkSurfaceContainerLow
+            : AppTheme.lightSurfaceContainerLow,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           'Clear Activity Log?',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w700,
             fontSize: 16,
-            color: textMain,
+            color: isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface,
           ),
         ),
         content: Text(
           'Are you sure you want to clear all recorded notification triage events? This on-device audit history cannot be restored.',
-          style: GoogleFonts.inter(fontSize: 13, color: textMuted, height: 1.4),
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            color: isDark
+                ? AppTheme.darkOnSurfaceVariant
+                : AppTheme.lightOnSurfaceVariant,
+            height: 1.4,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.inter(color: textMuted)),
+            child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor:
+                  isDark ? AppTheme.darkError : AppTheme.lightError,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () async {
               Navigator.pop(ctx);
               await AndroidNotificationPlatform.clearNativeActivityLog();
               if (!mounted) return;
-              setState(() {
-                _events.clear();
-              });
+              setState(() => _events.clear());
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
                 ..showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Triage activity log cleared.',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    ),
-                    backgroundColor: AppTheme.signalSuccess,
-                    duration: Duration(seconds: 2),
+                  SnackBar(
+                    content: const Text('Triage activity log cleared.'),
+                    backgroundColor: AppTheme.toastSuccess,
                   ),
                 );
             },
@@ -271,30 +285,43 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
     );
   }
 
-  void _showNotificationDetailsSheet(Map<String, dynamic> evt, bool isDark) {
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final subBoxBg = isDark ? const Color(0xFF222226) : const Color(0xFFF4F4F6);
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    const amber = Color(0xFFF59E0B);
-    const green = Color(0xFF22C55E);
+  void _showNotificationDetailsSheet(
+      Map<String, dynamic> evt, bool isDark) {
+    final containerLow = isDark
+        ? AppTheme.darkSurfaceContainerLow
+        : AppTheme.lightSurfaceContainerLow;
+    final containerHigh = isDark
+        ? AppTheme.darkSurfaceContainerHigh
+        : AppTheme.lightSurfaceContainerHigh;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final secContainer = isDark
+        ? AppTheme.darkSecondaryContainer
+        : AppTheme.lightSecondaryContainer;
+    final onSecContainer = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : AppTheme.lightOnSecondaryContainer;
 
     final String appName = evt['appName'] as String? ?? 'Application';
     final String packageName = evt['packageName'] as String? ?? '';
     final Uint8List? iconBytes = evt['iconBytes'] as Uint8List?;
-    final IconData fallbackIcon = evt['icon'] as IconData? ?? Icons.notifications_paused_rounded;
+    final IconData fallbackIcon =
+        evt['icon'] as IconData? ?? Icons.notifications_paused_rounded;
     final String notifTitle = evt['notifTitle'] as String? ?? '';
     final String notifMessage = evt['notifMessage'] as String? ?? '';
     final String subText = evt['subText'] as String? ?? '';
-    final String fullDateTime = evt['fullDateTime'] as String? ?? (evt['time'] as String? ?? '');
+    final String fullDateTime =
+        evt['fullDateTime'] as String? ?? (evt['time'] as String? ?? '');
     final bool isBlocked = evt['isBlocked'] as bool? ?? false;
     final String reason = evt['reason'] as String? ?? '';
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cardBg,
+      backgroundColor: containerLow,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -310,7 +337,7 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: borderCol,
+                    color: containerHigh,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -322,13 +349,13 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: subBoxBg,
+                      color: containerHigh,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: borderCol),
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: iconBytes != null
-                        ? Image.memory(iconBytes, width: 46, height: 46, fit: BoxFit.cover)
+                        ? Image.memory(iconBytes,
+                            width: 46, height: 46, fit: BoxFit.cover)
                         : Icon(fallbackIcon, color: textMain, size: 22),
                   ),
                   const SizedBox(width: 12),
@@ -338,16 +365,18 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
                       children: [
                         Text(
                           appName,
-                          style: GoogleFonts.inter(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: textMain,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          subText.isNotEmpty ? '$subText · $packageName' : packageName,
-                          style: GoogleFonts.jetBrainsMono(
+                          subText.isNotEmpty
+                              ? '$subText · $packageName'
+                              : packageName,
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             color: textMuted,
                           ),
@@ -358,187 +387,88 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isBlocked
-                          ? amber.withValues(alpha: 0.15)
-                          : green.withValues(alpha: 0.15),
+                      color: isBlocked ? primary.withOpacity(0.18) : secContainer,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isBlocked
-                            ? amber.withValues(alpha: 0.4)
-                            : green.withValues(alpha: 0.4),
-                      ),
                     ),
                     child: Text(
                       isBlocked ? 'MUTED' : 'ALLOWED',
-                      style: GoogleFonts.jetBrainsMono(
+                      style: GoogleFonts.plusJakartaSans(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
-                        color: isBlocked ? amber : green,
+                        color: isBlocked ? primary : onSecContainer,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: subBoxBg,
+                  color: containerHigh.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderCol),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'NOTIFICATION CONTENT',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: amber,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     if (notifTitle.isNotEmpty) ...[
-                      SelectableText(
+                      Text(
                         notifTitle,
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: textMain,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                     ],
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      child: SingleChildScrollView(
-                        child: SelectableText(
-                          notifMessage.isNotEmpty
-                              ? notifMessage
-                              : (notifTitle.isNotEmpty
-                                  ? 'No additional message body.'
-                                  : 'Notification intercepted while $appName was muted (no text content exposed by sender).'),
-                          style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            color: notifMessage.isNotEmpty ? textMain : textMuted,
-                            height: 1.45,
-                          ),
-                        ),
+                    Text(
+                      notifMessage.isNotEmpty
+                          ? notifMessage
+                          : 'No preview content available.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: textMuted,
+                        height: 1.4,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: subBoxBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: borderCol),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.access_time_rounded, size: 14, color: textMuted),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            fullDateTime,
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11.5,
-                              color: textMain,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          isBlocked ? Icons.block_rounded : Icons.check_circle_rounded,
-                          size: 14,
-                          color: isBlocked ? amber : green,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            reason,
-                            style: GoogleFonts.jetBrainsMono(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: isBlocked ? amber : green,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
               Row(
                 children: [
+                  Icon(Icons.shield_outlined, size: 16, color: primary),
+                  const SizedBox(width: 6),
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: textMain,
-                        side: BorderSide(color: borderCol),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text(
-                        'Close',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    child: Text(
+                      reason,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: primary,
                       ),
                     ),
                   ),
-                  if (packageName.isNotEmpty) ...[
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          final opened = await AndroidNotificationPlatform.openApp(packageName);
-                          if (!opened && mounted) {
-                            ScaffoldMessenger.of(context)
-                              ..hideCurrentSnackBar()
-                              ..showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Could not open $appName.',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                                  ),
-                                  backgroundColor: AppTheme.signalError,
-                                ),
-                              );
-                          }
-                        },
-                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                        label: Text(
-                          'Open App',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: amber,
-                          foregroundColor: const Color(0xFF09090B),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                      ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.access_time_rounded, size: 16, color: textMuted),
+                  const SizedBox(width: 6),
+                  Text(
+                    fullDateTime,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: textMuted,
                     ),
-                  ],
+                  ),
                 ],
               ),
             ],
@@ -551,501 +481,492 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF09090B) : const Color(0xFFF9F9FB);
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    const amber = Color(0xFFF59E0B);
+    final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
+    final container = isDark
+        ? AppTheme.darkSurfaceContainer
+        : AppTheme.lightSurfaceContainer;
+    final containerLow = isDark
+        ? AppTheme.darkSurfaceContainerLow
+        : AppTheme.lightSurfaceContainerLow;
+    final containerHigh = isDark
+        ? AppTheme.darkSurfaceContainerHigh
+        : AppTheme.lightSurfaceContainerHigh;
+    final borderCol = isDark
+        ? AppTheme.darkOutlineVariant.withOpacity(0.3)
+        : AppTheme.lightOutlineVariant.withOpacity(0.35);
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final secondary = isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary;
+    final secContainer = isDark
+        ? AppTheme.darkSecondaryContainer
+        : AppTheme.lightSecondaryContainer;
+    final onSecContainer = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : AppTheme.lightOnSecondaryContainer;
 
-    final interceptedStr = '$_silencedCount';
-    final focusGainStr = _silencedCount == 0
-        ? '0m'
-        : (_silencedCount * 4 >= 60
-            ? '${((_silencedCount * 4) / 60).toStringAsFixed(1)}h'
-            : '${_silencedCount * 4}m');
+    final events = _filteredEvents;
 
-    return ListenableBuilder(
-      listenable: widget.repository,
-      builder: (context, _) {
-        return Scaffold(
-          backgroundColor: bg,
-          appBar: widget.isEmbedded
-              ? null
-              : const StitchHeader(
-                  title: 'Activity Log',
+    return Scaffold(
+      backgroundColor: bg,
+      appBar:
+          widget.isEmbedded ? null : const StitchHeader(title: 'Activity Log'),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isTablet = constraints.maxWidth >= 600;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isTablet ? 1200 : 600,
                 ),
-          body: RefreshIndicator(
-            color: amber,
-            onRefresh: _loadNativeEvents,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              children: [
-                Text(
-                  'Notifications captured while apps are muted',
-                  style: GoogleFonts.inter(
-                    fontSize: 13.5,
-                    color: textMuted,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 24 : 16,
+                    vertical: 8,
                   ),
-                ),
-                const SizedBox(height: 16),
-
-                // 3 Metric Cards Grid
-                Row(
-                  children: [
-                    _buildMetricTile(
-                      title: 'Intercepted',
-                      value: interceptedStr,
-                      subtitle: 'Muted alerts held',
-                      icon: Icons.shield_rounded,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildMetricTile(
-                      title: 'Focus Gain',
-                      value: focusGainStr,
-                      subtitle: 'Deep focus saved',
-                      icon: Icons.bolt_rounded,
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: 8),
-                    _buildMetricTile(
-                      title: 'Leak Rate',
-                      value: '0%',
-                      subtitle: 'Zero cloud sync',
-                      icon: Icons.lock_outline_rounded,
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Filter Chips
-                Row(
-                  children: [
-                    _buildFilterChip('All ${_events.length}', 'all', isDark),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Silenced $_silencedCount', 'silenced', isDark),
-                    const SizedBox(width: 8),
-                    _buildFilterChip('Allowed $_allowedCount', 'allowed', isDark),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Events Section Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _events.isEmpty ? 'Events' : 'Recorded · ${_filteredEvents.length} Events',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: textMain,
+                  child: Column(
+                    children: [
+                      // Top 3 Bento Metrics (Intercepted, Permitted, Leak Rate)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Intercepted',
+                              count: '$_silencedCount',
+                              tag: 'MUTED',
+                              icon: Icons.notifications_off_rounded,
+                              isDark: isDark,
+                              container: container,
+                              containerHigh: containerHigh,
+                              borderCol: borderCol,
+                              textMain: textMain,
+                              textMuted: textMuted,
+                              accent: primary,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Permitted',
+                              count: '$_allowedCount',
+                              tag: 'ALERTS',
+                              icon: Icons.notifications_active_rounded,
+                              isDark: isDark,
+                              container: container,
+                              containerHigh: secContainer,
+                              borderCol: borderCol,
+                              textMain: textMain,
+                              textMuted: textMuted,
+                              accent: onSecContainer,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _buildMetricCard(
+                              title: 'Privacy Node',
+                              count: '100%',
+                              tag: 'LOCAL',
+                              icon: Icons.shield_rounded,
+                              isDark: isDark,
+                              container: container,
+                              containerHigh: secContainer,
+                              borderCol: borderCol,
+                              textMain: textMain,
+                              textMuted: textMuted,
+                              accent: secondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    GestureDetector(
-                      onTap: () => _confirmClearActivity(context, isDark, borderCol, textMain, textMuted),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      const SizedBox(height: 14),
+
+                      // Filter Bar & Clear Action
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
+                          color: containerLow,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderCol, width: 1.0),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.delete_sweep_rounded, size: 13, color: amber),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Clear Log',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: amber,
+                            // Filter Pills
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildFilterPill('all', 'All',
+                                        _events.length, isDark),
+                                    const SizedBox(width: 6),
+                                    _buildFilterPill('silenced', 'Silenced',
+                                        _silencedCount, isDark),
+                                    const SizedBox(width: 6),
+                                    _buildFilterPill('allowed', 'Allowed',
+                                        _allowedCount, isDark),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Clear Button
+                            GestureDetector(
+                              onTap: _confirmClearActivity,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: containerHigh,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.delete_sweep_rounded,
+                                        size: 16, color: textMuted),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Clear Log',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                // Events Stream or Clean Zero-State
-                if (_events.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderCol),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.history_toggle_off_rounded, size: 28, color: amber),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No Activity Recorded',
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: textMain,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Notifications that arrive while an app is muted will be recorded here with full message details.',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: textMuted,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (_filteredEvents.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderCol),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'No $_selectedFilter events match the current filter.',
-                        style: GoogleFonts.inter(fontSize: 13, color: textMuted),
+                      // Recorded Events List
+                      Expanded(
+                        child: events.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.history_toggle_off_rounded,
+                                        size: 40, color: textMuted),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'No notification events recorded',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        color: textMain,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Notifications intercepted or permitted will appear here in real-time.',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 12.5,
+                                        color: textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.only(
+                                    top: 4, bottom: 24),
+                                itemCount: events.length,
+                                itemBuilder: (context, index) {
+                                  final evt = events[index];
+                                  final isBlocked =
+                                      evt['isBlocked'] as bool? ?? false;
+                                  final Uint8List? iconBytes =
+                                      evt['iconBytes'] as Uint8List?;
+
+                                  return InkWell(
+                                    onTap: () => _showNotificationDetailsSheet(
+                                        evt, isDark),
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(bottom: 10),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: containerLow,
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(
+                                            color: borderCol, width: 1.0),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // App Icon with Small Status Indicator
+                                          Stack(
+                                            children: [
+                                              Container(
+                                                width: 42,
+                                                height: 42,
+                                                decoration: BoxDecoration(
+                                                  color: containerHigh,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                ),
+                                                clipBehavior: Clip.antiAlias,
+                                                child: iconBytes != null
+                                                    ? Image.memory(
+                                                        iconBytes,
+                                                        width: 42,
+                                                        height: 42,
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                    : Icon(
+                                                        evt['icon'] as IconData? ??
+                                                            Icons.notifications,
+                                                        size: 20,
+                                                        color: textMain,
+                                                      ),
+                                              ),
+                                              Positioned(
+                                                bottom: 0,
+                                                right: 0,
+                                                child: Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  decoration: BoxDecoration(
+                                                    color: isBlocked
+                                                        ? primary
+                                                        : secondary,
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: containerLow,
+                                                      width: 1.5,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(width: 12),
+
+                                          // Content Details
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Text(
+                                                      evt['appName'] as String? ??
+                                                          'App',
+                                                      style: GoogleFonts
+                                                          .plusJakartaSans(
+                                                        fontSize: 13.5,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: textMain,
+                                                      ),
+                                                    ),
+                                                    if ((evt['notifTitle']
+                                                                as String? ??
+                                                            '')
+                                                        .isNotEmpty) ...[
+                                                      Text(
+                                                        ' · ${evt['notifTitle']}',
+                                                        style: GoogleFonts
+                                                            .plusJakartaSans(
+                                                          fontSize: 12.5,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: textMain,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ],
+                                                    const Spacer(),
+                                                    Text(
+                                                      evt['time'] as String? ?? '',
+                                                      style: GoogleFonts
+                                                          .plusJakartaSans(
+                                                        fontSize: 11,
+                                                        color: textMuted,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  (evt['notifMessage']
+                                                                  as String? ??
+                                                              '')
+                                                          .isNotEmpty
+                                                      ? '“${evt['notifMessage']}”'
+                                                      : evt['reason']
+                                                              as String? ??
+                                                          '',
+                                                  style: GoogleFonts
+                                                      .plusJakartaSans(
+                                                    fontSize: 12,
+                                                    fontStyle: FontStyle.italic,
+                                                    color: textMuted,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                       ),
-                    ),
-                  )
-                else
-                  ..._filteredEvents.map((evt) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildEventCard(
-                          evt: evt,
-                          isDark: isDark,
-                        ),
-                      )),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        );
-      },
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
-  Widget _buildMetricTile({
+  Widget _buildMetricCard({
     required String title,
-    required String value,
-    required String subtitle,
+    required String count,
+    required String tag,
     required IconData icon,
     required bool isDark,
+    required Color container,
+    required Color containerHigh,
+    required Color borderCol,
+    required Color textMain,
+    required Color textMuted,
+    required Color accent,
   }) {
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    const amber = Color(0xFFF59E0B);
-
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderCol),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: textMuted,
-                  ),
-                ),
-                Icon(icon, size: 14, color: amber),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: GoogleFonts.jetBrainsMono(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: textMain,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: GoogleFonts.inter(
-                fontSize: 10,
-                color: textMuted,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: container,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderCol, width: 1.0),
       ),
-    );
-  }
-
-  Widget _buildFilterChip(String label, String value, bool isDark) {
-    final isSelected = _selectedFilter == value;
-    const amber = Color(0xFFF59E0B);
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-
-    return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected ? amber : cardBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? amber : borderCol),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w700,
-            color: isSelected ? const Color(0xFF09090B) : textMain,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventCard({
-    required Map<String, dynamic> evt,
-    required bool isDark,
-  }) {
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final subBoxBg = isDark ? const Color(0xFF222226) : const Color(0xFFF4F4F6);
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    const amber = Color(0xFFF59E0B);
-    const green = Color(0xFF22C55E);
-
-    final IconData appIcon = evt['icon'] as IconData? ?? Icons.notifications_none_rounded;
-    final Uint8List? iconBytes = evt['iconBytes'] as Uint8List?;
-    final String appName = evt['appName'] as String? ?? 'Notification';
-    final String subText = evt['subText'] as String? ?? '';
-    final String notifTitle = evt['notifTitle'] as String? ?? '';
-    final String notifMessage = evt['notifMessage'] as String? ?? '';
-    final String time = evt['time'] as String? ?? 'Just now';
-    final bool isBlocked = evt['isBlocked'] as bool? ?? false;
-    final String reason = evt['reason'] as String? ?? 'Evaluated';
-
-    final String headerLabel = subText.isNotEmpty ? '$appName · $subText' : appName;
-    final String primaryLine = notifTitle.isNotEmpty
-        ? (notifMessage.isNotEmpty ? '$notifTitle: $notifMessage' : notifTitle)
-        : (notifMessage.isNotEmpty
-            ? notifMessage
-            : (isBlocked
-                ? 'Notification silenced while $appName was muted'
-                : 'Notification allowed for $appName'));
-
-    return InkWell(
-      onTap: () => _showNotificationDetailsSheet(evt, isDark),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: cardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderCol),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Row: App Icon + App Name/Subtext + Time + Status Badge
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: subBoxBg,
-                    borderRadius: BorderRadius.circular(11),
-                    border: Border.all(color: borderCol),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: iconBytes != null
-                      ? Image.memory(
-                          iconBytes,
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.cover,
-                        )
-                      : Icon(appIcon, size: 20, color: textMain),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, size: 16, color: accent),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  color: containerHigh,
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        headerLabel,
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: textMain,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        time,
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 11,
-                          color: textMuted,
-                        ),
-                      ),
-                    ],
+                child: Text(
+                  tag,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: isBlocked
-                        ? amber.withValues(alpha: 0.15)
-                        : green.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isBlocked
-                          ? amber.withValues(alpha: 0.35)
-                          : green.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: isBlocked ? amber : green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        isBlocked ? 'SILENCED' : 'ALLOWED',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.4,
-                          color: isBlocked ? amber : green,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Middle: Notification Title & Message Details
-            if (notifTitle.isNotEmpty && notifMessage.isNotEmpty) ...[
-              Text(
-                notifTitle,
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: textMain,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-              Text(
-                notifMessage,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: textMuted,
-                  height: 1.35,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ] else ...[
-              Text(
-                primaryLine,
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: textMain,
-                  height: 1.35,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ],
-            const SizedBox(height: 10),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            count,
+            style: GoogleFonts.newsreader(
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              color: textMain,
+              letterSpacing: -0.4,
+            ),
+          ),
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // Bottom: Rule / Mute Reason Pill
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: subBoxBg,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: borderCol),
+  Widget _buildFilterPill(
+      String key, String label, int count, bool isDark) {
+    final isSelected = _selectedFilter == key;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final containerHigh = isDark
+        ? AppTheme.darkSurfaceContainerHigh
+        : AppTheme.lightSurfaceContainerHigh;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedFilter = key),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: isSelected
+                    ? (isDark
+                        ? AppTheme.darkOnPrimary
+                        : AppTheme.lightOnPrimary)
+                    : textMuted,
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    isBlocked ? Icons.block_rounded : Icons.check_circle_rounded,
-                    size: 14,
-                    color: isBlocked ? amber : green,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      reason,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: textMuted,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 16,
-                    color: textMuted,
-                  ),
-                ],
+            ),
+            const SizedBox(width: 5),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? (isDark
+                        ? AppTheme.darkOnPrimary.withOpacity(0.2)
+                        : AppTheme.lightOnPrimary.withOpacity(0.2))
+                    : containerHigh,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected
+                      ? (isDark
+                          ? AppTheme.darkOnPrimary
+                          : AppTheme.lightOnPrimary)
+                      : textMuted,
+                ),
               ),
             ),
           ],
@@ -1054,4 +975,3 @@ class ActivityScreenState extends State<ActivityScreen> with WidgetsBindingObser
     );
   }
 }
-

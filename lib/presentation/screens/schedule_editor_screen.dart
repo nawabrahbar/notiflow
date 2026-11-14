@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
+import '../../domain/models/rule_template.dart';
 import '../../domain/models/schedule_rule.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
 
-/// Schedule Rule Editor matching Stitch Obsidian Signal redesign.
-/// Features Rule configuration header, BLOCK vs ALLOW mode selector,
-/// Start / End time pickers with overnight math, 7-day recurrence selector,
-/// and urgent call escalation toggle.
+/// Schedule Rule Editor matching Botanical Sanctuary & Nocturne specifications:
+/// - Seamless header (no bottom border, integrated canvas)
+/// - "QUICK LOAD TEMPLATE / SAVED RULE" dropdown with placeholder "Choose a rule"
+/// - Autofills entire rule form upon template selection
+/// - Block vs Allow radio cards with organic botanical accents
+/// - Starts / Ends At time cards with duration math & overnight badge
+/// - Recurrence day presets & 7 individual day toggle buttons
+/// - Deduplicates and cycles newly saved custom rules into localDB templates
 class ScheduleEditorScreen extends StatefulWidget {
   final ScheduleRepository repository;
   final ManagedApp? app;
@@ -38,6 +43,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   late int _endMinute;
   late Set<int> _daysOfWeek;
   late bool _allowUrgent;
+  String? _selectedTemplateId;
   bool _isSaving = false;
 
   ManagedApp get _effectiveApp =>
@@ -78,6 +84,20 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     super.dispose();
   }
 
+  void _onTemplateSelected(RuleTemplate template) {
+    setState(() {
+      _selectedTemplateId = template.id;
+      _nameController.text = template.name;
+      _mode = template.mode;
+      _startHour = template.startTime.hour;
+      _startMinute = template.startTime.minute;
+      _endHour = template.endTime.hour;
+      _endMinute = template.endTime.minute;
+      _daysOfWeek = Set<int>.from(template.daysOfWeek);
+      _allowUrgent = template.allowVipContacts;
+    });
+  }
+
   int _calculateSpanHours() {
     int startM = _startHour * 60 + _startMinute;
     int endM = _endHour * 60 + _endMinute;
@@ -106,6 +126,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
 
     if (time != null) {
       setState(() {
+        _selectedTemplateId = null; // custom adjustment
         if (isStart) {
           _startHour = time.hour;
           _startMinute = time.minute;
@@ -119,6 +140,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
 
   void _applyDayPreset(String preset) {
     setState(() {
+      _selectedTemplateId = null;
       if (preset == 'everyday') {
         _daysOfWeek = {1, 2, 3, 4, 5, 6, 7};
       } else if (preset == 'weekdays') {
@@ -129,14 +151,27 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     });
   }
 
+  void _toggleDay(int day) {
+    setState(() {
+      _selectedTemplateId = null;
+      if (_daysOfWeek.contains(day)) {
+        if (_daysOfWeek.length > 1) {
+          _daysOfWeek.remove(day);
+        }
+      } else {
+        _daysOfWeek.add(day);
+      }
+    });
+  }
+
   Future<void> _handleSave() async {
     setState(() => _isSaving = true);
     final now = DateTime.now();
     final trimmedName = _nameController.text.trim();
 
     final rule = ScheduleRule(
-      id: widget.existingRule?.id ?? 'rule_${now.millisecondsSinceEpoch}',
-      appId: _effectiveApp.id,
+      id: widget.existingRule?.id ?? 'rule_${widget.existingRule?.appId ?? _effectiveApp.id}_${now.millisecondsSinceEpoch}',
+      appId: widget.existingRule?.appId ?? _effectiveApp.id,
       name: trimmedName.isNotEmpty ? trimmedName : 'Focus Schedule',
       enabled: widget.existingRule?.enabled ?? true,
       mode: _mode,
@@ -148,7 +183,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
       updatedAt: now,
     );
 
-    await widget.repository.saveRule(rule);
+    await widget.repository.saveRule(rule, autoSaveTemplate: true);
     setState(() => _isSaving = false);
 
     if (mounted) {
@@ -167,75 +202,179 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     }
   }
 
+  String _formatTimeDisplay(int hour, int minute) {
+    return widget.repository.formatTimeOfDay(hour, minute);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF09090B) : const Color(0xFFF9F9FB);
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    final amber = const Color(0xFFF59E0B);
+    final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
+    final cardBg = isDark ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow;
+    final cardBgHighest = isDark ? AppTheme.darkSurfaceContainerHighest : AppTheme.lightSurfaceContainer;
+    final borderCol = isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final primaryCol = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final primaryContainerCol = isDark ? AppTheme.darkPrimaryContainer : AppTheme.lightPrimaryContainer;
+    final secondaryContainerCol = isDark ? AppTheme.darkSecondaryContainer : AppTheme.lightSecondaryContainer;
+    final onSecondaryContainerCol = isDark ? AppTheme.darkOnSecondaryContainer : AppTheme.lightOnSecondaryContainer;
 
     final spanHours = _calculateSpanHours();
+    final templates = widget.repository.savedTemplates;
 
     return Scaffold(
       backgroundColor: bg,
-      appBar: const StitchHeader(title: 'Schedule Rule Editor'),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: Container(
+          color: bg,
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top,
+            left: 8,
+            right: 16,
+          ),
+          child: Row(
             children: [
-              // Top Meta Pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: borderCol),
-                ),
+              IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: Icon(Icons.arrow_back_rounded, color: textMain),
+                tooltip: 'Back',
+              ),
+              Expanded(
                 child: Text(
-                  'RULE CONFIGURATION · AUTOMATION #04',
-                  style: GoogleFonts.jetBrainsMono(
-                    color: amber,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+                  'Schedule Rule Editor',
+                  style: GoogleFonts.newsreader(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: textMain,
+                    letterSpacing: -0.3,
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const StitchThemeSwitch(),
+            ],
+          ),
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 600;
 
+          final templateAndNameColumn = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // QUICK LOAD TEMPLATE / SAVED RULE Dropdown
               Text(
-                'Custom Cadence',
-                style: GoogleFonts.inter(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: textMain,
-                  letterSpacing: -0.6,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Define automated focus shields & notification intervals. High-efficiency triage active.',
-                style: GoogleFonts.inter(
-                  fontSize: 13.5,
+                'QUICK LOAD TEMPLATE / SAVED RULE',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
                   color: textMuted,
-                  height: 1.4,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _selectedTemplateId != null ? primaryCol : borderCol,
+                    width: _selectedTemplateId != null ? 1.5 : 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.bookmark_border_rounded,
+                      color: primaryCol,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedTemplateId,
+                          hint: Text(
+                            'Choose a rule',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: textMuted,
+                            ),
+                          ),
+                          isExpanded: true,
+                          icon: Icon(Icons.expand_more_rounded, color: textMuted, size: 22),
+                          dropdownColor: cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          items: templates.map((tmpl) {
+                            return DropdownMenuItem<String>(
+                              value: tmpl.id,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      tmpl.name,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: textMain,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${widget.repository.formatTime(tmpl.startTime)} - ${widget.repository.formatTime(tmpl.endTime)}',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      color: textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (templateId) {
+                            if (templateId == null) return;
+                            final tmpl = templates.firstWhere((t) => t.id == templateId);
+                            _onTemplateSelected(tmpl);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 5),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Hint: Select a saved rule to auto-fill',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: textMuted.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 22),
 
               // Rule Name Input
               Text(
                 'RULE NAME',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 11,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: textMuted,
                   letterSpacing: 0.8,
+                  color: textMuted,
                 ),
               ),
               const SizedBox(height: 8),
@@ -244,49 +383,85 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: borderCol),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: TextField(
                   controller: _nameController,
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600, color: textMain),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: textMain,
+                  ),
                   decoration: InputDecoration(
                     border: InputBorder.none,
-                    hintText: 'e.g. Work Focus Hours, Sleep Shield',
-                    hintStyle: GoogleFonts.inter(color: textMuted),
+                    hintText: 'Enter rule moniker...',
+                    hintStyle: GoogleFonts.plusJakartaSans(
+                      color: textMuted.withValues(alpha: 0.6),
+                      fontSize: 14,
+                    ),
+                    suffixIcon: Icon(Icons.edit_note_rounded, color: textMuted, size: 20),
                   ),
+                  onChanged: (_) {
+                    if (_selectedTemplateId != null) {
+                      setState(() => _selectedTemplateId = null);
+                    }
+                  },
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 22),
 
               // Interception Behavior (BLOCK vs ALLOW)
               Text(
                 'INTERCEPTION BEHAVIOR',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 11,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color: textMuted,
                   letterSpacing: 0.8,
+                  color: textMuted,
                 ),
               ),
               const SizedBox(height: 10),
-
               Row(
                 children: [
+                  // BLOCK Option Card
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() => _mode = ScheduleMode.blockDuring),
-                      child: Container(
+                      onTap: () {
+                        setState(() {
+                          _mode = ScheduleMode.blockDuring;
+                          _selectedTemplateId = null;
+                        });
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: _mode == ScheduleMode.blockDuring
-                              ? (isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7))
+                              ? (isDark
+                                  ? primaryContainerCol.withValues(alpha: 0.25)
+                                  : primaryContainerCol.withValues(alpha: 0.2))
                               : cardBg,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: _mode == ScheduleMode.blockDuring ? amber : borderCol,
-                            width: _mode == ScheduleMode.blockDuring ? 1.8 : 1,
+                            color: _mode == ScheduleMode.blockDuring ? primaryCol : borderCol,
+                            width: _mode == ScheduleMode.blockDuring ? 1.8 : 1.0,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,25 +469,37 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Icon(Icons.remove_circle_outline_rounded,
-                                    color: _mode == ScheduleMode.blockDuring ? amber : textMuted, size: 20),
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: primaryCol.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.do_not_disturb_on_rounded,
+                                    color: primaryCol,
+                                    size: 18,
+                                  ),
+                                ),
                                 if (_mode == ScheduleMode.blockDuring)
-                                  Icon(Icons.check_circle_rounded, color: amber, size: 18),
+                                  Icon(Icons.check_circle_rounded, color: primaryCol, size: 20),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             Text(
                               'BLOCK',
-                              style: GoogleFonts.jetBrainsMono(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: _mode == ScheduleMode.blockDuring ? amber : textMain,
+                                fontWeight: FontWeight.w700,
+                                color: textMain,
+                                letterSpacing: 0.3,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Silence alerts',
-                              style: GoogleFonts.inter(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12,
                                 color: textMuted,
                               ),
@@ -322,21 +509,40 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 12),
+
+                  // ALLOW Option Card
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() => _mode = ScheduleMode.allowDuring),
-                      child: Container(
+                      onTap: () {
+                        setState(() {
+                          _mode = ScheduleMode.allowDuring;
+                          _selectedTemplateId = null;
+                        });
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
                           color: _mode == ScheduleMode.allowDuring
-                              ? (isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7))
+                              ? (isDark
+                                  ? primaryContainerCol.withValues(alpha: 0.25)
+                                  : primaryContainerCol.withValues(alpha: 0.2))
                               : cardBg,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: _mode == ScheduleMode.allowDuring ? const Color(0xFF22C55E) : borderCol,
-                            width: _mode == ScheduleMode.allowDuring ? 1.8 : 1,
+                            color: _mode == ScheduleMode.allowDuring ? primaryCol : borderCol,
+                            width: _mode == ScheduleMode.allowDuring ? 1.8 : 1.0,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,25 +550,37 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Icon(Icons.notifications_active_outlined,
-                                    color: _mode == ScheduleMode.allowDuring ? const Color(0xFF22C55E) : textMuted, size: 20),
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: (isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary).withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.notifications_active_rounded,
+                                    color: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
+                                    size: 18,
+                                  ),
+                                ),
                                 if (_mode == ScheduleMode.allowDuring)
-                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
+                                  Icon(Icons.check_circle_rounded, color: primaryCol, size: 20),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
                             Text(
                               'ALLOW',
-                              style: GoogleFonts.jetBrainsMono(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: _mode == ScheduleMode.allowDuring ? const Color(0xFF16A34A) : textMain,
+                                fontWeight: FontWeight.w700,
+                                color: textMain,
+                                letterSpacing: 0.3,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               'Pass through',
-                              style: GoogleFonts.inter(
+                              style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12,
                                 color: textMuted,
                               ),
@@ -375,198 +593,37 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 22),
 
-              // Time Window Selectors
-              Text(
-                'TIME WINDOW · DAILY SCHEDULE',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: textMuted,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _pickTime(isStart: true),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: borderCol),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'STARTS AT',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '${_startHour.toString().padLeft(2, '0')}:${_startMinute.toString().padLeft(2, '0')}',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: textMain,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
-                    child: Icon(Icons.arrow_forward_rounded, color: Color(0xFFF59E0B), size: 20),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _pickTime(isStart: false),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: borderCol),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'ENDS AT',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '${_endHour.toString().padLeft(2, '0')}:${_endMinute.toString().padLeft(2, '0')}',
-                              style: GoogleFonts.jetBrainsMono(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: textMain,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Span duration indicator
+              // Priority Urgent Call Exception Card
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF121214) : const Color(0xFFF3F3F5),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: borderCol),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle_outline_rounded, size: 16, color: amber),
-                    const SizedBox(width: 8),
-                    Text(
-                      _isOvernight
-                          ? 'Overnight interval ($spanHours hrs total across midnight)'
-                          : 'Same day interval ($spanHours hrs total)',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Recurrence Days
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'RECURRENCE DAYS',
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: textMuted,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  Text(
-                    '${_daysOfWeek.length} days / week',
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: amber,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              // Day presets
-              Row(
-                children: [
-                  _buildDayPresetChip('Everyday', 'everyday', isDark),
-                  const SizedBox(width: 8),
-                  _buildDayPresetChip('Weekdays', 'weekdays', isDark),
-                  const SizedBox(width: 8),
-                  _buildDayPresetChip('Weekends', 'weekends', isDark),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // 7 Day Toggle Pills
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildDayPill('M', 1, isDark),
-                  _buildDayPill('T', 2, isDark),
-                  _buildDayPill('W', 3, isDark),
-                  _buildDayPill('T', 4, isDark),
-                  _buildDayPill('F', 5, isDark),
-                  _buildDayPill('S', 6, isDark),
-                  _buildDayPill('S', 7, isDark),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // Exceptions & Escalation
-              Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: cardBg,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: borderCol),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
+                        color: secondaryContainerCol,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.emergency_rounded, color: amber, size: 20),
+                      child: Icon(
+                        Icons.emergency_rounded,
+                        color: onSecondaryContainerCol,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -574,8 +631,8 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Allow urgent repeated calls',
-                            style: GoogleFonts.inter(
+                            'Urgent Call Escalation',
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: textMain,
@@ -583,8 +640,11 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Passes priority pings through if received twice within 3 minutes.',
-                            style: GoogleFonts.inter(fontSize: 12, color: textMuted, height: 1.3),
+                            'Allow repeated calls within 3 minutes',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 12,
+                              color: textMuted,
+                            ),
                           ),
                         ],
                       ),
@@ -597,100 +657,403 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-              // Save Button
+              // Save Action Button
               SizedBox(
                 width: double.infinity,
+                height: 50,
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _handleSave,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: amber,
-                    foregroundColor: const Color(0xFF09090B),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    backgroundColor: primaryCol,
+                    foregroundColor: isDark ? const Color(0xFF482900) : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     elevation: 0,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Save Schedule Rule',
-                        style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.check_rounded, size: 18),
-                    ],
-                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          widget.existingRule != null ? 'Update Schedule Rule' : 'Save Schedule Rule',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
                 ),
               ),
-              const SizedBox(height: 20),
             ],
-          ),
-        ),
+          );
+
+          final timingAndRecurrenceColumn = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Time Window · Daily Schedule
+              Text(
+                'TIME WINDOW · DAILY SCHEDULE',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: textMuted,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  // Starts At Card
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _pickTime(isStart: true),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderCol),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'STARTS AT',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                                color: textMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatTimeDisplay(_startHour, _startMinute),
+                              style: GoogleFonts.newsreader(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w600,
+                                color: textMain,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Center Arrow Indicator
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: cardBgHighest,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.arrow_forward_rounded, size: 16, color: primaryCol),
+                    ),
+                  ),
+
+                  // Ends At Card
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _pickTime(isStart: false),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderCol),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ENDS AT',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
+                                color: textMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatTimeDisplay(_endHour, _endMinute),
+                              style: GoogleFonts.newsreader(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w600,
+                                color: textMain,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // Duration & Overnight Indicators
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: cardBgHighest,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Duration: $spanHours hrs',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted,
+                      ),
+                    ),
+                  ),
+                  if (_isOvernight) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: primaryCol.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.bedtime_rounded, size: 12, color: primaryCol),
+                          const SizedBox(width: 4),
+                          Text(
+                            '+1 DAY OVERNIGHT',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                              color: primaryCol,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Recurrence Days
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'RECURRENCE DAYS',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: textMuted,
+                    ),
+                  ),
+                  Text(
+                    '${_daysOfWeek.length} days / week',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: primaryCol,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Day Presets
+              Row(
+                children: [
+                  _buildPresetButton(
+                    label: 'Everyday',
+                    isActive: _daysOfWeek.length == 7,
+                    onTap: () => _applyDayPreset('everyday'),
+                    primaryCol: primaryCol,
+                    cardBg: cardBg,
+                    borderCol: borderCol,
+                    textMain: textMain,
+                    textMuted: textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildPresetButton(
+                    label: 'Weekdays',
+                    isActive: _daysOfWeek.length == 5 &&
+                        _daysOfWeek.contains(1) &&
+                        _daysOfWeek.contains(2) &&
+                        _daysOfWeek.contains(3) &&
+                        _daysOfWeek.contains(4) &&
+                        _daysOfWeek.contains(5),
+                    onTap: () => _applyDayPreset('weekdays'),
+                    primaryCol: primaryCol,
+                    cardBg: cardBg,
+                    borderCol: borderCol,
+                    textMain: textMain,
+                    textMuted: textMuted,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildPresetButton(
+                    label: 'Weekends',
+                    isActive: _daysOfWeek.length == 2 &&
+                        _daysOfWeek.contains(6) &&
+                        _daysOfWeek.contains(7),
+                    onTap: () => _applyDayPreset('weekends'),
+                    primaryCol: primaryCol,
+                    cardBg: cardBg,
+                    borderCol: borderCol,
+                    textMain: textMain,
+                    textMuted: textMuted,
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // 7 Day Toggle Squircle Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildDayButton(1, 'M', primaryCol, cardBg, borderCol, textMain, textMuted),
+                  _buildDayButton(2, 'T', primaryCol, cardBg, borderCol, textMain, textMuted),
+                  _buildDayButton(3, 'W', primaryCol, cardBg, borderCol, textMain, textMuted),
+                  _buildDayButton(4, 'T', primaryCol, cardBg, borderCol, textMain, textMuted),
+                  _buildDayButton(5, 'F', primaryCol, cardBg, borderCol, textMain, textMuted),
+                  _buildDayButton(6, 'S', primaryCol, cardBg, borderCol, textMain, textMuted),
+                  _buildDayButton(7, 'S', primaryCol, cardBg, borderCol, textMain, textMuted),
+                ],
+              ),
+            ],
+          );
+
+          if (isTablet) {
+            return ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 7, child: templateAndNameColumn),
+                    const SizedBox(width: 24),
+                    Expanded(flex: 5, child: timingAndRecurrenceColumn),
+                  ],
+                ),
+                const SizedBox(height: 32),
+              ],
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            children: [
+              templateAndNameColumn,
+              const SizedBox(height: 24),
+              timingAndRecurrenceColumn,
+              const SizedBox(height: 32),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildDayPresetChip(String label, String id, bool isDark) {
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-
+  Widget _buildPresetButton({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+    required Color primaryCol,
+    required Color cardBg,
+    required Color borderCol,
+    required Color textMain,
+    required Color textMuted,
+  }) {
     return GestureDetector(
-      onTap: () => _applyDayPreset(id),
-      child: Container(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: cardBg,
+          color: isActive ? primaryCol : cardBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: borderCol),
+          border: Border.all(color: isActive ? primaryCol : borderCol),
         ),
         child: Text(
           label,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: textMain,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12,
+            fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+            color: isActive ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF482900) : Colors.white) : textMuted,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDayPill(String label, int dayIndex, bool isDark) {
-    final isSelected = _daysOfWeek.contains(dayIndex);
-    final amber = const Color(0xFFF59E0B);
+  Widget _buildDayButton(
+    int day,
+    String label,
+    Color primaryCol,
+    Color cardBg,
+    Color borderCol,
+    Color textMain,
+    Color textMuted,
+  ) {
+    final bool active = _daysOfWeek.contains(day);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          if (isSelected) {
-            if (_daysOfWeek.length > 1) _daysOfWeek.remove(dayIndex);
-          } else {
-            _daysOfWeek.add(dayIndex);
-          }
-        });
-      },
-      child: Container(
-        width: 38,
-        height: 38,
+      onTap: () => _toggleDay(day),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
-          color: isSelected
-              ? amber
-              : (isDark ? const Color(0xFF18181B) : const Color(0xFFEEEEF0)),
+          color: active ? primaryCol : cardBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? amber : (isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4)),
-          ),
+          border: Border.all(color: active ? primaryCol : borderCol),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: isSelected ? const Color(0xFF09090B) : (isDark ? const Color(0xFFA1A1AA) : const Color(0xFF77767B)),
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: active
+                ? (isDark ? const Color(0xFF482900) : Colors.white)
+                : textMuted,
           ),
         ),
       ),

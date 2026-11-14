@@ -77,8 +77,8 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 | 5 | **Navigation Shell** | [`lib/presentation/screens/main_navigation_shell.dart`](lib/presentation/screens/main_navigation_shell.dart) | 4-tab bottom navigation (*Rules*, *Apps*, *Activity*, *Settings*) |
 | 6 | **Dashboard (Rules)** | [`lib/presentation/screens/dashboard_screen.dart`](lib/presentation/screens/dashboard_screen.dart) | Time-based greeting, triage counters, global overrides, managed apps |
 | 7 | **Add Apps Screen** | [`lib/presentation/screens/add_apps_screen.dart`](lib/presentation/screens/add_apps_screen.dart) | Installed app discovery, search, and category filters (*Messaging*, *Social*, etc.) |
-| 8 | **App Details Screen** | [`lib/presentation/screens/app_details_screen.dart`](lib/presentation/screens/app_details_screen.dart) | Real-time triage status card, quick mute pills, and app rule list |
-| 9 | **Schedule Editor** | [`lib/presentation/screens/schedule_editor_screen.dart`](lib/presentation/screens/schedule_editor_screen.dart) | Rule name, BLOCK/ALLOW mode, time pickers, overnight badge, day pills |
+| 8 | **App Details Screen** | [`lib/presentation/screens/app_details_screen.dart`](lib/presentation/screens/app_details_screen.dart) | Real-time triage status card, quick mute pills, multiple schedule rules list, and + Add Schedule button |
+| 9 | **Schedule Editor** | [`lib/presentation/screens/schedule_editor_screen.dart`](lib/presentation/screens/schedule_editor_screen.dart) | Quick Load Template dropdown with deduplication, BLOCK/ALLOW mode, time pickers, overnight badge, and day pills |
 | 10 | **Activity Log** | [`lib/presentation/screens/activity_screen.dart`](lib/presentation/screens/activity_screen.dart) | Muted notification log with full message details and app launcher sheet |
 | 11 | **Settings Screen** | [`lib/presentation/screens/settings_screen.dart`](lib/presentation/screens/settings_screen.dart) | Service health, on-device privacy audit, `.notiflow` backup/restore, reset |
 
@@ -91,6 +91,27 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 ## 📋 Changelog & Recent Updates
 
+- **v1.6.0 (`+10`) — Botanical Sanctuary Redesign, Rule Templates, Tablet Expansion & Native Hardening**:
+  - **Botanical Sanctuary & Nocturne Redesign**: Warm Canvas (`#FEF8F6`) / Deep Forest (`#101412`), Terracotta (`#7D562D` / `#FCBC76`), and Sage Green (`#5A6242` / `#BECCA3`) with elegant Newsreader display serifs and Plus Jakarta Sans body typography.
+  - **Seamless Canvas Flow**: Completely eliminated header bottom borders and dividers across all screens for a unified, tranquil surface.
+  - **Urgent Repeated Call Bypass (< 3 Minutes) Native Fix**: Fixed incoming call interception in native Kotlin (`NotificationHandlerListenerService.kt` & `NativeScheduleStore.kt`). Ringing calls are no longer skipped as ongoing foreground events; a 1st call during quiet hours is silenced while arming a 3-minute window, and a 2nd call from the same caller within 180 seconds immediately rings through.
+  - **Material You Dynamic Themed App Icon**: Added monochrome adaptive launcher icon layer (`<monochrome>`), enabling Android 13+ device home screens and app drawers to dynamically theme Notiflow in light or dark mode following system appearance.
+  - **First-Launch Theme Sync & Explicit User Preference**: Opens strictly following device system appearance on initial launch, then retains explicit user preference across subsequent sessions once toggled.
+  - **Responsive Phone & Tablet Architecture**:
+    - **Adaptive Navigation**: Bottom navigation bar on phones (<600dp), 88dp left Navigation Rail with emblem and 4 tabs on tablets (≥600dp).
+    - **Dashboard Bento**: 5:7 two-column responsive bento on tablet.
+    - **Add Apps Screen**: 2-column responsive grid on tablet with 5 category filter chips.
+    - **App Details Screen**: 5:7 two-column split on tablet.
+    - **Schedule Editor Screen**: 7:5 two-column split on tablet.
+    - **Settings Screen**: 6:6 two-column bento on tablet with storage audit and diagnostic cards.
+    - **Onboarding & Permission Centers**: Centered editorial cards (max 680dp) on tablet.
+  - **Smart Backup Import & Dormant Vault**: Detects uninstalled apps in `.notiflow` backups and offers to *"Keep in Vault & Auto-Apply on Install"* (safely parked in local DB and auto-applied when installed) or *"Exclude These Apps"*.
+  - **Quick Load Rule Templates**: Reusable schedule rule dropdown with deduplication, pre-seeded with `"Work Focus Hours"` (09:00 AM – 05:00 PM, Mon–Fri).
+  - **Multiple Schedules per App**: Full support for attaching multiple active schedules to a single app with independent monitoring switches.
+  - **Unified `.notiflow` Backup**: Single backup file format bundling rule templates alongside managed apps and schedules with 100% backward compatibility.
+  - **Google Play In-App Updates**: Added zero-network In-App Update checker via Play Core IPC (`in_app_update`), maintaining strict 100% on-device privacy with **zero `INTERNET` permission** in [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml).
+  - **12-Hour vs 24-Hour Time Format Option**: Added configurable time display preference under Settings, instantly updating schedule cards, dropdown templates, and activity logs across the entire app.
+  - **Phone & Tablet Form Factors**: Restricted supported screen targets exclusively to Phone and Tablet devices.
 - **v1.5.4 (`+9`) — Direct Permission Deep-Link, Auto-Return & Clean Play Store Onboarding**:
   - Removed the *"Sideloaded APK blocked on Android 13+?"* and *"Allow Restricted Settings"* cards from [`onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) and [`permission_screen.dart`](lib/presentation/screens/permission_screen.dart) for a clean Play Store onboarding experience.
   - Updated [`AndroidNotificationBridge.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/AndroidNotificationBridge.kt) to deep-link directly to Notiflow's `Allow notification access` switch (`Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS`) on Android 11+, skipping the all-apps list.

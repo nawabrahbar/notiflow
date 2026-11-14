@@ -30,7 +30,8 @@ data class NativeScheduleRule(
     val startTime: NativeTimeOfDay,
     val endTime: NativeTimeOfDay,
     val daysOfWeek: Set<Int>, // 1 = Monday ... 7 = Sunday
-    val isOvernight: Boolean
+    val isOvernight: Boolean,
+    val allowVipContacts: Boolean = true
 )
 
 data class NativeOverride(
@@ -110,6 +111,8 @@ class NativeScheduleEvaluator {
                 val endTime = NativeTimeOfDay(endObj.getInt("hour"), endObj.getInt("minute"))
                 val rawName = obj.optString("name", "").trim()
 
+                val allowVipContacts = obj.optBoolean("allowVipContacts", true)
+
                 val rule = NativeScheduleRule(
                     id = obj.getString("id"),
                     appId = obj.getString("appId"),
@@ -119,7 +122,8 @@ class NativeScheduleEvaluator {
                     startTime = startTime,
                     endTime = endTime,
                     daysOfWeek = daysSet,
-                    isOvernight = obj.optBoolean("isOvernight", startTime > endTime)
+                    isOvernight = obj.optBoolean("isOvernight", startTime > endTime),
+                    allowVipContacts = allowVipContacts
                 )
                 rulesList.add(rule)
             }
@@ -151,7 +155,16 @@ class NativeScheduleEvaluator {
         }
     }
 
-    fun evaluateNotification(packageName: String, postTimeMs: Long): NativeEvaluationDecision {
+    // Tracks caller timestamps for the 3-minute urgent repeated call bypass:
+    // Key is "$packageName:$callerIdentity", Value is timestampMs of the last call
+    private val callerHistory = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    fun evaluateNotification(
+        packageName: String,
+        postTimeMs: Long,
+        category: String = "",
+        title: String = ""
+    ): NativeEvaluationDecision {
         val app = cachedApps[packageName]
 
         // 1. Check active per-app override if the app is managed and enabled
@@ -208,6 +221,9 @@ class NativeScheduleEvaluator {
             )
         }
 
+        val isCall = category.equals("call", ignoreCase = true) ||
+                     category.equals("android.category.call", ignoreCase = true)
+
         val cal = Calendar.getInstance().apply { timeInMillis = postTimeMs }
         val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
         val todayIso = if (dayOfWeek == Calendar.SUNDAY) 7 else dayOfWeek - 1
@@ -222,6 +238,33 @@ class NativeScheduleEvaluator {
             if (isRuleMatching(rule, todayIso, yesterdayIso, currentTime)) {
                 val label = rule.name ?: "Block Schedule"
                 val window = formatRuleWindow(rule)
+
+                // Urgent repeated call escalation check (3-minute window)
+                if (isCall && rule.allowVipContacts) {
+                    val callerKey = "$packageName:${if (title.isNotBlank()) title.trim() else "unknown"}"
+                    val lastCallMs = callerHistory[callerKey]
+                    val threeMinutesMs = 3 * 60 * 1000L
+
+                    if (callerHistory.size > 200) {
+                        callerHistory.entries.removeIf { postTimeMs - it.value > threeMinutesMs * 3 }
+                    }
+
+                    if (lastCallMs != null && (postTimeMs - lastCallMs) in 1..threeMinutesMs) {
+                        // 2nd call within 3 minutes bypasses suppression and rings through!
+                        callerHistory.remove(callerKey)
+                        return NativeEvaluationDecision(
+                            shouldBlock = false,
+                            isManagedOrOverridden = true,
+                            reason = "Allowed by urgent repeated call bypass (< 3 mins)",
+                            ruleName = "Urgent Call Bypass",
+                            timeWindow = window
+                        )
+                    } else {
+                        // 1st call attempt: record timestamp and suppress
+                        callerHistory[callerKey] = postTimeMs
+                    }
+                }
+
                 return NativeEvaluationDecision(
                     shouldBlock = true,
                     isManagedOrOverridden = true,
@@ -250,6 +293,31 @@ class NativeScheduleEvaluator {
             val firstAllow = allowRules.first()
             val label = firstAllow.name ?: "Allow Schedule"
             val window = formatRuleWindow(firstAllow)
+
+            // Urgent repeated call escalation check outside allow window
+            if (isCall && firstAllow.allowVipContacts) {
+                val callerKey = "$packageName:${if (title.isNotBlank()) title.trim() else "unknown"}"
+                val lastCallMs = callerHistory[callerKey]
+                val threeMinutesMs = 3 * 60 * 1000L
+
+                if (callerHistory.size > 200) {
+                    callerHistory.entries.removeIf { postTimeMs - it.value > threeMinutesMs * 3 }
+                }
+
+                if (lastCallMs != null && (postTimeMs - lastCallMs) in 1..threeMinutesMs) {
+                    callerHistory.remove(callerKey)
+                    return NativeEvaluationDecision(
+                        shouldBlock = false,
+                        isManagedOrOverridden = true,
+                        reason = "Allowed by urgent repeated call bypass (< 3 mins)",
+                        ruleName = "Urgent Call Bypass",
+                        timeWindow = window
+                    )
+                } else {
+                    callerHistory[callerKey] = postTimeMs
+                }
+            }
+
             return NativeEvaluationDecision(
                 shouldBlock = true,
                 isManagedOrOverridden = true,
@@ -266,8 +334,18 @@ class NativeScheduleEvaluator {
         )
     }
 
-    fun shouldBlockNotification(packageName: String, postTimeMs: Long): Boolean {
-        return evaluateNotification(packageName, postTimeMs).shouldBlock
+    fun shouldBlockNotification(
+        packageName: String,
+        postTimeMs: Long,
+        category: String = "",
+        title: String = ""
+    ): Boolean {
+        return evaluateNotification(
+            packageName = packageName,
+            postTimeMs = postTimeMs,
+            category = category,
+            title = title
+        ).shouldBlock
     }
 
     fun isManagedPackage(packageName: String): Boolean {
@@ -375,7 +453,12 @@ class NativeScheduleStore(context: Context) {
         isGroupSummary: Boolean = false
     ): NativeEvaluationDecision {
         reloadIfChanged()
-        val decision = evaluator.evaluateNotification(packageName, postTimeMs)
+        val decision = evaluator.evaluateNotification(
+            packageName = packageName,
+            postTimeMs = postTimeMs,
+            category = category,
+            title = title
+        )
 
         // Record notification details when blocked (muted) or when from an actively managed app.
         // Skip empty group summary container notifications so we don't duplicate real messages.

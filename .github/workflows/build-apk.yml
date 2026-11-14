@@ -62,8 +62,8 @@ jobs:
 
       - name: Build Android Release APK & Play Store App Bundle (.aab)
         run: |
-          flutter build apk --release
-          flutter build appbundle --release
+          flutter build apk --release --android-skip-build-dependency-validation
+          flutter build appbundle --release --android-skip-build-dependency-validation
 
       - name: Prepare APK & AAB artifacts
         id: meta

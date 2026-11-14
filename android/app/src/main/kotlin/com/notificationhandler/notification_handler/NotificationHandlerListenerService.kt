@@ -44,12 +44,20 @@ class NotificationHandlerListenerService : NotificationListenerService() {
         val packageName = sbn.packageName ?: return
         val key = sbn.key ?: return
 
-        // Skip our own notifications and ongoing persistent foreground service notifications
+        // Skip our own notifications
         if (packageName == applicationContext.packageName) return
-        if (sbn.isOngoing) return
 
         val notification = sbn.notification
+        val category = notification?.category ?: ""
         val extras = notification?.extras
+
+        val isCall = category.equals(Notification.CATEGORY_CALL, ignoreCase = true) ||
+                     category.equals("call", ignoreCase = true) ||
+                     extras?.containsKey("android.callType") == true
+
+        // Skip ongoing persistent foreground service notifications UNLESS it is an incoming call
+        if (sbn.isOngoing && !isCall) return
+
         val isGroupSummary = ((notification?.flags ?: 0) and Notification.FLAG_GROUP_SUMMARY) != 0
 
         val rawTitle = extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
@@ -93,7 +101,6 @@ class NotificationHandlerListenerService : NotificationListenerService() {
             else -> ""
         }
 
-        val category = notification?.category ?: ""
         val appName = resolveAppName(packageName)
         val postTime = if (sbn.postTime > 0) sbn.postTime else System.currentTimeMillis()
 

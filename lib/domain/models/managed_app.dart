@@ -11,6 +11,7 @@ class ManagedApp {
   final String? category;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool isDormantVault;
 
   const ManagedApp({
     required this.id,
@@ -21,6 +22,7 @@ class ManagedApp {
     this.category,
     required this.createdAt,
     required this.updatedAt,
+    this.isDormantVault = false,
   });
 
   ManagedApp copyWith({
@@ -32,6 +34,7 @@ class ManagedApp {
     String? category,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isDormantVault,
   }) {
     return ManagedApp(
       id: id ?? this.id,
@@ -42,6 +45,7 @@ class ManagedApp {
       category: category ?? this.category,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isDormantVault: isDormantVault ?? this.isDormantVault,
     );
   }
 
@@ -55,6 +59,7 @@ class ManagedApp {
       'category': category,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'isDormantVault': isDormantVault,
     };
   }
 
@@ -70,6 +75,7 @@ class ManagedApp {
       category: json['category'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      isDormantVault: json['isDormantVault'] as bool? ?? false,
     );
   }
 
