@@ -176,7 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(
-            'Remove $count ${count == 1 ? 'App' : 'Apps'}?',
+            'Delete $count ${count == 1 ? 'Rule' : 'Rules'}?',
             style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.w700,
               color: isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface,
@@ -202,7 +202,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Remove'),
+              child: const Text('Delete'),
             ),
           ],
         );
@@ -295,7 +295,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Focus Shield Active',
+                                    'Focus Shield Online',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
@@ -303,7 +303,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     ),
                                   ),
                                   Text(
-                                    'IPC Access Connected',
+                                    'ACCESS RESTORED',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -316,7 +316,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             TextButton(
                               onPressed: () => setState(
                                   () => _showRestorationBanner = false),
-                              child: const Text('Dismiss'),
+                              child: const Text('Audit Health'),
                             ),
                           ],
                         ),
@@ -790,15 +790,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                         child: Row(
                           children: [
-                            IconButton(
-                              icon: Icon(Icons.close_rounded,
-                                  size: 20, color: textMain),
-                              onPressed: () =>
-                                  setState(() => _selectedAppIds.clear()),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
+                            Checkbox(
+                              key: const Key('select_all_checkbox'),
+                              value: _selectedAppIds.length == widget.repository.managedApps.length,
+                              onChanged: (val) {
+                                setState(() {
+                                  if (val == true) {
+                                    _selectedAppIds.addAll(widget.repository.managedApps.map((a) => a.id));
+                                  } else {
+                                    _selectedAppIds.clear();
+                                  }
+                                });
+                              },
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                             Text(
                               '${_selectedAppIds.length} Selected',
                               style: GoogleFonts.plusJakartaSans(
@@ -866,8 +871,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                           ],
                         ),
-                        GestureDetector(
-                          onTap: widget.onAddAppTap ??
+                        TextButton(
+                          onPressed: widget.onAddAppTap ??
                               () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
@@ -876,28 +881,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                                 );
                               },
-                          child: Container(
+                          style: TextButton.styleFrom(
+                            foregroundColor: primary,
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: secContainer,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.add_rounded,
-                                    size: 16, color: onSecContainer),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Add App',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: onSecContainer,
-                                  ),
-                                ),
-                              ],
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            '+ Add App',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),

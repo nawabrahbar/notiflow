@@ -631,7 +631,7 @@ class ActivityScreenState extends State<ActivityScreen>
                                         size: 16, color: textMuted),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Clear',
+                                      'Clear Log',
                                       style: GoogleFonts.plusJakartaSans(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.w600,

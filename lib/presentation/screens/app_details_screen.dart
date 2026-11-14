@@ -434,7 +434,7 @@ class AppDetailsScreen extends StatelessWidget {
                             letterSpacing: -0.2,
                           ),
                         ),
-                        TextButton.icon(
+                        TextButton(
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -447,9 +447,8 @@ class AppDetailsScreen extends StatelessWidget {
                               ),
                             );
                           },
-                          icon: Icon(Icons.add_rounded, size: 18, color: primaryCol),
-                          label: Text(
-                            'Add Rule',
+                          child: Text(
+                            '+ Add Schedule',
                             style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.w700,
                               color: primaryCol,
