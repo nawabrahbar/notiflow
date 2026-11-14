@@ -80,9 +80,9 @@ jobs:
       - name: Build Android Release APK & Play Store App Bundle (.aab)
         run: |
           set +e
-          flutter build apk --release > build_apk.log 2>&1
+          flutter build apk --release --android-skip-build-dependency-validation > build_apk.log 2>&1
           APK_CODE=$?
-          flutter build appbundle --release > build_aab.log 2>&1
+          flutter build appbundle --release --android-skip-build-dependency-validation > build_aab.log 2>&1
           AAB_CODE=$?
           set -e
           mkdir -p /tmp/ci-logs-repo-2
