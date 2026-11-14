@@ -38,24 +38,7 @@ jobs:
         run: flutter pub get
 
       - name: Run Flutter unit & widget tests
-        run: |
-          set +e
-          flutter test --reporter expanded > test_results.txt 2>&1
-          TEST_EXIT_CODE=$?
-          set -e
-          mkdir /tmp/ci-logs-repo
-          cd /tmp/ci-logs-repo
-          git init
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git checkout -b ci-logs
-          cp $GITHUB_WORKSPACE/test_results.txt ./
-          git add test_results.txt
-          git commit -m "ci test logs [skip ci]" || true
-          git push -f origin ci-logs || true
-          cd $GITHUB_WORKSPACE
-          exit $TEST_EXIT_CODE
+        run: flutter test
 
       - name: Configure Release Signing Keystore
         env:
@@ -79,33 +62,8 @@ jobs:
 
       - name: Build Android Release APK & Play Store App Bundle (.aab)
         run: |
-          set +e
-          flutter build apk --release --android-skip-build-dependency-validation > build_apk.log 2>&1
-          APK_CODE=$?
-          flutter build appbundle --release --android-skip-build-dependency-validation > build_aab.log 2>&1
-          AAB_CODE=$?
-          set -e
-          mkdir -p /tmp/ci-logs-repo-2
-          cd /tmp/ci-logs-repo-2
-          git init
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git checkout -b ci-logs
-          cp $GITHUB_WORKSPACE/build_apk.log ./
-          cp $GITHUB_WORKSPACE/build_aab.log ./
-          git add build_apk.log build_aab.log
-          git commit -m "ci build logs [skip ci]" || true
-          git push -f origin ci-logs || true
-          cd $GITHUB_WORKSPACE
-          if [ $APK_CODE -ne 0 ]; then
-            cat build_apk.log | tail -n 100
-            exit $APK_CODE
-          fi
-          if [ $AAB_CODE -ne 0 ]; then
-            cat build_aab.log | tail -n 100
-            exit $AAB_CODE
-          fi
+          flutter build apk --release --android-skip-build-dependency-validation
+          flutter build appbundle --release --android-skip-build-dependency-validation
 
       - name: Prepare APK & AAB artifacts
         id: meta
