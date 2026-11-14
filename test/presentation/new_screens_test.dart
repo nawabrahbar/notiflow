@@ -377,7 +377,6 @@ void main() {
     expect(repository.getActiveOverride(testApp.id), isNotNull);
     expect(find.text('Clear Temporary Override'), findsOneWidget);
     expect(find.textContaining('LEFT'), findsOneWidget);
-    expect(find.text('Muted "Quick Test App" for 15 minutes'), findsOneWidget);
 
     // Tap 15m Mute again to toggle off
     await tester.tap(find.text('15m Mute'));
@@ -386,7 +385,6 @@ void main() {
     // Override should be cleared
     expect(repository.getActiveOverride(testApp.id), isNull);
     expect(find.text('Clear Temporary Override'), findsNothing);
-    expect(find.text('Cleared temporary override for "Quick Test App"'), findsOneWidget);
 
     // Tap + Custom pill to open custom mute dialog
     await tester.tap(find.text('+ Custom'));

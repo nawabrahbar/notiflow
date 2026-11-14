@@ -1163,59 +1163,49 @@ class AppDetailsScreen extends StatelessWidget {
               ),
               actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               actions: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: Text(
-                          'Cancel',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w600,
-                            color: textMuted,
-                          ),
-                        ),
-                      ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      color: textMuted,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          Navigator.of(dialogContext).pop();
-                          await repository.setTemporaryMute(
-                            appId: app.id,
-                            duration: Duration(hours: selectedHours),
-                          );
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text('Muted "${app.displayName}" for $selectedHours hours'),
-                                backgroundColor: AppTheme.signalHeld,
-                              ),
-                            );
-                        },
-                        icon: const Icon(Icons.do_not_disturb_on_rounded, size: 16),
-                        label: Text(
-                          'Mute for $selectedHours hrs',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.of(dialogContext).pop();
+                    await repository.setTemporaryMute(
+                      appId: app.id,
+                      duration: Duration(hours: selectedHours),
+                    );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text('Muted "${app.displayName}" for $selectedHours hours'),
+                          backgroundColor: AppTheme.signalHeld,
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryCol,
-                          foregroundColor: isDark ? AppTheme.darkBackground : Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                      );
+                  },
+                  icon: const Icon(Icons.do_not_disturb_on_rounded, size: 16),
+                  label: Text(
+                    'Mute for $selectedHours hrs',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryCol,
+                    foregroundColor: isDark ? AppTheme.darkBackground : Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ],
             );
@@ -1260,16 +1250,14 @@ class AppDetailsScreen extends StatelessWidget {
                 Icon(icon, size: 13, color: isActive ? primaryCol : textMain),
                 const SizedBox(width: 3),
               ],
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: isActive ? primaryCol : textMain,
-                  ),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: isActive ? primaryCol : textMain,
                 ),
               ),
             ],
