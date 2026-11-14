@@ -15,6 +15,7 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onProfileTap;
   final List<Widget>? actions;
   final bool showThemeToggle;
+  final bool showEmblem;
 
   const StitchHeader({
     super.key,
@@ -22,6 +23,7 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
     this.onProfileTap,
     this.actions,
     this.showThemeToggle = true,
+    this.showEmblem = true,
   });
 
   @override
@@ -53,29 +55,31 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Notiflow Emblem matching Botanical design
-                Container(
-                  width: 32,
-                  height: 32,
-                  margin: const EdgeInsets.only(right: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppTheme.darkSurfaceContainer : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant,
-                      width: 1.0,
+                if (showEmblem) ...[
+                  // Notiflow Emblem matching Botanical design
+                  Container(
+                    width: 32,
+                    height: 32,
+                    margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppTheme.darkSurfaceContainer : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant,
+                        width: 1.0,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        'assets/icon/app_icon.png',
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assets/icon/app_icon.png',
-                      width: 32,
-                      height: 32,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
+                ],
                 Flexible(
                   child: Text(
                     title,

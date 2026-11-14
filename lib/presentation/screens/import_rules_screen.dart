@@ -32,44 +32,303 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
 
   final List<RulePreset> _presets = RulePreset.curatedPresets;
 
+  Future<String?> _showUninstalledChoiceSheet(List<ManagedApp> uninstalled) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? AppTheme.darkSurfaceContainerLow
+        : AppTheme.lightSurfaceContainerLow;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final secContainer = isDark
+        ? AppTheme.darkSecondaryContainer
+        : AppTheme.lightSecondaryContainer;
+    final onSecContainer = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : AppTheme.lightOnSecondaryContainer;
+    final borderCol = isDark
+        ? AppTheme.darkOutlineVariant.withOpacity(0.3)
+        : AppTheme.lightOutlineVariant.withOpacity(0.35);
+
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: borderCol),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 30),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTheme.darkSurfaceContainerHigh
+                      : AppTheme.lightSurfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: primary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.apps_outage_rounded,
+                      color: primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Uninstalled Apps (${uninstalled.length})',
+                        style: GoogleFonts.newsreader(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: textMain,
+                        ),
+                      ),
+                      Text(
+                        'Detected in backup, but not installed on this device',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (isDark
+                        ? AppTheme.darkSurfaceContainer
+                        : AppTheme.lightSurfaceContainer)
+                    .withOpacity(0.7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: borderCol),
+              ),
+              child: Text(
+                'Apps: ${uninstalled.map((a) => a.displayName).take(5).join(', ')}${uninstalled.length > 5 ? ' ...and ${uninstalled.length - 5} more' : ''}',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: textMain,
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // Option 1: Keep in Vault (Recommended)
+            InkWell(
+              onTap: () => Navigator.pop(ctx, 'vault'),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: secContainer.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: (isDark
+                              ? AppTheme.darkSecondary
+                              : AppTheme.lightSecondary)
+                          .withOpacity(0.4)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined,
+                        color: onSecContainer, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Keep in Vault',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: textMain,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: secContainer,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'RECOMMENDED',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: onSecContainer,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Keep rules in local database. Hidden from Rules page now, and auto-applied when you install the app.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11.5,
+                              color: textMuted,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: onSecContainer),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Option 2: Exclude Apps
+            InkWell(
+              onTap: () => Navigator.pop(ctx, 'exclude'),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppTheme.darkSurfaceContainer
+                      : AppTheme.lightSurfaceContainer,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderCol),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.remove_circle_outline_rounded,
+                        color: textMuted, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Exclude These Apps',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: textMain,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Discard rules for uninstalled apps and only import rules for apps installed on this device.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11.5,
+                              color: textMuted,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: textMuted),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handlePickFromDevice() async {
+    final rawContent = await widget.repository.pickBackupRawContent();
+    if (!mounted || rawContent == null) return;
+    if (rawContent.trim().isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('Selected backup file is empty.'),
+            backgroundColor: AppTheme.toastError,
+          ),
+        );
+      return;
+    }
+    await _processBackupContent(rawContent);
+  }
+
+  Future<void> _processBackupContent(String rawContent) async {
     setState(() {
       _isProcessing = true;
       _statusMessage = null;
     });
 
-    final result = await widget.repository.pickRulesFromFile();
-    if (!mounted) return;
+    final uninstalled =
+        await widget.repository.detectUninstalledAppsInBackup(rawContent);
+    bool excludeUninstalled = false;
 
-    if (result == null) {
-      // User canceled the system file picker
-      setState(() {
-        _isProcessing = false;
-      });
-      return;
+    if (uninstalled.isNotEmpty && mounted) {
+      final choice = await _showUninstalledChoiceSheet(uninstalled);
+      if (choice == null) {
+        setState(() => _isProcessing = false);
+        return;
+      }
+      excludeUninstalled = (choice == 'exclude');
     }
 
+    final success = await widget.repository.importRulesJson(
+      rawContent,
+      replaceAll: true,
+      vaultUninstalled: !excludeUninstalled,
+      excludeUninstalled: excludeUninstalled,
+    );
+
+    if (!mounted) return;
     setState(() {
       _isProcessing = false;
-      if (result) {
-        _statusMessage = 'Rules successfully restored from .notiflow backup file!';
+      if (success) {
+        _statusMessage =
+            'Rules successfully restored from .notiflow backup file!';
         _isSuccessMessage = true;
       } else {
-        _statusMessage = 'Invalid .notiflow backup file. Please select a valid backup exported from Notiflow.';
+        _statusMessage =
+            'Invalid .notiflow backup file. Please select a valid backup exported from Notiflow.';
         _isSuccessMessage = false;
       }
     });
 
-    if (result) {
+    if (success) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Backup file restored successfully!',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: AppTheme.signalSuccess,
+          SnackBar(
+            content: const Text('Backup file restored successfully!'),
+            backgroundColor: AppTheme.toastSuccess,
           ),
         );
       await _finishFlow();
@@ -77,12 +336,9 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Invalid .notiflow backup file.',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: AppTheme.signalError,
+          SnackBar(
+            content: const Text('Invalid .notiflow backup file.'),
+            backgroundColor: AppTheme.toastError,
           ),
         );
     }

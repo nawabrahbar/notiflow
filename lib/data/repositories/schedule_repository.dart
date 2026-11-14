@@ -48,7 +48,11 @@ class ScheduleRepository extends ChangeNotifier {
   bool get vipEmergencyBypass => _vipEmergencyBypass;
   String get defaultScheduleMode => _defaultScheduleMode;
   bool get use24HourFormat => _use24HourFormat;
-  List<ManagedApp> get managedApps => List.unmodifiable(_managedApps);
+  List<ManagedApp> get managedApps =>
+      List.unmodifiable(_managedApps.where((a) => !a.isDormantVault));
+  List<ManagedApp> get allManagedApps => List.unmodifiable(_managedApps);
+  List<ManagedApp> get dormantVaultApps =>
+      List.unmodifiable(_managedApps.where((a) => a.isDormantVault));
   List<ScheduleRule> get schedules => List.unmodifiable(_schedules);
   List<RuleTemplate> get ruleTemplates => List.unmodifiable(_ruleTemplates);
   List<RuleTemplate> get savedTemplates => ruleTemplates;
@@ -117,6 +121,8 @@ class ScheduleRepository extends ChangeNotifier {
     _vipEmergencyBypass = prefs.getBool(_keyVipBypass) ?? true;
     _defaultScheduleMode = prefs.getString(_keyDefaultScheduleMode) ?? 'allow';
     _use24HourFormat = prefs.getBool(_keyUse24HourFormat) ?? false;
+
+    await checkAndActivateDormantApps(notify: false);
 
     _isInitialized = true;
     notifyListeners();
@@ -527,10 +533,79 @@ class ScheduleRepository extends ChangeNotifier {
     );
   }
 
+  /// Checks if any dormant vault apps have now been installed on the device,
+  /// and automatically activates them and brings them to the Rules page!
+  Future<int> checkAndActivateDormantApps({bool notify = true}) async {
+    try {
+      final dormant = _managedApps.where((a) => a.isDormantVault).toList();
+      if (dormant.isEmpty) return 0;
+
+      final installed = await _platformService.getInstalledApplications();
+      final installedMap = {for (final a in installed) a.packageName: a};
+
+      int activatedCount = 0;
+      for (int i = 0; i < _managedApps.length; i++) {
+        final app = _managedApps[i];
+        if (app.isDormantVault && installedMap.containsKey(app.packageName)) {
+          final discovered = installedMap[app.packageName]!;
+          _managedApps[i] = app.copyWith(
+            isDormantVault: false,
+            displayName: discovered.displayName.isNotEmpty
+                ? discovered.displayName
+                : app.displayName,
+            iconBytes: discovered.iconBytes ?? app.iconBytes,
+          );
+          activatedCount++;
+        }
+      }
+
+      if (activatedCount > 0) {
+        await _persist();
+        if (notify) notifyListeners();
+      }
+      return activatedCount;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Reads raw string content from a picked .notiflow backup file.
+  Future<String?> pickBackupRawContent() async {
+    return await _platformService.pickBackupFile();
+  }
+
+  /// Inspects a raw .notiflow JSON payload and returns the list of uninstalled apps
+  Future<List<ManagedApp>> detectUninstalledAppsInBackup(String rawJson) async {
+    try {
+      final sanitized = rawJson.trim().replaceFirst(RegExp(r'^\uFEFF'), '');
+      final decoded = jsonDecode(sanitized);
+      if (decoded is! Map<String, dynamic>) return [];
+      final List<dynamic>? appsList = decoded['managedApps'] as List<dynamic>?;
+      if (appsList == null) return [];
+
+      final importedApps = appsList
+          .map((e) => ManagedApp.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+
+      final installed = await _platformService.getInstalledApplications();
+      final installedPkgs = installed.map((a) => a.packageName).toSet();
+
+      return importedApps
+          .where((a) => !installedPkgs.contains(a.packageName))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Prompts user to pick a backup file and imports it.
   /// Returns `true` if imported, `false` if the selected file was invalid,
   /// or `null` if the user canceled the file picker.
-  Future<bool?> pickRulesFromFile({bool replaceAll = true}) async {
+  Future<bool?> pickRulesFromFile({
+    bool replaceAll = true,
+    bool vaultUninstalled = true,
+    bool excludeUninstalled = false,
+  }) async {
     final fileContent = await _platformService.pickBackupFile();
     if (fileContent == null) {
       return null;
@@ -538,12 +613,22 @@ class ScheduleRepository extends ChangeNotifier {
     if (fileContent.trim().isEmpty) {
       return false;
     }
-    return await importRulesJson(fileContent, replaceAll: replaceAll);
+    return await importRulesJson(
+      fileContent,
+      replaceAll: replaceAll,
+      vaultUninstalled: vaultUninstalled,
+      excludeUninstalled: excludeUninstalled,
+    );
   }
 
   /// Imports and validates a .notiflow JSON string.
   /// Restores apps, schedules, and ruleTemplates seamlessly with backward compatibility.
-  Future<bool> importRulesJson(String rawJson, {bool replaceAll = true}) async {
+  Future<bool> importRulesJson(
+    String rawJson, {
+    bool replaceAll = true,
+    bool vaultUninstalled = true,
+    bool excludeUninstalled = false,
+  }) async {
     try {
       final sanitized = rawJson.trim().replaceFirst(RegExp(r'^\uFEFF'), '');
       final decoded = jsonDecode(sanitized);
@@ -570,6 +655,25 @@ class ScheduleRepository extends ChangeNotifier {
       final importedTemplates = templatesList != null
           ? templatesList.map((e) => RuleTemplate.fromJson(Map<String, dynamic>.from(e as Map))).toList()
           : <RuleTemplate>[];
+
+      // Handle uninstalled apps:
+      final installed = await _platformService.getInstalledApplications();
+      final installedPkgs = installed.map((a) => a.packageName).toSet();
+
+      if (excludeUninstalled) {
+        // Exclude uninstalled apps and their rules completely
+        importedApps.removeWhere((a) => !installedPkgs.contains(a.packageName));
+        final remainingAppIds = importedApps.map((a) => a.id).toSet();
+        importedSchedules.removeWhere((r) => !remainingAppIds.contains(r.appId));
+      } else if (vaultUninstalled) {
+        // Keep in vault & auto-apply when installed: mark isDormantVault: true so they are not shown on Rules page
+        for (int i = 0; i < importedApps.length; i++) {
+          final a = importedApps[i];
+          if (!installedPkgs.contains(a.packageName)) {
+            importedApps[i] = a.copyWith(isDormantVault: true);
+          }
+        }
+      }
 
       if (replaceAll) {
         _managedApps = importedApps;
