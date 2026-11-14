@@ -998,17 +998,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Urgent Repeated Call Bypass',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: textMain,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Urgent Repeated Call Bypass',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: textMain,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -1345,7 +1341,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         Text(
                           'Notiflow v1.6.0',
@@ -1355,7 +1354,6 @@ class _SettingsScreenState extends State<SettingsScreen>
                             color: textMain,
                           ),
                         ),
-                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
