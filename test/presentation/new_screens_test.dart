@@ -366,7 +366,7 @@ void main() {
     expect(find.text('15m Mute'), findsOneWidget);
     expect(find.text('30m Mute'), findsOneWidget);
     expect(find.text('1h Mute'), findsOneWidget);
-    expect(find.text('Today 24h'), findsOneWidget);
+    expect(find.text('+ Custom'), findsOneWidget);
     expect(find.text('Clear Temporary Override'), findsNothing);
 
     // Tap 15m Mute pill
@@ -387,6 +387,38 @@ void main() {
     expect(repository.getActiveOverride(testApp.id), isNull);
     expect(find.text('Clear Temporary Override'), findsNothing);
     expect(find.text('Cleared temporary override for "Quick Test App"'), findsOneWidget);
+
+    // Tap + Custom pill to open custom mute dialog
+    await tester.tap(find.text('+ Custom'));
+    await tester.pumpAndSettle();
+
+    // Dialog should be open
+    expect(find.text('Custom Mute Duration'), findsOneWidget);
+    expect(find.text('QUICK SELECT'), findsOneWidget);
+    expect(find.text('3h'), findsOneWidget);
+
+    // Select 3h preset and confirm
+    await tester.tap(find.text('3h'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Mute for 3 hrs'));
+    await tester.pumpAndSettle();
+
+    // Override should now be active for 3 hours and pill should dynamically display '3h Mute'
+    expect(repository.getActiveOverride(testApp.id), isNotNull);
+    expect(repository.getActiveOverride(testApp.id)!.durationMinutes, 180);
+    expect(find.text('3h Mute'), findsOneWidget);
+    expect(find.text('+ Custom'), findsNothing);
+    expect(find.text('Clear Temporary Override'), findsOneWidget);
+
+    // Tap Clear Temporary Override button
+    await tester.tap(find.text('Clear Temporary Override'));
+    await tester.pumpAndSettle();
+
+    // Custom timer should now be cleared and pill should reset back to + Custom
+    expect(repository.getActiveOverride(testApp.id), isNull);
+    expect(find.text('Clear Temporary Override'), findsNothing);
+    expect(find.text('+ Custom'), findsOneWidget);
+    expect(find.text('3h Mute'), findsNothing);
   });
 }
 

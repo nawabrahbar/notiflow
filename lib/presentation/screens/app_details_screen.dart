@@ -328,7 +328,7 @@ class AppDetailsScreen extends StatelessWidget {
                               ),
                             ),
                             child: Text(
-                              '${override.remainingMinutes > 0 ? override.remainingMinutes : 1}m LEFT',
+                              _formatRemainingBadge(override.remainingMinutes),
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w800,
@@ -340,152 +340,171 @@ class AppDetailsScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _buildOverridePill(
-                          label: '15m Mute',
-                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 15,
-                          onTap: () {
-                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 15) {
-                              repository.clearOverride(currentApp.id);
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
-                                    backgroundColor: AppTheme.signalNeutral,
-                                  ),
-                                );
-                            } else {
-                              repository.setTemporaryMute(
-                                appId: currentApp.id,
-                                duration: const Duration(minutes: 15),
-                              );
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Muted "${currentApp.displayName}" for 15 minutes'),
-                                    backgroundColor: AppTheme.signalHeld,
-                                  ),
-                                );
-                            }
-                          },
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildOverridePill(
-                          label: '30m Mute',
-                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 30,
-                          onTap: () {
-                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 30) {
-                              repository.clearOverride(currentApp.id);
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
-                                    backgroundColor: AppTheme.signalNeutral,
-                                  ),
-                                );
-                            } else {
-                              repository.setTemporaryMute(
-                                appId: currentApp.id,
-                                duration: const Duration(minutes: 30),
-                              );
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Muted "${currentApp.displayName}" for 30 minutes'),
-                                    backgroundColor: AppTheme.signalHeld,
-                                  ),
-                                );
-                            }
-                          },
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildOverridePill(
-                          label: '1h Mute',
-                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 60,
-                          onTap: () {
-                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 60) {
-                              repository.clearOverride(currentApp.id);
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
-                                    backgroundColor: AppTheme.signalNeutral,
-                                  ),
-                                );
-                            } else {
-                              repository.setTemporaryMute(
-                                appId: currentApp.id,
-                                duration: const Duration(hours: 1),
-                              );
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Muted "${currentApp.displayName}" for 1 hour'),
-                                    backgroundColor: AppTheme.signalHeld,
-                                  ),
-                                );
-                            }
-                          },
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildOverridePill(
-                          label: 'Today 24h',
-                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 1440,
-                          onTap: () {
-                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 1440) {
-                              repository.clearOverride(currentApp.id);
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
-                                    backgroundColor: AppTheme.signalNeutral,
-                                  ),
-                                );
-                            } else {
-                              repository.setTemporaryMute(
-                                appId: currentApp.id,
-                                duration: const Duration(hours: 24),
-                              );
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  SnackBar(
-                                    content: Text('Muted "${currentApp.displayName}" for 24 hours'),
-                                    backgroundColor: AppTheme.signalHeld,
-                                  ),
-                                );
-                            }
-                          },
-                          isDark: isDark,
-                          primaryCol: primaryCol,
-                          cardBg: cardBg,
-                          borderCol: borderCol,
-                          textMain: textMain,
-                        ),
-                      ],
+                    Builder(
+                      builder: (context) {
+                        final isStandardPill = override != null &&
+                            override.mode == OverrideMode.block &&
+                            (override.durationMinutes == 15 ||
+                             override.durationMinutes == 30 ||
+                             override.durationMinutes == 60);
+
+                        final isCustomActive = override != null &&
+                            override.mode == OverrideMode.block &&
+                            !isStandardPill;
+
+                        final customHours = isCustomActive ? (override.durationMinutes / 60).round() : null;
+                        final customPillLabel = isCustomActive
+                            ? (customHours != null && customHours >= 1 ? '${customHours}h Mute' : '${override.durationMinutes}m Mute')
+                            : '+ Custom';
+
+                        return Row(
+                          children: [
+                            _buildOverridePill(
+                              label: '15m Mute',
+                              isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 15,
+                              onTap: () {
+                                if (override?.mode == OverrideMode.block && override?.durationMinutes == 15) {
+                                  repository.clearOverride(currentApp.id);
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        backgroundColor: AppTheme.signalNeutral,
+                                      ),
+                                    );
+                                } else {
+                                  repository.setTemporaryMute(
+                                    appId: currentApp.id,
+                                    duration: const Duration(minutes: 15),
+                                  );
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text('Muted "${currentApp.displayName}" for 15 minutes'),
+                                        backgroundColor: AppTheme.signalHeld,
+                                      ),
+                                    );
+                                }
+                              },
+                              isDark: isDark,
+                              primaryCol: primaryCol,
+                              cardBg: cardBg,
+                              borderCol: borderCol,
+                              textMain: textMain,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildOverridePill(
+                              label: '30m Mute',
+                              isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 30,
+                              onTap: () {
+                                if (override?.mode == OverrideMode.block && override?.durationMinutes == 30) {
+                                  repository.clearOverride(currentApp.id);
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        backgroundColor: AppTheme.signalNeutral,
+                                      ),
+                                    );
+                                } else {
+                                  repository.setTemporaryMute(
+                                    appId: currentApp.id,
+                                    duration: const Duration(minutes: 30),
+                                  );
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text('Muted "${currentApp.displayName}" for 30 minutes'),
+                                        backgroundColor: AppTheme.signalHeld,
+                                      ),
+                                    );
+                                }
+                              },
+                              isDark: isDark,
+                              primaryCol: primaryCol,
+                              cardBg: cardBg,
+                              borderCol: borderCol,
+                              textMain: textMain,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildOverridePill(
+                              label: '1h Mute',
+                              isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 60,
+                              onTap: () {
+                                if (override?.mode == OverrideMode.block && override?.durationMinutes == 60) {
+                                  repository.clearOverride(currentApp.id);
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        backgroundColor: AppTheme.signalNeutral,
+                                      ),
+                                    );
+                                } else {
+                                  repository.setTemporaryMute(
+                                    appId: currentApp.id,
+                                    duration: const Duration(hours: 1),
+                                  );
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text('Muted "${currentApp.displayName}" for 1 hour'),
+                                        backgroundColor: AppTheme.signalHeld,
+                                      ),
+                                    );
+                                }
+                              },
+                              isDark: isDark,
+                              primaryCol: primaryCol,
+                              cardBg: cardBg,
+                              borderCol: borderCol,
+                              textMain: textMain,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildOverridePill(
+                              label: customPillLabel,
+                              isActive: isCustomActive,
+                              icon: isCustomActive ? null : Icons.add_rounded,
+                              onTap: () {
+                                if (isCustomActive) {
+                                  repository.clearOverride(currentApp.id);
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        backgroundColor: AppTheme.signalNeutral,
+                                      ),
+                                    );
+                                } else {
+                                  _showCustomMuteDialog(
+                                    context,
+                                    repository,
+                                    currentApp,
+                                    isDark: isDark,
+                                    primaryCol: primaryCol,
+                                    cardBg: cardBg,
+                                    borderCol: borderCol,
+                                    textMain: textMain,
+                                    textMuted: textMuted,
+                                  );
+                                }
+                              },
+                              isDark: isDark,
+                              primaryCol: primaryCol,
+                              cardBg: cardBg,
+                              borderCol: borderCol,
+                              textMain: textMain,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     if (override != null) ...[
                       const SizedBox(height: 8),
@@ -960,6 +979,252 @@ class AppDetailsScreen extends StatelessWidget {
     return '${days.length} days/wk';
   }
 
+  String _formatRemainingBadge(int minutes) {
+    if (minutes < 1) return '1m LEFT';
+    if (minutes < 60) return '${minutes}m LEFT';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    return m == 0 ? '${h}h LEFT' : '${h}h ${m}m LEFT';
+  }
+
+  Future<void> _showCustomMuteDialog(
+    BuildContext context,
+    ScheduleRepository repository,
+    ManagedApp app, {
+    required bool isDark,
+    required Color primaryCol,
+    required Color cardBg,
+    required Color borderCol,
+    required Color textMain,
+    required Color textMuted,
+  }) async {
+    int selectedHours = 3;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final now = DateTime.now();
+            final endTime = now.add(Duration(hours: selectedHours));
+            final formattedEndTime = repository.formatTimeOfDay(endTime.hour, endTime.minute);
+
+            const quickPresets = [2, 3, 4, 8, 12, 24];
+
+            return AlertDialog(
+              backgroundColor: cardBg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: borderCol),
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryCol.withValues(alpha: isDark ? 0.2 : 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.hourglass_top_rounded, color: primaryCol, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Custom Mute Duration',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Silence notifications for ${app.displayName}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 8),
+                    Text(
+                      'QUICK SELECT',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                        color: textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      alignment: WrapAlignment.center,
+                      children: quickPresets.map((h) {
+                        final isSelected = selectedHours == h;
+                        final label = h == 8 ? '8h Work' : (h == 24 ? '24h Day' : '${h}h');
+                        return ChoiceChip(
+                          label: Text(label),
+                          labelStyle: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                            color: isSelected ? primaryCol : textMain,
+                          ),
+                          selected: isSelected,
+                          onSelected: (_) => setDialogState(() => selectedHours = h),
+                          backgroundColor: isDark
+                              ? AppTheme.darkSurfaceContainerHigh
+                              : AppTheme.lightSurfaceContainerHigh,
+                          selectedColor: isDark
+                              ? primaryCol.withValues(alpha: 0.25)
+                              : primaryCol.withValues(alpha: 0.15),
+                          side: BorderSide(
+                            color: isSelected ? primaryCol : borderCol,
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          showCheckmark: false,
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppTheme.darkSurfaceContainerHigh
+                            : AppTheme.lightSurfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: borderCol),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            onPressed: selectedHours > 2
+                                ? () => setDialogState(() => selectedHours--)
+                                : null,
+                            icon: const Icon(Icons.remove_circle_outline_rounded),
+                            color: primaryCol,
+                            disabledColor: textMuted.withValues(alpha: 0.3),
+                            tooltip: 'Decrease 1 hour',
+                          ),
+                          Column(
+                            children: [
+                              Text(
+                                '$selectedHours Hours',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: textMain,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Muted until $formattedEndTime',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: primaryCol,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            onPressed: selectedHours < 24
+                                ? () => setDialogState(() => selectedHours++)
+                                : null,
+                            icon: const Icon(Icons.add_circle_outline_rounded),
+                            color: primaryCol,
+                            disabledColor: textMuted.withValues(alpha: 0.3),
+                            tooltip: 'Increase 1 hour',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              actions: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w600,
+                            color: textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(dialogContext).pop();
+                          await repository.setTemporaryMute(
+                            appId: app.id,
+                            duration: Duration(hours: selectedHours),
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text('Muted "${app.displayName}" for $selectedHours hours'),
+                                backgroundColor: AppTheme.signalHeld,
+                              ),
+                            );
+                        },
+                        icon: const Icon(Icons.do_not_disturb_on_rounded, size: 16),
+                        label: Text(
+                          'Mute for $selectedHours hrs',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryCol,
+                          foregroundColor: isDark ? AppTheme.darkBackground : Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildOverridePill({
     required String label,
     required bool isActive,
@@ -969,6 +1234,7 @@ class AppDetailsScreen extends StatelessWidget {
     required Color cardBg,
     required Color borderCol,
     required Color textMain,
+    IconData? icon,
   }) {
     return Expanded(
       child: GestureDetector(
@@ -986,13 +1252,27 @@ class AppDetailsScreen extends StatelessWidget {
             ),
           ),
           alignment: Alignment.center,
-          child: Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: isActive ? primaryCol : textMain,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 13, color: isActive ? primaryCol : textMain),
+                const SizedBox(width: 3),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: isActive ? primaryCol : textMain,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
