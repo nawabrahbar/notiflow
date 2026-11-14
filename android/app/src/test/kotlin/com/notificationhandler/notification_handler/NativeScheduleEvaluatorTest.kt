@@ -198,4 +198,74 @@ class NativeScheduleEvaluatorTest {
         assertTrue(decision.reason.contains("Deep Work Shield"))
         assertTrue(decision.reason.contains("09:00 - 17:00"))
     }
+
+    @Test
+    fun testPerAppTemporaryMuteOverrideWithLocalIsoAndEpochMs() {
+        val evaluator = NativeScheduleEvaluator()
+        val now = System.currentTimeMillis()
+        val future = now + 15 * 60 * 1000L
+
+        // Test with local ISO format WITHOUT trailing Z (the exact bug from 1.5.4) and epoch ms fallback
+        evaluator.parsePayload("""
+            {
+                "managedApps": [
+                    {"id": "app_slack_123", "packageName": "com.Slack", "enabled": true}
+                ],
+                "schedules": [],
+                "overrides": [
+                    {
+                        "id": "ov_quick_15m",
+                        "appId": "app_slack_123",
+                        "mode": "block",
+                        "startDateTime": "2026-11-14T10:30:00.123456",
+                        "endDateTime": "2026-11-14T10:45:00.123456",
+                        "startMs": $now,
+                        "endMs": $future
+                    }
+                ]
+            }
+        """.trimIndent())
+
+        val testTime = now + 5 * 60 * 1000L
+        val decision = evaluator.evaluateNotification("com.Slack", testTime)
+        assertTrue("Quick temporary mute override must block notifications during active window", decision.shouldBlock)
+        assertTrue(decision.isManagedOrOverridden)
+        assertTrue(decision.reason.contains("Muted by temporary app override"))
+
+        // After the window expires -> should ALLOW
+        val afterExpiryTime = future + 1000L
+        val afterDecision = evaluator.evaluateNotification("com.Slack", afterExpiryTime)
+        assertFalse("Notification must be allowed after override expires", afterDecision.shouldBlock)
+    }
+
+    @Test
+    fun testPerAppOverrideAppliesEvenIfAppDisabled() {
+        val evaluator = NativeScheduleEvaluator()
+        val now = System.currentTimeMillis()
+        val future = now + 30 * 60 * 1000L
+
+        evaluator.parsePayload("""
+            {
+                "managedApps": [
+                    {"id": "app_discord_456", "packageName": "com.discord", "enabled": false}
+                ],
+                "schedules": [],
+                "overrides": [
+                    {
+                        "id": "ov_discord_30m",
+                        "appId": "app_discord_456",
+                        "mode": "block",
+                        "startDateTime": "2026-11-14T12:00:00Z",
+                        "endDateTime": "2026-11-14T12:30:00Z",
+                        "startMs": $now,
+                        "endMs": $future
+                    }
+                ]
+            }
+        """.trimIndent())
+
+        val testTime = now + 10 * 60 * 1000L
+        val decision = evaluator.evaluateNotification("com.discord", testTime)
+        assertTrue("Manual temporary mute override must take precedence even if app is disabled", decision.shouldBlock)
+    }
 }

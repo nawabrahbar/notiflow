@@ -300,26 +300,77 @@ class AppDetailsScreen extends StatelessWidget {
 
                     const SizedBox(height: 22),
 
-                    // Quick Temporary Override Pills
-                    Text(
-                      'QUICK TEMPORARY OVERRIDE',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: textMuted,
-                      ),
+                    // Quick Temporary Block · Instant Override
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'QUICK TEMPORARY BLOCK · INSTANT OVERRIDE',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              color: textMuted,
+                            ),
+                          ),
+                        ),
+                        if (override != null && override.isActive)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppTheme.signalHeld.withValues(alpha: 0.2)
+                                  : const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: AppTheme.signalHeld.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Text(
+                              '${override.remainingMinutes > 0 ? override.remainingMinutes : 1}m LEFT',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                color: AppTheme.signalHeld,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         _buildOverridePill(
                           label: '15m Mute',
-                          isActive: override?.durationMinutes == 15,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(minutes: 15),
-                          ),
+                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 15,
+                          onTap: () {
+                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 15) {
+                              repository.clearOverride(currentApp.id);
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                    backgroundColor: AppTheme.signalNeutral,
+                                  ),
+                                );
+                            } else {
+                              repository.setTemporaryMute(
+                                appId: currentApp.id,
+                                duration: const Duration(minutes: 15),
+                              );
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Muted "${currentApp.displayName}" for 15 minutes'),
+                                    backgroundColor: AppTheme.signalHeld,
+                                  ),
+                                );
+                            }
+                          },
                           isDark: isDark,
                           primaryCol: primaryCol,
                           cardBg: cardBg,
@@ -329,11 +380,33 @@ class AppDetailsScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         _buildOverridePill(
                           label: '30m Mute',
-                          isActive: override?.durationMinutes == 30,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(minutes: 30),
-                          ),
+                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 30,
+                          onTap: () {
+                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 30) {
+                              repository.clearOverride(currentApp.id);
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                    backgroundColor: AppTheme.signalNeutral,
+                                  ),
+                                );
+                            } else {
+                              repository.setTemporaryMute(
+                                appId: currentApp.id,
+                                duration: const Duration(minutes: 30),
+                              );
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Muted "${currentApp.displayName}" for 30 minutes'),
+                                    backgroundColor: AppTheme.signalHeld,
+                                  ),
+                                );
+                            }
+                          },
                           isDark: isDark,
                           primaryCol: primaryCol,
                           cardBg: cardBg,
@@ -343,11 +416,33 @@ class AppDetailsScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         _buildOverridePill(
                           label: '1h Mute',
-                          isActive: override?.durationMinutes == 60,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(hours: 1),
-                          ),
+                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 60,
+                          onTap: () {
+                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 60) {
+                              repository.clearOverride(currentApp.id);
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                    backgroundColor: AppTheme.signalNeutral,
+                                  ),
+                                );
+                            } else {
+                              repository.setTemporaryMute(
+                                appId: currentApp.id,
+                                duration: const Duration(hours: 1),
+                              );
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Muted "${currentApp.displayName}" for 1 hour'),
+                                    backgroundColor: AppTheme.signalHeld,
+                                  ),
+                                );
+                            }
+                          },
                           isDark: isDark,
                           primaryCol: primaryCol,
                           cardBg: cardBg,
@@ -357,11 +452,33 @@ class AppDetailsScreen extends StatelessWidget {
                         const SizedBox(width: 8),
                         _buildOverridePill(
                           label: 'Today 24h',
-                          isActive: override?.durationMinutes == 1440,
-                          onTap: () => repository.setTemporaryMute(
-                            appId: currentApp.id,
-                            duration: const Duration(hours: 24),
-                          ),
+                          isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 1440,
+                          onTap: () {
+                            if (override?.mode == OverrideMode.block && override?.durationMinutes == 1440) {
+                              repository.clearOverride(currentApp.id);
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                    backgroundColor: AppTheme.signalNeutral,
+                                  ),
+                                );
+                            } else {
+                              repository.setTemporaryMute(
+                                appId: currentApp.id,
+                                duration: const Duration(hours: 24),
+                              );
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Text('Muted "${currentApp.displayName}" for 24 hours'),
+                                    backgroundColor: AppTheme.signalHeld,
+                                  ),
+                                );
+                            }
+                          },
                           isDark: isDark,
                           primaryCol: primaryCol,
                           cardBg: cardBg,
@@ -373,7 +490,17 @@ class AppDetailsScreen extends StatelessWidget {
                     if (override != null) ...[
                       const SizedBox(height: 8),
                       TextButton.icon(
-                        onPressed: () => repository.clearOverride(currentApp.id),
+                        onPressed: () {
+                          repository.clearOverride(currentApp.id);
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                backgroundColor: AppTheme.signalNeutral,
+                              ),
+                            );
+                        },
                         icon: const Icon(Icons.refresh_rounded, size: 16),
                         label: const Text('Clear Temporary Override'),
                         style: TextButton.styleFrom(foregroundColor: primaryCol),

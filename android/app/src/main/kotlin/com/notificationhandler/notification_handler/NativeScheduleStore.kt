@@ -134,11 +134,8 @@ class NativeScheduleEvaluator {
             val overridesMap = mutableMapOf<String, NativeOverride>()
             for (i in 0 until overridesArray.length()) {
                 val obj = overridesArray.getJSONObject(i)
-                val startIso = obj.getString("startDateTime")
-                val endIso = obj.getString("endDateTime")
-
-                val startMs = java.time.Instant.parse(startIso).toEpochMilli()
-                val endMs = java.time.Instant.parse(endIso).toEpochMilli()
+                val startMs = parseTimestampMs(obj, "startDateTime", "startMs")
+                val endMs = parseTimestampMs(obj, "endDateTime", "endMs")
 
                 val ov = NativeOverride(
                     id = obj.getString("id"),
@@ -148,11 +145,52 @@ class NativeScheduleEvaluator {
                     endMs = endMs
                 )
                 overridesMap[ov.appId] = ov
+
+                // Also map packageName <-> appId for per-app overrides so lookups succeed either way
+                val matchingApp = appsMap.values.firstOrNull { it.id == ov.appId || it.packageName == ov.appId }
+                if (matchingApp != null) {
+                    overridesMap[matchingApp.packageName] = ov
+                    overridesMap[matchingApp.id] = ov
+                }
             }
             cachedOverrides = overridesMap
         } catch (e: Exception) {
             // Gracefully ignore parse error in background
         }
+    }
+
+    private fun parseTimestampMs(obj: JSONObject, keyIso: String, keyMs: String): Long {
+        val ms = obj.optLong(keyMs, -1L)
+        if (ms > 0) return ms
+
+        val iso = obj.optString(keyIso, "").trim()
+        if (iso.isEmpty()) return 0L
+
+        // 1. Standard ISO Instant (UTC with 'Z')
+        try {
+            return java.time.Instant.parse(iso).toEpochMilli()
+        } catch (_: Exception) {}
+
+        // 2. OffsetDateTime (e.g. 2026-11-14T10:30:00+02:00)
+        try {
+            return java.time.OffsetDateTime.parse(iso).toInstant().toEpochMilli()
+        } catch (_: Exception) {}
+
+        // 3. LocalDateTime (local ISO without zone: 2026-11-14T10:30:00.123456)
+        try {
+            return java.time.LocalDateTime.parse(iso)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        } catch (_: Exception) {}
+
+        // 4. Numeric string epoch
+        try {
+            val num = iso.toLongOrNull()
+            if (num != null && num > 0) return num
+        } catch (_: Exception) {}
+
+        return 0L
     }
 
     // Tracks caller timestamps for the 3-minute urgent repeated call bypass:
@@ -166,19 +204,18 @@ class NativeScheduleEvaluator {
         title: String = ""
     ): NativeEvaluationDecision {
         val app = cachedApps[packageName]
+        val appOverride = (if (app != null) cachedOverrides[app.id] else null)
+            ?: cachedOverrides[packageName]
 
-        // 1. Check active per-app override if the app is managed and enabled
-        if (app != null && app.enabled) {
-            val appOverride = cachedOverrides[app.id]
-            if (appOverride != null && postTimeMs >= appOverride.startMs && postTimeMs < appOverride.endMs) {
-                val blocked = appOverride.mode == "block"
-                return NativeEvaluationDecision(
-                    shouldBlock = blocked,
-                    isManagedOrOverridden = true,
-                    reason = if (blocked) "Muted by temporary app override" else "Allowed by temporary app override",
-                    ruleName = "Temporary Override"
-                )
-            }
+        // 1. Check active per-app override (takes absolute priority over app disabled status and recurring schedules)
+        if (appOverride != null && postTimeMs >= appOverride.startMs && postTimeMs < appOverride.endMs) {
+            val blocked = appOverride.mode == "block"
+            return NativeEvaluationDecision(
+                shouldBlock = blocked,
+                isManagedOrOverridden = true,
+                reason = if (blocked) "Muted by temporary app override" else "Allowed by temporary app override",
+                ruleName = "Temporary Override"
+            )
         }
 
         // 2. Check active global override (applies to enabled managed apps, and global_mute applies if active)

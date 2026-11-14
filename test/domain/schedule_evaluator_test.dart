@@ -322,6 +322,29 @@ void main() {
       expect(decision.decision, NotificationDecisionType.allow);
       expect(decision.overrideId, 'override_allow_1');
     });
+
+    test('Temporary BLOCK override suppresses even if app scheduling is disabled', () {
+      final disabledApp = testApp.copyWith(enabled: false);
+      final dt = DateTime(2026, 10, 5, 14, 0);
+      final blockOverride = TemporaryOverride(
+        id: 'override_block_dis',
+        appId: disabledApp.id,
+        mode: OverrideMode.block,
+        startDateTime: DateTime(2026, 10, 5, 13, 0),
+        endDateTime: DateTime(2026, 10, 5, 15, 0),
+        createdAt: DateTime(2026, 10, 5, 13, 0),
+      );
+
+      final decision = evaluator.evaluate(
+        app: disabledApp,
+        schedules: [],
+        override: blockOverride,
+        currentDateTime: dt,
+      );
+
+      expect(decision.decision, NotificationDecisionType.block);
+      expect(decision.overrideId, 'override_block_dis');
+    });
   });
 
   group('ScheduleEvaluator - Defaults & Edge Cases', () {
