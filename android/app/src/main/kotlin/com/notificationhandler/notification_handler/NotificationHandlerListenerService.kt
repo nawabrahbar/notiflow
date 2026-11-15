@@ -116,7 +116,6 @@ class NotificationHandlerListenerService : NotificationListenerService() {
         )
 
         if (decision.shouldBlock) {
-            Log.d(TAG, "Suppressing notification from package: $packageName (${decision.reason})")
             cancelNotification(key)
         }
     }

@@ -33,6 +33,8 @@ class IosNotificationPlatform implements NotificationPlatformInterface {
     required List<ManagedApp> managedApps,
     required List<ScheduleRule> schedules,
     required List<TemporaryOverride> overrides,
+    bool unmanagedAppsUntouched = true,
+    bool vipEmergencyBypass = true,
   }) async {
     // No-op on iOS
   }

@@ -115,17 +115,12 @@
       Notification titles, message text, and metadata are processed strictly locally on your device and <strong>never leave your phone</strong>.
     </p>
 
-    <h3>B. Installed Applications List (<code>QUERY_ALL_PACKAGES</code>)</h3>
+    <h3>B. Installed Launcher Applications Discovery (<code>&lt;queries&gt;</code> Intent Filter)</h3>
     <p>
-      Used solely on-device to list your installed launcher applications (app name, package name, and icon) so you can select which apps to schedule or mute. Your installed app list is never transmitted off your device.
+      Notiflow uses Android's standard <code>&lt;queries&gt;</code> launcher intent filter (<code>CATEGORY_LAUNCHER</code>)—without requesting the broad <code>QUERY_ALL_PACKAGES</code> permission—solely on-device to list your installed launcher applications (app name, package name, and icon) so you can select which apps to schedule or mute. Your installed app list is never transmitted off your device.
     </p>
 
-    <h3>C. Receive Boot Completed (<code>RECEIVE_BOOT_COMPLETED</code>)</h3>
-    <p>
-      Used to restore your active notification schedules automatically when your device restarts.
-    </p>
-
-    <h3>D. User-Initiated Backup Export &amp; Import (Storage Access Framework)</h3>
+    <h3>C. User-Initiated Backup Export &amp; Import (Storage Access Framework)</h3>
     <p>
       When you export or import a <code>.notiflow</code> backup file, Notiflow uses Android's built-in system file picker (<code>ACTION_CREATE_DOCUMENT</code> / <code>ACTION_OPEN_DOCUMENT</code>) to read or write only the specific backup file you select.
     </p>

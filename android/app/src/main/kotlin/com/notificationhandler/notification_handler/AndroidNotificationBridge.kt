@@ -10,7 +10,6 @@ import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
@@ -30,6 +29,7 @@ class AndroidNotificationBridge(
     companion object {
         private const val REQUEST_CODE_PICK_BACKUP = 9104
         private const val REQUEST_CODE_EXPORT_BACKUP = 9105
+        private const val MAX_BACKUP_BYTES = 5 * 1024 * 1024L // 5 MB safety limit
     }
 
     private val scheduleStore = NativeScheduleStore(context)
@@ -99,10 +99,38 @@ class AndroidNotificationBridge(
                 if (resultCode == Activity.RESULT_OK && data?.data != null) {
                     try {
                         val uri = data.data!!
-                        val content = context.contentResolver
-                            .openInputStream(uri)
-                            ?.bufferedReader(Charsets.UTF_8)
-                            ?.use { it.readText() }
+                        var declaredSize = -1L
+                        try {
+                            context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+                                ?.use { cursor ->
+                                    if (cursor.moveToFirst()) {
+                                        val idx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                                        if (idx >= 0 && !cursor.isNull(idx)) {
+                                            declaredSize = cursor.getLong(idx)
+                                        }
+                                    }
+                                }
+                        } catch (_: Exception) {
+                        }
+                        if (declaredSize > MAX_BACKUP_BYTES) {
+                            pending.error("PICK_ERROR", "Selected backup file exceeds the 5 MB limit.", null)
+                            return true
+                        }
+
+                        val content = context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val out = ByteArrayOutputStream()
+                            val buffer = ByteArray(8192)
+                            var totalRead = 0L
+                            var read: Int
+                            while (stream.read(buffer).also { read = it } != -1) {
+                                totalRead += read
+                                if (totalRead > MAX_BACKUP_BYTES) {
+                                    throw IllegalArgumentException("Selected backup file exceeds the 5 MB limit.")
+                                }
+                                out.write(buffer, 0, read)
+                            }
+                            out.toString(Charsets.UTF_8.name())
+                        }
                         pending.success(content)
                     } catch (e: Exception) {
                         pending.error("PICK_ERROR", "Failed to read selected backup file: ${e.message}", null)
@@ -267,13 +295,12 @@ class AndroidNotificationBridge(
                     }
                 } else {
                     try {
-                        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                            ?: context.getExternalFilesDir(null)
-                            ?: context.filesDir
-                        if (!downloadsDir.exists()) {
-                            downloadsDir.mkdirs()
+                        val exportDir = context.getExternalFilesDir(null) ?: context.filesDir
+                        if (!exportDir.exists()) {
+                            exportDir.mkdirs()
                         }
-                        val file = java.io.File(downloadsDir, fileName)
+                        val safeName = java.io.File(fileName).name.ifBlank { "notiflow_backup.notiflow" }
+                        val file = java.io.File(exportDir, safeName)
                         file.writeText(content, Charsets.UTF_8)
                         result.success(file.absolutePath)
                     } catch (e: Exception) {

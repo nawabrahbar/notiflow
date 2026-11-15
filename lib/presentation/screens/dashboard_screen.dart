@@ -656,7 +656,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Mute All Active (${activeOverride.remainingMinutes}m left)',
+                                      _formatOverrideBannerText(
+                                          activeOverride, apps),
                                       style: GoogleFonts.plusJakartaSans(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w700,
@@ -1019,6 +1020,26 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  String _formatOverrideBannerText(
+    TemporaryOverride override,
+    List<ManagedApp> apps,
+  ) {
+    final mins = override.remainingMinutes;
+    final isBlock = override.mode == OverrideMode.block;
+    if (override.appId == 'global_mute' ||
+        override.appId == 'global_allow' ||
+        override.appId == 'global') {
+      return isBlock
+          ? 'Mute All Active (${mins}m left)'
+          : 'Allow All Active (${mins}m left)';
+    }
+    final matchingApp = apps
+        .where((a) => a.id == override.appId || a.packageName == override.appId)
+        .firstOrNull;
+    final label = matchingApp?.displayName ?? 'App';
+    return '$label ${isBlock ? 'Muted' : 'Allowed'} (${mins}m left)';
+  }
+
   Widget _buildManagedAppCard(
     BuildContext context, {
     required ManagedApp app,
@@ -1033,6 +1054,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     required Color secContainer,
     required Color onSecContainer,
   }) {
+    final allRules = widget.repository.getRulesForApp(app.id);
     final rule = widget.repository.getRuleForApp(app.id);
     final decision = widget.repository.evaluateApp(app);
     final isBlocked = decision.isBlocked;
@@ -1060,9 +1082,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (!app.enabled) {
       detailText = 'Monitoring paused';
     } else if (rule != null) {
-      final mode = rule.mode == ScheduleMode.blockDuring ? 'Block' : 'Allow';
-      detailText =
-          '$mode · ${widget.repository.formatTime(rule.startTime)} - ${widget.repository.formatTime(rule.endTime)}';
+      final isBlockRule = rule.mode == ScheduleMode.blockDuring ||
+          rule.mode == ScheduleMode.allDayBlock;
+      final mode = isBlockRule ? 'Block' : 'Allow';
+      final isAllDay = rule.mode == ScheduleMode.allDayBlock ||
+          rule.mode == ScheduleMode.allDayAllow;
+      final windowStr = isAllDay
+          ? 'All Day'
+          : '${widget.repository.formatTime(rule.startTime)} - ${widget.repository.formatTime(rule.endTime)}';
+      final extraCount = allRules.length > 1 ? ' (+${allRules.length - 1} more)' : '';
+      detailText = '$mode · $windowStr$extraCount';
     } else {
       detailText = 'No active schedule rule';
     }

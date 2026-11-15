@@ -34,7 +34,7 @@ class RulePreset {
         apps: [
           ManagedApp(
             id: 'app_slack',
-            packageName: 'com.slack',
+            packageName: 'com.Slack',
             displayName: 'Slack',
             category: 'Productivity',
             createdAt: now,

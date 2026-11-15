@@ -69,12 +69,16 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
     required List<ManagedApp> managedApps,
     required List<ScheduleRule> schedules,
     required List<TemporaryOverride> overrides,
+    bool unmanagedAppsUntouched = true,
+    bool vipEmergencyBypass = true,
   }) async {
     try {
       final payload = jsonEncode({
         'managedApps': managedApps.map((a) => a.toJson()).toList(),
         'schedules': schedules.map((s) => s.toJson()).toList(),
         'overrides': overrides.map((o) => o.toJson()).toList(),
+        'unmanagedAppsUntouched': unmanagedAppsUntouched,
+        'vipEmergencyBypass': vipEmergencyBypass,
       });
 
       await _channel.invokeMethod<void>('syncSchedules', {'payload': payload});
