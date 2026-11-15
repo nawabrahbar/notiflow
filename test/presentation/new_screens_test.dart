@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
 import 'package:notification_handler/domain/models/managed_app.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
@@ -54,6 +55,14 @@ class MockPlatformService implements NotificationPlatformInterface {
   Future<String?> pickBackupFile() async => null;
 }
 
+Future<void> flushFontsAndSettle(WidgetTester tester) async {
+  await tester.runAsync(() async {
+    await GoogleFonts.pendingFonts();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  });
+  await tester.pumpAndSettle();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -61,6 +70,7 @@ void main() {
   late ScheduleRepository repository;
 
   setUp(() async {
+    GoogleFonts.config.allowRuntimeFetching = false;
     SharedPreferences.setMockInitialValues({});
     mockPlatform = MockPlatformService();
     PlatformFactory.mockPlatformService = mockPlatform;
@@ -88,7 +98,7 @@ void main() {
     });
 
     await tester.pumpWidget(wrapWithTheme(OnboardingScreen(repository: repository)));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify Step 1 title and pillars
     expect(find.text('Take back control of your attention'), findsOneWidget);
@@ -100,7 +110,7 @@ void main() {
     final getStartedButton = find.text('Get Started');
     expect(getStartedButton, findsOneWidget);
     await tester.tap(getStartedButton);
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify Step 2 Notification Access requirement
     expect(find.text('Notification Access is required'), findsOneWidget);
@@ -121,7 +131,7 @@ void main() {
       repository: repository,
       isInitialSetup: false,
     )));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     expect(find.textContaining('ACTION REQUIRED'), findsOneWidget);
     expect(find.text('Notification Access is paused'), findsOneWidget);
@@ -135,7 +145,7 @@ void main() {
       repository: repository,
       initialShowRestorationBanner: true,
     )));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     expect(find.text('Focus Shield Online'), findsOneWidget);
     expect(find.text('ACCESS RESTORED'), findsOneWidget);
@@ -154,7 +164,7 @@ void main() {
       repository: repository,
       showBackButton: true,
     )));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     expect(find.text('Settings'), findsOneWidget);
     expect(find.byType(StitchThemeSwitch), findsOneWidget);
@@ -186,7 +196,7 @@ void main() {
     await tester.pumpWidget(wrapWithTheme(DashboardScreen(
       repository: repository,
     )));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify Greeting is displayed
     expect(find.textContaining('Good '), findsOneWidget);
@@ -196,7 +206,7 @@ void main() {
 
     // Long press on app card to trigger selection mode
     await tester.longPress(find.text('Test Chat'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify selection bar is displayed with Checkbox and NO Select/Deselect All text
     expect(find.text('1 Selected'), findsOneWidget);
@@ -207,13 +217,13 @@ void main() {
 
     // Tap Delete button
     await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Dialog confirmation
     expect(find.text('Delete 1 Rule?'), findsOneWidget);
     // Tap Delete inside dialog
     await tester.tap(find.widgetWithText(ElevatedButton, 'Delete').last);
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify app was deleted
     expect(repository.managedApps.any((a) => a.id == 'app_test_chat'), isFalse);
@@ -228,14 +238,14 @@ void main() {
     });
 
     await tester.pumpWidget(wrapWithTheme(ActivityScreen(repository: repository)));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify exactly one Clear Log button exists (in Events section)
     expect(find.text('Clear Log'), findsOneWidget);
 
     // Tap Clear Log button when empty
     await tester.tap(find.text('Clear Log'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify empty state snackbar
     expect(find.text('Activity log is already empty.'), findsOneWidget);
@@ -254,7 +264,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // In Light mode:
     // Sun icon should be visible, Moon icon should be hidden, 'Light' text should be visible
@@ -265,7 +275,7 @@ void main() {
 
     // Tap to switch to Dark mode
     await tester.tap(find.byType(StitchThemeSwitch));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // In Dark mode:
     // Moon icon should be visible on right, Sun icon should be hidden, 'Dark' text should be visible
@@ -276,7 +286,7 @@ void main() {
 
     // Tap again to switch back to Light mode
     await tester.tap(find.byType(StitchThemeSwitch));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     expect(find.text('Light'), findsOneWidget);
     expect(find.text('Dark'), findsNothing);
@@ -302,7 +312,7 @@ void main() {
     ));
 
     await tester.pumpWidget(wrapWithTheme(DashboardScreen(repository: repository)));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     final addAppButton = find.widgetWithText(TextButton, '+ Add App');
     expect(addAppButton, findsOneWidget);
@@ -331,7 +341,7 @@ void main() {
       app: testApp,
       repository: repository,
     )));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     final addScheduleButton = find.widgetWithText(TextButton, '+ Add Schedule');
     expect(addScheduleButton, findsOneWidget);
@@ -361,7 +371,7 @@ void main() {
       app: testApp,
       repository: repository,
     )));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Verify section header exists
     expect(find.text('QUICK TEMPORARY BLOCK · INSTANT OVERRIDE'), findsOneWidget);
@@ -373,7 +383,7 @@ void main() {
 
     // Tap 15m Mute pill
     await tester.tap(find.text('15m Mute'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Override should now be active
     expect(repository.getActiveOverride(testApp.id), isNotNull);
@@ -382,7 +392,7 @@ void main() {
 
     // Tap 15m Mute again to toggle off
     await tester.tap(find.text('15m Mute'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Override should be cleared
     expect(repository.getActiveOverride(testApp.id), isNull);
@@ -390,7 +400,7 @@ void main() {
 
     // Tap + Custom pill to open custom mute dialog
     await tester.tap(find.text('+ Custom'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Dialog should be open
     expect(find.text('Custom Mute Duration'), findsOneWidget);
@@ -399,9 +409,9 @@ void main() {
 
     // Select 3h preset and confirm
     await tester.tap(find.text('3h'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
     await tester.tap(find.text('Mute for 3 hrs'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Override should now be active for 3 hours and pill should dynamically display '3h Mute'
     expect(repository.getActiveOverride(testApp.id), isNotNull);
@@ -412,7 +422,7 @@ void main() {
 
     // Tap Clear Temporary Override button
     await tester.tap(find.text('Clear Temporary Override'));
-    await tester.pumpAndSettle();
+    await flushFontsAndSettle(tester);
 
     // Custom timer should now be cleared and pill should reset back to + Custom
     expect(repository.getActiveOverride(testApp.id), isNull);
