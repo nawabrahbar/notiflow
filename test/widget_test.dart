@@ -1,4 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
 import 'package:notification_handler/domain/models/managed_app.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
@@ -44,13 +46,19 @@ class MockPlatformService implements NotificationPlatformInterface {
 
 void main() {
   testWidgets('NotificationHandlerApp launches to splash screen', (WidgetTester tester) async {
+    GoogleFonts.config.allowRuntimeFetching = false;
     SharedPreferences.setMockInitialValues({'pref_onboarding_completed': true});
 
     final mockPlatform = MockPlatformService();
     final repository = ScheduleRepository(platformService: mockPlatform);
 
     await tester.pumpWidget(NotificationHandlerApp(repository: repository));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Notiflow'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 }
