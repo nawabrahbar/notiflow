@@ -53,7 +53,8 @@ void main() {
     final repository = ScheduleRepository(platformService: mockPlatform);
 
     await tester.pumpWidget(NotificationHandlerApp(repository: repository));
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Notiflow'), findsOneWidget);
