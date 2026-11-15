@@ -11,7 +11,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   build-apk:
@@ -39,8 +38,6 @@ jobs:
         run: flutter pub get
 
       - name: Run Flutter unit & widget tests
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           flutter test --reporter expanded > /tmp/flutter_test.log 2>&1
@@ -50,10 +47,6 @@ jobs:
             ERR_LINES=$(grep -B 2 -A 20 -E "(Error:|Exception|\[E\]|══╡)" /tmp/flutter_test.log | head -n 60)
             TAIL_OUT=$(printf "%s\n---\n%s" "$ERR_LINES" "$(tail -n 40 /tmp/flutter_test.log)" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
             echo "::error title=Flutter Test Failure::${TAIL_OUT}"
-            if [ -n "${{ github.event.pull_request.number }}" ]; then
-              printf "### CI Test Failure Log\n\`\`\`\n%s\n---\n%s\n\`\`\`\n" "$ERR_LINES" "$(tail -n 60 /tmp/flutter_test.log)" > /tmp/test_comment.md
-              gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/test_comment.md || true
-            fi
             exit $STATUS
           fi
 
