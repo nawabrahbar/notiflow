@@ -23,7 +23,7 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
     this.onProfileTap,
     this.actions,
     this.showThemeToggle = true,
-    this.showEmblem = true,
+    this.showEmblem = false,
   });
 
   @override
@@ -34,13 +34,12 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
     final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
-    final accent = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
 
     return Container(
       height: preferredSize.height + MediaQuery.of(context).padding.top,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top,
-        left: 16,
+        left: 20,
         right: 16,
       ),
       decoration: BoxDecoration(
@@ -56,7 +55,6 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (showEmblem) ...[
-                  // Notiflow Emblem matching Botanical design
                   Container(
                     width: 32,
                     height: 32,
@@ -72,7 +70,7 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.asset(
-                        'assets/icon/app_icon.png',
+                        isDark ? 'assets/icon/app_icon.png' : 'assets/icon/app_icon_light.png',
                         width: 32,
                         height: 32,
                         fit: BoxFit.cover,
@@ -87,19 +85,10 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.newsreader(
                       fontSize: 22,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                       color: textMain,
                       letterSpacing: -0.3,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    shape: BoxShape.circle,
                   ),
                 ),
               ],
