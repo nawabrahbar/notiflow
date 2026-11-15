@@ -46,8 +46,20 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   String? _selectedTemplateId;
   bool _isSaving = false;
 
-  ManagedApp get _effectiveApp =>
-      widget.app ?? widget.targetApp ?? widget.repository.managedApps.first;
+  ManagedApp get _effectiveApp {
+    final explicit = widget.app ?? widget.targetApp;
+    if (explicit != null) return explicit;
+    final apps = widget.repository.managedApps;
+    if (apps.isNotEmpty) return apps.first;
+    final now = DateTime.now();
+    return ManagedApp(
+      id: 'app_default',
+      packageName: 'com.android.settings',
+      displayName: 'Selected App',
+      createdAt: now,
+      updatedAt: now,
+    );
+  }
 
   @override
   void initState() {

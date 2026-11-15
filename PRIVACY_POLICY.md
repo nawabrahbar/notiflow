@@ -29,14 +29,11 @@ To function as an automatic notification scheduler and blocker on Android, Notif
   - Muted notification logs are stored locally inside the app's private Android storage (`SharedPreferences`) and are capped automatically.
   - Notification data **never leaves your device**.
 
-### B. Installed Applications List (`android.permission.QUERY_ALL_PACKAGES`)
-- **Why it is required:** Allows Notiflow to display your installed launcher applications (name, package identifier, and icon) so you can choose which apps to manage or mute on a schedule.
+### B. Installed Launcher Applications Discovery (`<queries>` Intent Filter)
+- **Why it is required:** Notiflow declares a standard `<queries>` intent filter for launchable apps (`android.intent.action.MAIN` / `android.intent.category.LAUNCHER`)—without requesting the broad `QUERY_ALL_PACKAGES` permission—so you can view your installed applications (name, package identifier, and icon) and choose which apps to manage or mute on a schedule.
 - **How your data is handled:** Your installed app list is read locally on your device to render the app picker UI and is never uploaded or shared anywhere.
 
-### C. Boot Completed (`android.permission.RECEIVE_BOOT_COMPLETED`)
-- **Why it is required:** Ensures your active notification schedules and background listener resume automatically after you restart your phone.
-
-### D. Storage Access Framework (Export & Import `.notiflow` Backup Files)
+### C. Storage Access Framework (Export & Import `.notiflow` Backup Files)
 - **Why it is required:** When you explicitly tap **Export .notiflow File** or **Select .notiflow File**, Android's system file picker (`ACTION_CREATE_DOCUMENT` / `ACTION_OPEN_DOCUMENT`) is used to save or load your rules backup file in the folder you select. Notiflow cannot access any other files on your device.
 
 ---

@@ -27,6 +27,8 @@ abstract class NotificationPlatformInterface {
     required List<ManagedApp> managedApps,
     required List<ScheduleRule> schedules,
     required List<TemporaryOverride> overrides,
+    bool unmanagedAppsUntouched = true,
+    bool vipEmergencyBypass = true,
   });
 
   /// Exports a .notiflow backup file to local device storage and invokes share sheet.

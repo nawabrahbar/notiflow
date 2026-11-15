@@ -1446,8 +1446,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   _buildSecurityBadge(
                     icon: Icons.key_rounded,
-                    title: 'AES-256 Vault',
-                    subtitle: 'Hardware Keystore',
+                    title: 'FBE Protected',
+                    subtitle: 'OS Disk Encryption',
                     isDark: isDark,
                     borderCol: borderCol,
                     textMain: textMain,
@@ -1455,8 +1455,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   _buildSecurityBadge(
                     icon: Icons.storage_rounded,
-                    title: 'SQLite 3.45',
-                    subtitle: 'Isolated Local DB',
+                    title: 'Private Store',
+                    subtitle: 'Isolated Sandbox',
                     isDark: isDark,
                     borderCol: borderCol,
                     textMain: textMain,

@@ -26,15 +26,22 @@ class MockPlatformService implements NotificationPlatformInterface {
   @override
   Future<List<DiscoveredAppInfo>> getInstalledApplications() async => [];
 
+  bool lastUnmanagedAppsUntouched = true;
+  bool lastVipEmergencyBypass = true;
+
   @override
   Future<void> syncSchedules({
     required List<ManagedApp> managedApps,
     required List<ScheduleRule> schedules,
     required List<TemporaryOverride> overrides,
+    bool unmanagedAppsUntouched = true,
+    bool vipEmergencyBypass = true,
   }) async {
     syncCalled = true;
     lastSyncedApps = managedApps;
     lastSyncedRules = schedules;
+    lastUnmanagedAppsUntouched = unmanagedAppsUntouched;
+    lastVipEmergencyBypass = vipEmergencyBypass;
   }
 
   String? lastExportedFileName;
@@ -260,5 +267,53 @@ void main() {
     expect(repository.schedules.length, 1);
     expect(repository.schedules.first.name, 'Work Focus');
     expect(repository.defaultScheduleMode, 'block');
+  });
+
+  test('Triage preferences sync to native platform service', () async {
+    await repository.setUnmanagedAppsUntouched(false);
+    expect(mockPlatform.lastUnmanagedAppsUntouched, false);
+
+    await repository.setVipEmergencyBypass(false);
+    expect(mockPlatform.lastVipEmergencyBypass, false);
+  });
+
+  test('importRulesJson rejects malformed JSON with out-of-range hours or daysOfWeek', () async {
+    const badHourJson = '''
+    {
+      "managedApps": [],
+      "schedules": [
+        {
+          "id": "bad_rule",
+          "appId": "app_1",
+          "mode": "blockDuring",
+          "startTime": {"hour": 99, "minute": 0},
+          "endTime": {"hour": 17, "minute": 0},
+          "daysOfWeek": [1, 2, 3],
+          "createdAt": "2026-10-05T10:00:00.000",
+          "updatedAt": "2026-10-05T10:00:00.000"
+        }
+      ]
+    }
+    ''';
+    expect(await repository.importRulesJson(badHourJson), false);
+
+    const badDaysJson = '''
+    {
+      "managedApps": [],
+      "schedules": [
+        {
+          "id": "bad_rule_2",
+          "appId": "app_1",
+          "mode": "blockDuring",
+          "startTime": {"hour": 9, "minute": 0},
+          "endTime": {"hour": 17, "minute": 0},
+          "daysOfWeek": [0, 8],
+          "createdAt": "2026-10-05T10:00:00.000",
+          "updatedAt": "2026-10-05T10:00:00.000"
+        }
+      ]
+    }
+    ''';
+    expect(await repository.importRulesJson(badDaysJson), false);
   });
 }

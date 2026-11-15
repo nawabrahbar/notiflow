@@ -268,4 +268,63 @@ class NativeScheduleEvaluatorTest {
         val decision = evaluator.evaluateNotification("com.discord", testTime)
         assertTrue("Manual temporary mute override must take precedence even if app is disabled", decision.shouldBlock)
     }
+
+    @Test
+    fun testUnmanagedAppsUntouchedFalseBlocksUnmanagedApps() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload("""
+            {
+                "managedApps": [],
+                "schedules": [],
+                "overrides": [],
+                "unmanagedAppsUntouched": false
+            }
+        """.trimIndent())
+
+        val decision = evaluator.evaluateNotification("com.unknown.app", System.currentTimeMillis())
+        assertTrue("Unmanaged app must be blocked when unmanagedAppsUntouched is false", decision.shouldBlock)
+        assertTrue(decision.isManagedOrOverridden)
+        org.junit.Assert.assertEquals("Strict Mode", decision.ruleName)
+    }
+
+    @Test
+    fun testVipEmergencyBypassToggleAndCaseInsensitivePackageLookup() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload("""
+            {
+                "managedApps": [
+                    {"id": "app_slack", "packageName": "com.Slack", "enabled": true}
+                ],
+                "schedules": [
+                    {
+                        "id": "rule_work",
+                        "appId": "app_slack",
+                        "name": "Deep Work Shield",
+                        "enabled": true,
+                        "mode": "blockDuring",
+                        "startTime": {"hour": 9, "minute": 0},
+                        "endTime": {"hour": 17, "minute": 0},
+                        "daysOfWeek": [1, 2, 3, 4, 5, 6, 7],
+                        "isOvernight": false,
+                        "allowVipContacts": true
+                    }
+                ],
+                "overrides": [],
+                "vipEmergencyBypass": false
+            }
+        """.trimIndent())
+
+        val callTime1 = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 11)
+            set(Calendar.MINUTE, 10)
+            set(Calendar.SECOND, 0)
+        }.timeInMillis
+        val callTime2 = callTime1 + 60_000L
+
+        // Case-insensitive lookup ("com.slack" vs "com.Slack") + vipEmergencyBypass = false
+        val firstCall = evaluator.evaluateNotification("com.slack", callTime1, category = "call", title = "Alice")
+        val secondCall = evaluator.evaluateNotification("com.slack", callTime2, category = "call", title = "Alice")
+        assertTrue(firstCall.shouldBlock)
+        assertTrue("Second call within 3 mins must still be blocked when global vipEmergencyBypass is false", secondCall.shouldBlock)
+    }
 }

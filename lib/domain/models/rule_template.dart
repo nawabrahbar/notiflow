@@ -92,13 +92,25 @@ class RuleTemplate {
   }
 
   factory RuleTemplate.fromJson(Map<String, dynamic> json) {
+    final rawDays = json['daysOfWeek'] as List<dynamic>;
+    final validDays = <int>{};
+    for (final item in rawDays) {
+      if (item is! int || item < 1 || item > 7) {
+        throw FormatException('Invalid day of week in template JSON: $item');
+      }
+      validDays.add(item);
+    }
+    if (validDays.isEmpty) {
+      throw const FormatException('RuleTemplate daysOfWeek cannot be empty');
+    }
+
     return RuleTemplate(
       id: json['id'] as String,
       name: json['name'] as String,
       mode: ScheduleMode.fromJson(json['mode'] as String),
-      startTime: TimeOfDayValue.fromJson(json['startTime'] as Map<String, dynamic>),
-      endTime: TimeOfDayValue.fromJson(json['endTime'] as Map<String, dynamic>),
-      daysOfWeek: (json['daysOfWeek'] as List<dynamic>).map((e) => e as int).toSet(),
+      startTime: TimeOfDayValue.fromJson(Map<String, dynamic>.from(json['startTime'] as Map)),
+      endTime: TimeOfDayValue.fromJson(Map<String, dynamic>.from(json['endTime'] as Map)),
+      daysOfWeek: validDays,
       allowVipContacts: json['allowVipContacts'] as bool? ?? true,
       isPreSeeded: json['isPreSeeded'] as bool? ?? false,
       createdAt: json['createdAt'] != null

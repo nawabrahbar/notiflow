@@ -21,6 +21,7 @@ class ScheduleEvaluator {
     required List<ScheduleRule> schedules,
     TemporaryOverride? override,
     required DateTime currentDateTime,
+    bool unmanagedAppsUntouched = true,
   }) {
     // 1. Temporary Override (Takes absolute precedence over normal schedules and disabled state)
     if (override != null && override.isActiveAt(currentDateTime)) {
@@ -47,6 +48,12 @@ class ScheduleEvaluator {
 
     // 2. Unmanaged or disabled app
     if (app == null) {
+      if (!unmanagedAppsUntouched) {
+        return const ScheduleDecision(
+          decision: NotificationDecisionType.block,
+          reason: 'App is unmanaged (strict mode blocks unmanaged apps)',
+        );
+      }
       return const ScheduleDecision(
         decision: NotificationDecisionType.allow,
         reason: 'App is unmanaged (default allow)',

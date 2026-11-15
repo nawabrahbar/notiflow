@@ -28,6 +28,8 @@ class MockPlatformService implements NotificationPlatformInterface {
     required List<ManagedApp> managedApps,
     required List<ScheduleRule> schedules,
     required List<TemporaryOverride> overrides,
+    bool unmanagedAppsUntouched = true,
+    bool vipEmergencyBypass = true,
   }) async {}
 
   @override

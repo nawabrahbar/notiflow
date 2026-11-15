@@ -50,9 +50,17 @@ class TimeOfDayValue implements Comparable<TimeOfDayValue> {
   Map<String, dynamic> toJson() => {'hour': hour, 'minute': minute};
 
   factory TimeOfDayValue.fromJson(Map<String, dynamic> json) {
+    final hour = json['hour'];
+    final minute = json['minute'];
+    if (hour is! int || hour < 0 || hour > 23) {
+      throw FormatException('Invalid hour value in backup JSON: $hour');
+    }
+    if (minute is! int || minute < 0 || minute > 59) {
+      throw FormatException('Invalid minute value in backup JSON: $minute');
+    }
     return TimeOfDayValue(
-      hour: json['hour'] as int,
-      minute: json['minute'] as int,
+      hour: hour,
+      minute: minute,
     );
   }
 
@@ -155,15 +163,27 @@ class ScheduleRule {
   }
 
   factory ScheduleRule.fromJson(Map<String, dynamic> json) {
+    final rawDays = json['daysOfWeek'] as List<dynamic>;
+    final validDays = <int>{};
+    for (final item in rawDays) {
+      if (item is! int || item < 1 || item > 7) {
+        throw FormatException('Invalid day of week in backup JSON: $item');
+      }
+      validDays.add(item);
+    }
+    if (validDays.isEmpty) {
+      throw const FormatException('ScheduleRule daysOfWeek cannot be empty');
+    }
+
     return ScheduleRule(
       id: json['id'] as String,
       appId: json['appId'] as String,
       name: json['name'] as String?,
       enabled: json['enabled'] as bool? ?? true,
       mode: ScheduleMode.fromJson(json['mode'] as String),
-      startTime: TimeOfDayValue.fromJson(json['startTime'] as Map<String, dynamic>),
-      endTime: TimeOfDayValue.fromJson(json['endTime'] as Map<String, dynamic>),
-      daysOfWeek: (json['daysOfWeek'] as List<dynamic>).map((e) => e as int).toSet(),
+      startTime: TimeOfDayValue.fromJson(Map<String, dynamic>.from(json['startTime'] as Map)),
+      endTime: TimeOfDayValue.fromJson(Map<String, dynamic>.from(json['endTime'] as Map)),
+      daysOfWeek: validDays,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       allowVipContacts: json['allowVipContacts'] as bool? ?? true,

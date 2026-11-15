@@ -235,9 +235,11 @@ class ScheduleRepository extends ChangeNotifier {
   }
 
   /// Gets the primary schedule rule configured for [appId], or null.
+  /// Prefers enabled rules when multiple rules exist for the same app.
   ScheduleRule? getRuleForApp(String appId) {
     final rules = getRulesForApp(appId);
-    return rules.isNotEmpty ? rules.first : null;
+    if (rules.isEmpty) return null;
+    return rules.firstWhere((r) => r.enabled, orElse: () => rules.first);
   }
 
   /// Adds or updates a schedule rule, and automatically evaluates caching it as a saved template.
@@ -494,6 +496,7 @@ class ScheduleRepository extends ChangeNotifier {
       schedules: _schedules,
       override: override,
       currentDateTime: dt,
+      unmanagedAppsUntouched: _unmanagedAppsUntouched,
     );
   }
 
@@ -563,14 +566,18 @@ class ScheduleRepository extends ChangeNotifier {
       if (dormant.isEmpty) return 0;
 
       final installed = await _platformService.getInstalledApplications();
-      final installedMap = {for (final a in installed) a.packageName: a};
+      final installedMap = {
+        for (final a in installed) a.packageName.toLowerCase(): a,
+      };
 
       int activatedCount = 0;
       for (int i = 0; i < _managedApps.length; i++) {
         final app = _managedApps[i];
-        if (app.isDormantVault && installedMap.containsKey(app.packageName)) {
-          final discovered = installedMap[app.packageName]!;
+        final key = app.packageName.toLowerCase();
+        if (app.isDormantVault && installedMap.containsKey(key)) {
+          final discovered = installedMap[key]!;
           _managedApps[i] = app.copyWith(
+            packageName: discovered.packageName,
             isDormantVault: false,
             displayName: discovered.displayName.isNotEmpty
                 ? discovered.displayName
@@ -610,10 +617,10 @@ class ScheduleRepository extends ChangeNotifier {
           .toList();
 
       final installed = await _platformService.getInstalledApplications();
-      final installedPkgs = installed.map((a) => a.packageName).toSet();
+      final installedPkgs = installed.map((a) => a.packageName.toLowerCase()).toSet();
 
       return importedApps
-          .where((a) => !installedPkgs.contains(a.packageName))
+          .where((a) => !installedPkgs.contains(a.packageName.toLowerCase()))
           .toList();
     } catch (_) {
       return [];
@@ -680,19 +687,19 @@ class ScheduleRepository extends ChangeNotifier {
 
       // Handle uninstalled apps:
       final installed = await _platformService.getInstalledApplications();
-      final installedPkgs = installed.map((a) => a.packageName).toSet();
+      final installedPkgs = installed.map((a) => a.packageName.toLowerCase()).toSet();
 
       if (installed.isNotEmpty) {
         if (excludeUninstalled) {
           // Exclude uninstalled apps and their rules completely
-          importedApps.removeWhere((a) => !installedPkgs.contains(a.packageName));
+          importedApps.removeWhere((a) => !installedPkgs.contains(a.packageName.toLowerCase()));
           final remainingAppIds = importedApps.map((a) => a.id).toSet();
           importedSchedules.removeWhere((r) => !remainingAppIds.contains(r.appId));
         } else if (vaultUninstalled) {
           // Keep in vault & auto-apply when installed: mark isDormantVault: true so they are not shown on Rules page
           for (int i = 0; i < importedApps.length; i++) {
             final a = importedApps[i];
-            if (!installedPkgs.contains(a.packageName)) {
+            if (!installedPkgs.contains(a.packageName.toLowerCase())) {
               importedApps[i] = a.copyWith(isDormantVault: true);
             }
           }
@@ -708,7 +715,9 @@ class ScheduleRepository extends ChangeNotifier {
         _overrides.clear();
       } else {
         for (final app in importedApps) {
-          if (!_managedApps.any((a) => a.id == app.id || a.packageName == app.packageName)) {
+          if (!_managedApps.any((a) =>
+              a.id == app.id ||
+              a.packageName.toLowerCase() == app.packageName.toLowerCase())) {
             _managedApps.add(app);
           }
         }
@@ -761,17 +770,43 @@ class ScheduleRepository extends ChangeNotifier {
     }
   }
 
-  /// Applies a curated focus preset.
+  /// Applies a curated focus preset and hydrates icons/display names from installed apps.
   Future<void> applyPreset(RulePreset preset, {bool replaceAll = false}) async {
+    Map<String, DiscoveredAppInfo> installedMap = {};
+    try {
+      final installed = await _platformService.getInstalledApplications();
+      installedMap = {
+        for (final a in installed) a.packageName.toLowerCase(): a,
+      };
+    } catch (_) {}
+
+    ManagedApp hydratePresetApp(ManagedApp app) {
+      final discovered = installedMap[app.packageName.toLowerCase()];
+      if (discovered == null) return app;
+      return app.copyWith(
+        packageName: discovered.packageName,
+        displayName: discovered.displayName.isNotEmpty
+            ? discovered.displayName
+            : app.displayName,
+        iconBytes: discovered.iconBytes ?? app.iconBytes,
+      );
+    }
+
     if (replaceAll) {
-      _managedApps = List.from(preset.apps);
+      _managedApps = preset.apps.map(hydratePresetApp).toList();
       _schedules = List.from(preset.schedules);
       _overrides.clear();
     } else {
-      for (final app in preset.apps) {
-        final existingIndex = _managedApps.indexWhere((a) => a.packageName == app.packageName);
+      for (final rawApp in preset.apps) {
+        final app = hydratePresetApp(rawApp);
+        final existingIndex = _managedApps.indexWhere(
+          (a) => a.packageName.toLowerCase() == app.packageName.toLowerCase(),
+        );
         if (existingIndex >= 0) {
-          _managedApps[existingIndex] = _managedApps[existingIndex].copyWith(enabled: true);
+          _managedApps[existingIndex] = _managedApps[existingIndex].copyWith(
+            enabled: true,
+            iconBytes: _managedApps[existingIndex].iconBytes ?? app.iconBytes,
+          );
         } else {
           _managedApps.add(app);
         }
@@ -809,6 +844,8 @@ class ScheduleRepository extends ChangeNotifier {
       managedApps: managedApps,
       schedules: _schedules,
       overrides: _overrides.values.toList(),
+      unmanagedAppsUntouched: _unmanagedAppsUntouched,
+      vipEmergencyBypass: _vipEmergencyBypass,
     );
   }
 }

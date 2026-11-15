@@ -67,17 +67,30 @@ class NativeScheduleEvaluator {
     var cachedOverrides: Map<String, NativeOverride> = emptyMap()
         private set
 
+    @Volatile
+    var unmanagedAppsUntouched: Boolean = true
+        private set
+
+    @Volatile
+    var vipEmergencyBypass: Boolean = true
+        private set
+
     @Synchronized
     fun parsePayload(payload: String?) {
         if (payload.isNullOrBlank()) {
             cachedApps = emptyMap()
             cachedRules = emptyList()
             cachedOverrides = emptyMap()
+            unmanagedAppsUntouched = true
+            vipEmergencyBypass = true
             return
         }
 
         try {
             val root = JSONObject(payload)
+
+            unmanagedAppsUntouched = root.optBoolean("unmanagedAppsUntouched", true)
+            vipEmergencyBypass = root.optBoolean("vipEmergencyBypass", true)
 
             // 1. Managed Apps
             val appsArray = root.optJSONArray("managedApps") ?: org.json.JSONArray()
@@ -147,7 +160,10 @@ class NativeScheduleEvaluator {
                 overridesMap[ov.appId] = ov
 
                 // Also map packageName <-> appId for per-app overrides so lookups succeed either way
-                val matchingApp = appsMap.values.firstOrNull { it.id == ov.appId || it.packageName == ov.appId }
+                val matchingApp = appsMap.values.firstOrNull {
+                    it.id.equals(ov.appId, ignoreCase = true) ||
+                        it.packageName.equals(ov.appId, ignoreCase = true)
+                }
                 if (matchingApp != null) {
                     overridesMap[matchingApp.packageName] = ov
                     overridesMap[matchingApp.id] = ov
@@ -197,14 +213,19 @@ class NativeScheduleEvaluator {
     // Key is "$packageName:$callerIdentity", Value is timestampMs of the last call
     private val callerHistory = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
+    private fun findManagedApp(packageName: String): NativeManagedApp? {
+        return cachedApps[packageName]
+            ?: cachedApps.entries.firstOrNull { it.key.equals(packageName, ignoreCase = true) }?.value
+    }
+
     fun evaluateNotification(
         packageName: String,
         postTimeMs: Long,
         category: String = "",
         title: String = ""
     ): NativeEvaluationDecision {
-        val app = cachedApps[packageName]
-        val appOverride = (if (app != null) cachedOverrides[app.id] else null)
+        val app = findManagedApp(packageName)
+        val appOverride = (if (app != null) cachedOverrides[app.id] ?: cachedOverrides[app.packageName] else null)
             ?: cachedOverrides[packageName]
 
         // 1. Check active per-app override (takes absolute priority over app disabled status and recurring schedules)
@@ -241,7 +262,23 @@ class NativeScheduleEvaluator {
             }
         }
 
-        if (app == null || !app.enabled) {
+        if (app == null) {
+            if (!unmanagedAppsUntouched) {
+                return NativeEvaluationDecision(
+                    shouldBlock = true,
+                    isManagedOrOverridden = true,
+                    reason = "Blocked (unmanaged apps pass-through disabled)",
+                    ruleName = "Strict Mode"
+                )
+            }
+            return NativeEvaluationDecision(
+                shouldBlock = false,
+                isManagedOrOverridden = false,
+                reason = "Unmanaged or paused app"
+            )
+        }
+
+        if (!app.enabled) {
             return NativeEvaluationDecision(
                 shouldBlock = false,
                 isManagedOrOverridden = false,
@@ -277,7 +314,7 @@ class NativeScheduleEvaluator {
                 val window = formatRuleWindow(rule)
 
                 // Urgent repeated call escalation check (3-minute window)
-                if (isCall && rule.allowVipContacts) {
+                if (vipEmergencyBypass && isCall && rule.allowVipContacts) {
                     val callerKey = "$packageName:${if (title.isNotBlank()) title.trim() else "unknown"}"
                     val lastCallMs = callerHistory[callerKey]
                     val threeMinutesMs = 3 * 60 * 1000L
@@ -332,7 +369,7 @@ class NativeScheduleEvaluator {
             val window = formatRuleWindow(firstAllow)
 
             // Urgent repeated call escalation check outside allow window
-            if (isCall && firstAllow.allowVipContacts) {
+            if (vipEmergencyBypass && isCall && firstAllow.allowVipContacts) {
                 val callerKey = "$packageName:${if (title.isNotBlank()) title.trim() else "unknown"}"
                 val lastCallMs = callerHistory[callerKey]
                 val threeMinutesMs = 3 * 60 * 1000L
@@ -386,7 +423,7 @@ class NativeScheduleEvaluator {
     }
 
     fun isManagedPackage(packageName: String): Boolean {
-        val app = cachedApps[packageName] ?: return false
+        val app = findManagedApp(packageName) ?: return false
         return app.enabled
     }
 
