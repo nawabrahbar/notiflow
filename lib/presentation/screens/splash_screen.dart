@@ -99,11 +99,9 @@ class _SplashScreenState extends State<SplashScreen>
     final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
     final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
     final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
-    final containerLow = isDark ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow;
     final borderCol = isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant;
     final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
-    final secondary = isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary;
-    final tertiary = isDark ? AppTheme.darkTertiary : AppTheme.lightTertiary;
+    final iconAsset = isDark ? 'assets/icon/app_icon.png' : 'assets/icon/app_icon_light.png';
 
     return Scaffold(
       backgroundColor: bg,
@@ -111,161 +109,135 @@ class _SplashScreenState extends State<SplashScreen>
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isTablet = constraints.maxWidth >= 600;
+            final iconSize = isTablet ? 124.0 : 104.0;
+            final ringSize = isTablet ? 168.0 : 144.0;
 
             return Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: isTablet ? 640 : 420,
+                  maxWidth: isTablet ? 520 : 360,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // App Icon inside concentric dashed ring
+                      AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (context, child) {
+                          final pulse = _pulseController.value;
+                          return SizedBox(
+                            width: ringSize,
+                            height: ringSize,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CustomPaint(
+                                  size: Size(ringSize, ringSize),
+                                  painter: _DashedCirclePainter(
+                                    color: borderCol.withValues(alpha: 0.55 + (0.25 * pulse)),
+                                    strokeWidth: 1.2,
+                                  ),
+                                ),
+                                Container(
+                                  width: iconSize,
+                                  height: iconSize,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(isTablet ? 30 : 26),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 10),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(isTablet ? 30 : 26),
+                                    child: Image.asset(
+                                      iconAsset,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Editorial Serif Brand Headline
+                      Text(
+                        'Notiflow',
+                        style: GoogleFonts.newsreader(
+                          fontSize: isTablet ? 44 : 36,
+                          fontWeight: FontWeight.w600,
+                          color: textMain,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
                       const SizedBox(height: 12),
 
-                      // Central Medallion Core
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Tactile Medallion with Ambient Pulse Rings
-                          AnimatedBuilder(
-                            animation: _pulseController,
-                            builder: (context, child) {
-                              final pulse = _pulseController.value;
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Outer atmospheric glow
-                                  Container(
-                                    width: (isTablet ? 180 : 150) + (pulse * 20),
-                                    height: (isTablet ? 180 : 150) + (pulse * 20),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: primary.withOpacity(0.06 + (0.05 * (1 - pulse))),
-                                    ),
-                                  ),
-                                  // Mid secondary pulse ring
-                                  Container(
-                                    width: (isTablet ? 160 : 135) + (pulse * 10),
-                                    height: (isTablet ? 160 : 135) + (pulse * 10),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: secondary.withOpacity(0.10 + (0.05 * pulse)),
-                                    ),
-                                  ),
-                                  // Tactile cardstock medallion
-                                  Container(
-                                    width: isTablet ? 130 : 110,
-                                    height: isTablet ? 130 : 110,
-                                    decoration: BoxDecoration(
-                                      color: containerLow,
-                                      borderRadius: BorderRadius.circular(isTablet ? 36 : 30),
-                                      border: Border.all(
-                                        color: borderCol.withOpacity(0.5),
-                                        width: 1.5,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
-                                          blurRadius: 24,
-                                          offset: const Offset(0, 10),
-                                        ),
-                                      ],
-                                    ),
-                                    padding: const EdgeInsets.all(12),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(isTablet ? 26 : 22),
-                                      child: Image.asset(
-                                        'assets/icon/app_icon.png',
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 28),
-
-                          // Editorial Serif Brand Headline
-                          Text(
-                            'Notiflow',
-                            style: GoogleFonts.newsreader(
-                              fontSize: isTablet ? 46 : 38,
-                              fontWeight: FontWeight.w600,
-                              color: textMain,
-                              letterSpacing: -0.6,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Brand Positioning Subtitle
-                          Text(
-                            'Quiet the noise. Schedule your peace.',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: isTablet ? 16 : 14.5,
-                              fontWeight: FontWeight.w400,
-                              color: textMuted,
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-
-                          // Subdued Cadence Indicator (3 bouncing dots)
-                          AnimatedBuilder(
-                            animation: _pulseController,
-                            builder: (context, _) {
-                              final p = _pulseController.value;
-                              return Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _CadenceDot(color: primary, offset: (p * 5)),
-                                  const SizedBox(width: 8),
-                                  _CadenceDot(color: secondary, offset: ((1 - p) * 5)),
-                                  const SizedBox(width: 8),
-                                  _CadenceDot(color: tertiary, offset: (p * 4)),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
+                      // Brand Positioning Tagline (regular + italic)
+                      Text(
+                        'Silence the noise.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: isTablet ? 16 : 14.5,
+                          fontWeight: FontWeight.w400,
+                          color: textMuted,
+                          height: 1.4,
+                        ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Protect what matters.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.newsreader(
+                          fontSize: isTablet ? 17 : 15.5,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w400,
+                          color: textMain.withValues(alpha: 0.9),
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
 
-                      // Bottom Security & Integrity Watermark (Zero borders)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: containerLow,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: borderCol.withOpacity(0.35),
-                              width: 1.0,
+                      // Thin horizontal progress bar
+                      AnimatedBuilder(
+                        animation: _pulseController,
+                        builder: (context, _) {
+                          final progress = 0.35 + (0.55 * _pulseController.value);
+                          return Container(
+                            width: isTablet ? 220 : 185,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: borderCol.withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(999),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.lock_outline_rounded,
-                                size: 15,
-                                color: tertiary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '100% On-Device · Zero Telemetry',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: textMain,
-                                  letterSpacing: 0.2,
+                            alignment: Alignment.centerLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: progress,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: primary,
+                                  borderRadius: BorderRadius.circular(999),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      Text(
+                        'Waking on-device shield...',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: textMuted.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -280,24 +252,40 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-class _CadenceDot extends StatelessWidget {
+class _DashedCirclePainter extends CustomPainter {
   final Color color;
-  final double offset;
+  final double strokeWidth;
 
-  const _CadenceDot({required this.color, required this.offset});
+  const _DashedCirclePainter({
+    required this.color,
+    this.strokeWidth = 1.2,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: Offset(0, -offset),
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final radius = (size.shortestSide / 2) - strokeWidth;
+    final center = Offset(size.width / 2, size.height / 2);
+    const dashCount = 48;
+    const sweepPerDash = (2 * 3.141592653589793) / dashCount;
+
+    for (int i = 0; i < dashCount; i++) {
+      final startAngle = i * sweepPerDash;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweepPerDash * 0.52,
+        false,
+        paint,
+      );
+    }
   }
+
+  @override
+  bool shouldRepaint(covariant _DashedCirclePainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.strokeWidth != strokeWidth;
 }

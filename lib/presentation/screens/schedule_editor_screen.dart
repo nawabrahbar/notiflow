@@ -258,7 +258,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   'Schedule Rule Editor',
                   style: GoogleFonts.newsreader(
                     fontSize: 22,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                     color: textMain,
                     letterSpacing: -0.3,
                   ),

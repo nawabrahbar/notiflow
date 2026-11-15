@@ -124,7 +124,7 @@ class AppDetailsScreen extends StatelessWidget {
                         'App Details',
                         style: GoogleFonts.newsreader(
                           fontSize: 22,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                           color: textMain,
                           letterSpacing: -0.3,
                         ),
@@ -679,58 +679,107 @@ class AppDetailsScreen extends StatelessWidget {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ScheduleEditorScreen(
-                                            repository: repository,
-                                            targetApp: currentApp,
-                                            existingRule: rule,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    behavior: HitTestBehavior.opaque,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.schedule_rounded,
-                                          size: 18,
-                                          color: primaryCol,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '${repository.formatTime(rule.startTime)} → ${repository.formatTime(rule.endTime)}',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: textMain,
-                                          ),
-                                        ),
-                                        if (rule.isOvernight) ...[
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: cardBgHighest,
-                                              borderRadius: BorderRadius.circular(4),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ScheduleEditorScreen(
+                                              repository: repository,
+                                              targetApp: currentApp,
+                                              existingRule: rule,
                                             ),
-                                            child: Text(
-                                              '+1 DAY',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 9.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: primaryCol,
+                                          ),
+                                        );
+                                      },
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              color: secondaryContainerCol.withValues(alpha: 0.7),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: onSecondaryContainerCol.withValues(alpha: 0.25),
                                               ),
+                                            ),
+                                            child: Icon(
+                                              rule.isOvernight
+                                                  ? Icons.nights_stay_rounded
+                                                  : Icons.schedule_rounded,
+                                              size: 18,
+                                              color: onSecondaryContainerCol,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  (rule.name != null && rule.name!.trim().isNotEmpty)
+                                                      ? rule.name!.trim()
+                                                      : (isBlock ? 'Silent Hold Window' : 'Allow Window'),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: textMain,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.schedule_rounded,
+                                                      size: 13,
+                                                      color: textMuted,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Flexible(
+                                                      child: Text(
+                                                        '${repository.formatTime(rule.startTime)} → ${repository.formatTime(rule.endTime)}',
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: GoogleFonts.plusJakartaSans(
+                                                          fontSize: 12.5,
+                                                          fontWeight: FontWeight.w500,
+                                                          color: textMuted,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (rule.isOvernight) ...[
+                                                      const SizedBox(width: 6),
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                        decoration: BoxDecoration(
+                                                          color: cardBgHighest,
+                                                          borderRadius: BorderRadius.circular(4),
+                                                        ),
+                                                        child: Text(
+                                                          '+1 DAY',
+                                                          style: GoogleFonts.plusJakartaSans(
+                                                            fontSize: 9,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: primaryCol,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
-                                      ],
+                                      ),
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
                                   StitchSwitch(
                                     value: rule.enabled,
                                     onChanged: (val) => repository.toggleRuleEnabled(rule.id, val),
@@ -930,6 +979,42 @@ class AppDetailsScreen extends StatelessWidget {
                   ],
                 );
 
+                final saveChangesButton = SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => MainNavigationShell(repository: repository),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 20),
+                    label: Text(
+                      'Save Changes',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryContainerCol,
+                      foregroundColor: isDark
+                          ? AppTheme.darkOnPrimary
+                          : AppTheme.lightOnSurface,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                );
+
                 if (isTablet) {
                   return ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -942,6 +1027,8 @@ class AppDetailsScreen extends StatelessWidget {
                           Expanded(flex: 7, child: rightRulesColumn),
                         ],
                       ),
+                      const SizedBox(height: 20),
+                      saveChangesButton,
                       const SizedBox(height: 32),
                     ],
                   );
@@ -953,6 +1040,8 @@ class AppDetailsScreen extends StatelessWidget {
                     leftCardColumn,
                     const SizedBox(height: 28),
                     rightRulesColumn,
+                    const SizedBox(height: 20),
+                    saveChangesButton,
                     const SizedBox(height: 32),
                   ],
                 );
@@ -1237,12 +1326,12 @@ class AppDetailsScreen extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
           decoration: BoxDecoration(
             color: isActive
                 ? (isDark ? primaryCol.withValues(alpha: 0.25) : primaryCol.withValues(alpha: 0.15))
                 : cardBg,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isActive ? primaryCol : borderCol,
               width: isActive ? 1.5 : 1,
@@ -1256,16 +1345,16 @@ class AppDetailsScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: 13, color: isActive ? primaryCol : textMain),
-                  const SizedBox(width: 3),
+                  Icon(icon, size: 16, color: isActive ? primaryCol : textMain),
+                  const SizedBox(width: 6),
                 ],
                 Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                     color: isActive ? primaryCol : textMain,
                   ),
                 ),

@@ -132,7 +132,7 @@ class MainNavigationShellState extends State<MainNavigationShell> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Image.asset(
-                              'assets/icon/app_icon.png',
+                              isDark ? 'assets/icon/app_icon.png' : 'assets/icon/app_icon_light.png',
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -201,7 +201,7 @@ class MainNavigationShellState extends State<MainNavigationShell> {
           backgroundColor: bg,
           appBar: StitchHeader(
             title: _getTitle(),
-            showEmblem: true,
+            showEmblem: false,
             onProfileTap: () => switchTab(3),
           ),
           body: IndexedStack(

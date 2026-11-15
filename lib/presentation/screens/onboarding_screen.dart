@@ -3,9 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
+import '../theme/app_theme.dart';
 import 'import_rules_screen.dart';
 
-/// 3-Step Onboarding Journey faithfully implemented from Stitch UX.
+/// 3-Step Onboarding Journey faithfully adhering to Botanical Nocturne & Sanctuary UX:
 /// Step 1: System Setup & Attention Ownership
 /// Step 2: Permission Health & Notification Access
 /// Step 3: Rules Import (Curated Presets / .notiflow Backup)
@@ -57,7 +58,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF09090B) : const Color(0xFFF9F9FB);
+    final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
 
     return Scaffold(
       backgroundColor: bg,
@@ -77,119 +78,78 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
     );
   }
 
+  Widget _buildTopMetaBar(String stepLabel, bool isDark) {
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final primaryContainer = isDark ? AppTheme.darkPrimaryContainer : AppTheme.lightPrimaryContainer;
+    final cardBg = isDark ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Notiflow',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: textMain,
+            letterSpacing: -0.3,
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: primaryContainer.withValues(alpha: 0.4)),
+          ),
+          child: Text(
+            stepLabel,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: primary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ===========================================================================
   // STEP 1: Cognitive Peace of Mind & Value Pillars
   // ===========================================================================
   Widget _buildStepOne(bool isDark) {
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    final amber = const Color(0xFFF59E0B);
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final primaryContainer = isDark ? AppTheme.darkPrimaryContainer : AppTheme.lightPrimaryContainer;
+    final onPrimary = isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnSurface;
 
     return ListView(
       key: const ValueKey('onboarding_step_1'),
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
       children: [
-        // Top Meta Bar
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: amber.withValues(alpha: 0.3)),
-                  ),
-                  child: Icon(Icons.shield_rounded, color: amber, size: 20),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Notiflow',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: textMain,
-                      ),
-                    ),
-                    Text(
-                      'SOVEREIGN PROTOCOL',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.0,
-                        color: amber,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'STEP 1 OF 3',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: amber,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
+        _buildTopMetaBar('STEP 1 OF 3', isDark),
+        const SizedBox(height: 28),
 
-        // Hero Tag & Headline
         Text(
           'Take back control of your attention',
-          style: GoogleFonts.inter(
-            fontSize: 27,
-            fontWeight: FontWeight.w800,
+          style: GoogleFonts.newsreader(
+            fontSize: 32,
+            fontWeight: FontWeight.w500,
             color: textMain,
-            letterSpacing: -0.7,
-            height: 1.2,
+            letterSpacing: -0.5,
+            height: 1.15,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
           'Silence distracting notifications on your schedule while letting critical alerts reach you.',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 14.5,
             color: textMuted,
-            height: 1.45,
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Metrics Banner (Obsidian Protocol)
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF121214) : const Color(0xFFF3F3F5),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: borderCol),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildMetricItem('LATENCY', '0.08ms', isDark),
-              Container(width: 1, height: 26, color: borderCol),
-              _buildMetricItem('NETWORK', '0 kb/s', isDark),
-              Container(width: 1, height: 26, color: borderCol),
-              _buildMetricItem('ISOLATION', '100%', isDark),
-            ],
+            height: 1.5,
           ),
         ),
         const SizedBox(height: 24),
@@ -201,6 +161,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
           title: 'Precision Scheduling',
           description: 'Set custom silent windows for specific distracting apps. Overnights, weekdays, or weekend shifts handled automatically.',
           isDark: isDark,
+          isGreenTag: false,
         ),
         const SizedBox(height: 12),
         _buildPillarCard(
@@ -209,6 +170,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
           title: '100% On-Device Privacy',
           description: 'Zero cloud servers, zero analytics. Notiflow operates without an internet permission manifest, keeping all data on your phone.',
           isDark: isDark,
+          isGreenTag: true,
         ),
         const SizedBox(height: 12),
         _buildPillarCard(
@@ -217,6 +179,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
           title: 'Unmanaged Apps Untouched',
           description: 'Non-configured apps bypass the gate instantly without interference, delay, or battery drain.',
           isDark: isDark,
+          isGreenTag: false,
         ),
         const SizedBox(height: 32),
 
@@ -224,10 +187,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
         ElevatedButton(
           onPressed: () => setState(() => _currentStep = 2),
           style: ElevatedButton.styleFrom(
-            backgroundColor: amber,
-            foregroundColor: const Color(0xFF09090B),
+            backgroundColor: primaryContainer,
+            foregroundColor: onPrimary,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             elevation: 0,
           ),
           child: Row(
@@ -235,7 +198,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
             children: [
               Text(
                 'Get Started',
-                style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w700),
+                style: GoogleFonts.plusJakartaSans(fontSize: 15.5, fontWeight: FontWeight.w700),
               ),
               const SizedBox(width: 8),
               const Icon(Icons.arrow_forward_rounded, size: 18),
@@ -247,50 +210,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
     );
   }
 
-  Widget _buildMetricItem(String label, String value, bool isDark) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w700,
-            color: isDark ? const Color(0xFFA1A1AA) : const Color(0xFF77767B),
-            letterSpacing: 0.8,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          value,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFFF59E0B),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildPillarCard({
     required IconData icon,
     required String tag,
     required String title,
     required String description,
     required bool isDark,
+    required bool isGreenTag,
   }) {
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    final amber = const Color(0xFFF59E0B);
+    final cardBg = isDark ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow;
+    final borderCol = isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final secondary = isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary;
+    final secContainer = isDark ? AppTheme.darkSecondaryContainer : AppTheme.lightSecondaryContainer;
+    final iconColor = isGreenTag ? secondary : primary;
+    final iconBg = isGreenTag
+        ? secContainer.withValues(alpha: 0.6)
+        : primary.withValues(alpha: 0.14);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderCol),
+        border: Border.all(color: borderCol.withValues(alpha: 0.6)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,10 +243,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
+              color: iconBg,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: iconColor.withValues(alpha: 0.25)),
             ),
-            child: Icon(icon, color: amber, size: 20),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -311,38 +257,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: textMain,
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: textMain,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                        borderRadius: BorderRadius.circular(4),
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: iconColor.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         tag,
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 9,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9.5,
                           fontWeight: FontWeight.w700,
-                          color: amber,
+                          letterSpacing: 0.6,
+                          color: iconColor,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   description,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
                     color: textMuted,
-                    height: 1.35,
+                    height: 1.45,
                   ),
                 ),
               ],
@@ -357,80 +308,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
   // STEP 2: Permission Health & Notification Access
   // ===========================================================================
   Widget _buildStepTwo(bool isDark) {
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    final amber = const Color(0xFFF59E0B);
+    final cardBg = isDark ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow;
+    final borderCol = isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final primaryContainer = isDark ? AppTheme.darkPrimaryContainer : AppTheme.lightPrimaryContainer;
+    final onPrimary = isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnSurface;
 
     return ListView(
       key: const ValueKey('onboarding_step_2'),
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
       children: [
-        // Top Meta Bar
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: amber.withValues(alpha: 0.3)),
-                  ),
-                  child: Icon(Icons.shield_rounded, color: amber, size: 18),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Notiflow',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                    color: textMain,
-                  ),
-                ),
-              ],
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'STEP 2 OF 3 · PERMISSION HEALTH',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  color: amber,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
+        _buildTopMetaBar('STEP 2 OF 3', isDark),
+        const SizedBox(height: 28),
 
         Text(
           'Notification Access is required',
-          style: GoogleFonts.inter(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
+          style: GoogleFonts.newsreader(
+            fontSize: 30,
+            fontWeight: FontWeight.w500,
             color: textMain,
-            letterSpacing: -0.6,
+            letterSpacing: -0.5,
+            height: 1.15,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
           'To silently filter notifications outside your chosen schedules, Android requires Notification Access permission for Notiflow.',
-          style: GoogleFonts.inter(
+          style: GoogleFonts.plusJakartaSans(
             fontSize: 14,
             color: textMuted,
-            height: 1.45,
+            height: 1.5,
           ),
         ),
         const SizedBox(height: 24),
@@ -441,28 +349,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
           decoration: BoxDecoration(
             color: cardBg,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderCol),
+            border: Border.all(color: borderCol.withValues(alpha: 0.6)),
           ),
           child: Column(
             children: [
               _buildStepItem(
                 '1',
                 'Open Android Settings',
-                'Opens Notiflow\'s notification permission screen directly',
+                'Directs to phone\'s Device & app notifications',
                 isDark,
               ),
-              const SizedBox(height: 16),
+              Divider(color: borderCol.withValues(alpha: 0.4), height: 24),
               _buildStepItem(
                 '2',
+                'Find “Notiflow”',
+                'Locate Notiflow in the listener list',
+                isDark,
+              ),
+              Divider(color: borderCol.withValues(alpha: 0.4), height: 24),
+              _buildStepItem(
+                '3',
                 'Switch Toggle to ON',
-                'Turn on "Allow notification access" and accept the prompt — you\'ll return automatically',
+                'Accept the Android system dialog',
                 isDark,
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 28),
+        const SizedBox(height: 32),
 
         // Primary Action
         ElevatedButton(
@@ -472,10 +387,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
                   await _platform.openNotificationAccessSettings();
                 },
           style: ElevatedButton.styleFrom(
-            backgroundColor: amber,
-            foregroundColor: const Color(0xFF09090B),
+            backgroundColor: primaryContainer,
+            foregroundColor: onPrimary,
             padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             elevation: 0,
           ),
           child: Row(
@@ -483,7 +398,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
             children: [
               Text(
                 'Open Android Settings',
-                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
+                style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               const SizedBox(width: 8),
               const Icon(Icons.north_east_rounded, size: 18),
@@ -496,7 +411,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
             onPressed: () => setState(() => _currentStep = 3),
             child: Text(
               'Continue to Rule Setup',
-              style: GoogleFonts.inter(
+              style: GoogleFonts.plusJakartaSans(
                 fontSize: 13.5,
                 color: textMuted,
                 fontWeight: FontWeight.w600,
@@ -509,27 +424,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
   }
 
   Widget _buildStepItem(String number, String title, String subtitle, bool isDark) {
-    final amber = const Color(0xFFF59E0B);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
 
     return Row(
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
+            color: primary.withValues(alpha: 0.14),
             shape: BoxShape.circle,
-            border: Border.all(color: amber.withValues(alpha: 0.5)),
+            border: Border.all(color: primary.withValues(alpha: 0.4)),
           ),
           alignment: Alignment.center,
           child: Text(
             number,
-            style: GoogleFonts.jetBrainsMono(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: amber,
+              fontWeight: FontWeight.w700,
+              color: primary,
             ),
           ),
         ),
@@ -540,16 +455,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
             children: [
               Text(
                 title,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w700,
                   color: textMain,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12.5,
                   color: textMuted,
                 ),
               ),
