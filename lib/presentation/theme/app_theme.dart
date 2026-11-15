@@ -13,6 +13,7 @@ class AppTheme {
   static const Color signalError = Color(0xFFEF4444);
   static const Color signalWarning = Color(0xFFF59E0B);
   static const Color signalHeld = Color(0xFFF87171);
+  static const Color signalNeutral = Color(0xFF64748B);
   static const Color toastSuccess = signalSuccess;
   static const Color toastWarning = signalWarning;
   static const Color toastError = signalError;

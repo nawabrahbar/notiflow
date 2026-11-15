@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
+import '../../domain/models/temporary_override.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';

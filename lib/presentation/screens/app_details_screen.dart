@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
+import '../../domain/models/temporary_override.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
@@ -1124,27 +1125,33 @@ class AppDetailsScreen extends StatelessWidget {
                             disabledColor: textMuted.withValues(alpha: 0.3),
                             tooltip: 'Decrease 1 hour',
                           ),
-                          Column(
-                            children: [
-                              Text(
-                                '$selectedHours Hours',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: textMain,
-                                  letterSpacing: -0.3,
+                          Flexible(
+                            child: Column(
+                              children: [
+                                Text(
+                                  '$selectedHours Hours',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: textMain,
+                                    letterSpacing: -0.3,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Muted until $formattedEndTime',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: primaryCol,
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Muted until $formattedEndTime',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: primaryCol,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                           IconButton(
                             onPressed: selectedHours < 24
@@ -1230,7 +1237,7 @@ class AppDetailsScreen extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
           decoration: BoxDecoration(
             color: isActive
                 ? (isDark ? primaryCol.withValues(alpha: 0.25) : primaryCol.withValues(alpha: 0.15))
@@ -1242,25 +1249,28 @@ class AppDetailsScreen extends StatelessWidget {
             ),
           ),
           alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 13, color: isActive ? primaryCol : textMain),
-                const SizedBox(width: 3),
-              ],
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: isActive ? primaryCol : textMain,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 13, color: isActive ? primaryCol : textMain),
+                  const SizedBox(width: 3),
+                ],
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: isActive ? primaryCol : textMain,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

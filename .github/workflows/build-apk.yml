@@ -38,19 +38,15 @@ jobs:
         run: flutter pub get
 
       - name: Run Flutter unit & widget tests
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
-          OUTPUT=$(flutter test --reporter expanded 2>&1)
+          flutter test --reporter expanded > /tmp/flutter_test.log 2>&1
           STATUS=$?
+          cat /tmp/flutter_test.log
           if [ $STATUS -ne 0 ]; then
-            echo "$OUTPUT"
-            FAIL_SUMMARY=$(echo "$OUTPUT" | tail -n 80)
-            gh pr comment ${{ github.event.pull_request.number }} --body "### CI Test Failure Log
-\`\`\`
-$FAIL_SUMMARY
-\`\`\`" || true
+            ERR_LINES=$(grep -B 2 -A 20 -E "(Error:|Exception|\[E\]|══╡)" /tmp/flutter_test.log | head -n 60)
+            TAIL_OUT=$(printf "%s\n---\n%s" "$ERR_LINES" "$(tail -n 40 /tmp/flutter_test.log)" | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+            echo "::error title=Flutter Test Failure::${TAIL_OUT}"
             exit $STATUS
           fi
 
@@ -63,12 +59,8 @@ $FAIL_SUMMARY
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-            cat <<EOF > android/key.properties
-          storePassword=$STORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=upload-keystore.jks
-          EOF
+            printf "storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n" \
+              "$STORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" > android/key.properties
             echo "Release signing configured with upload-keystore.jks"
           else
             echo "No KEYSTORE_BASE64 secret found; falling back to debug signing"
