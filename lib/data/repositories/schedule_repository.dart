@@ -797,23 +797,31 @@ class ScheduleRepository extends ChangeNotifier {
       _schedules = List.from(preset.schedules);
       _overrides.clear();
     } else {
+      final appIdRemap = <String, String>{};
       for (final rawApp in preset.apps) {
         final app = hydratePresetApp(rawApp);
         final existingIndex = _managedApps.indexWhere(
           (a) => a.packageName.toLowerCase() == app.packageName.toLowerCase(),
         );
         if (existingIndex >= 0) {
-          _managedApps[existingIndex] = _managedApps[existingIndex].copyWith(
+          final existing = _managedApps[existingIndex];
+          appIdRemap[rawApp.id] = existing.id;
+          _managedApps[existingIndex] = existing.copyWith(
             enabled: true,
-            iconBytes: _managedApps[existingIndex].iconBytes ?? app.iconBytes,
+            isDormantVault: false,
+            iconBytes: existing.iconBytes ?? app.iconBytes,
           );
         } else {
           _managedApps.add(app);
         }
       }
       for (final schedule in preset.schedules) {
-        if (!_schedules.any((s) => s.id == schedule.id)) {
-          _schedules.add(schedule);
+        final mappedAppId = appIdRemap[schedule.appId] ?? schedule.appId;
+        final mappedSchedule = mappedAppId != schedule.appId
+            ? schedule.copyWith(appId: mappedAppId)
+            : schedule;
+        if (!_schedules.any((s) => s.id == mappedSchedule.id)) {
+          _schedules.add(mappedSchedule);
         }
       }
     }

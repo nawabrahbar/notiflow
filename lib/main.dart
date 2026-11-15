@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/repositories/schedule_repository.dart';
 import 'presentation/screens/splash_screen.dart';
@@ -30,7 +29,6 @@ Future<void> updateAppThemeMode(ThemeMode mode) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  GoogleFonts.config.allowRuntimeFetching = false;
 
   final prefs = await SharedPreferences.getInstance();
   final savedTheme = prefs.getString('pref_theme_mode') ?? 'system';
