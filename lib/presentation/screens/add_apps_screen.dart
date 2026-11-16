@@ -40,10 +40,25 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
     _platform = PlatformFactory.createPlatformService();
     _loadInstalledApps();
     _searchController.addListener(() => setState(() {}));
+    widget.repository.addListener(_onRepositoryChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant AddAppsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.repository != widget.repository) {
+      oldWidget.repository.removeListener(_onRepositoryChanged);
+      widget.repository.addListener(_onRepositoryChanged);
+    }
+  }
+
+  void _onRepositoryChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    widget.repository.removeListener(_onRepositoryChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -263,16 +278,17 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Text(
+                              Flexible(
+                                child: Text(
                                 'Discovered Applications',
-                                style: GoogleFonts.newsreader(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: textMain,
-                                  letterSpacing: -0.3,
                                 ),
+                              ),
                               ),
                               const SizedBox(width: 8),
                               Container(
@@ -292,22 +308,6 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Icon(Icons.sync_rounded,
-                                  size: 14, color: textMuted),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Auto-synced',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11.5,
-                                  color: textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -541,23 +541,54 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
 
           // Add / Configured Action
           if (isManaged) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: secContainer,
-                borderRadius: BorderRadius.circular(12),
+            TextButton(
+              style: TextButton.styleFrom(
+                backgroundColor: isDark ? const Color(0xFF181F1B) : container,
+                foregroundColor:
+                    isDark ? const Color(0xFFD5C3B4) : textMuted,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF2E3932)
+                        : Colors.transparent,
+                  ),
+                ),
               ),
+              onPressed: () {
+                final managedApp = widget.repository.managedApps
+                    .where((a) => a.packageName == app.packageName)
+                    .firstOrNull;
+                if (managedApp == null) return;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AppDetailsScreen(
+                      repository: widget.repository,
+                      app: managedApp,
+                    ),
+                  ),
+                );
+              },
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_rounded, size: 14, color: onSecContainer),
-                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.tune_rounded,
+                    size: 15,
+                    color: isDark
+                        ? const Color(0xFFA7D4A3)
+                        : const Color(0xFF5C6145),
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    'Active',
+                    'Manage',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: onSecContainer,
+                      fontSize: 13,
+                      fontWeight: isDark ? FontWeight.w500 : FontWeight.w600,
                     ),
                   ),
                 ],
@@ -565,16 +596,21 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
             ),
           ] else ...[
             ElevatedButton(
+              key: ValueKey('add-app-${app.packageName}'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
+                backgroundColor: isDark
+                    ? AppTheme.darkPrimaryContainer
+                    : AppTheme.lightPrimaryContainer,
                 foregroundColor: isDark
-                    ? AppTheme.darkOnPrimary
-                    : AppTheme.lightOnPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    ? const Color(0xFF2B1700)
+                    : AppTheme.lightOnPrimaryContainer,
+                elevation: 1,
+                shadowColor: Colors.black.withValues(alpha: 0.2),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               onPressed: () async {
@@ -594,12 +630,20 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                   );
                 }
               },
-              child: Text(
-                'Add Rule',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded,
+                      size: MediaQuery.sizeOf(context).width >= 600 ? 18 : 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Add',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

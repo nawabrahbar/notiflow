@@ -323,7 +323,7 @@ void main() {
       expect(decision.overrideId, 'override_allow_1');
     });
 
-    test('Temporary BLOCK override suppresses even if app scheduling is disabled', () {
+    test('Paused app lets notifications through even with an active temporary mute', () {
       final disabledApp = testApp.copyWith(enabled: false);
       final dt = DateTime(2026, 10, 5, 14, 0);
       final blockOverride = TemporaryOverride(
@@ -342,8 +342,8 @@ void main() {
         currentDateTime: dt,
       );
 
-      expect(decision.decision, NotificationDecisionType.block);
-      expect(decision.overrideId, 'override_block_dis');
+      expect(decision.decision, NotificationDecisionType.allow);
+      expect(decision.overrideId, isNull);
     });
   });
 

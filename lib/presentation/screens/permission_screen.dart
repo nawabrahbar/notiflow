@@ -67,9 +67,9 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
           const SnackBar(
             content: Text(
               'Access Restored · Focus Shield Online',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600),
             ),
-            backgroundColor: AppTheme.signalSuccess,
+            backgroundColor: AppTheme.toastSuccess,
           ),
         );
       Navigator.of(context).pushReplacement(

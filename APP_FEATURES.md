@@ -27,10 +27,10 @@ Notiflow consists of **11 dedicated screens/pages** structured across a startup 
 
 | # | Page / Screen Name | Type | Primary Role |
 |---|---|---|---|
-| **1** | **Splash Screen** (`SplashScreen`) | Launch Screen | Brand intro, Stitch animated icon, engine calibration, dynamic startup routing |
+| **1** | **Startup Routing** (`resolveStartScreen` in `main.dart`) | No UI | Opens Onboarding, Permission, or the Main Shell directly (no splash screen) |
 | **2** | **Onboarding Screen** (`OnboardingScreen`) | First-Time Flow | Value pillars explanation and initial notification permission authorization |
 | **3** | **Permission & Health Center** (`PermissionScreen`) | Recovery Screen | Access restoration, OEM battery kill guides, Android 13+ sideload helper |
-| **4** | **Import Rules & Presets Screen** (`ImportRulesScreen`) | Setup & Sub-Screen | Preset protocols (*Deep Work*, *Mindful Evening*, *Minimalist*), `.notiflow` file import, paste JSON |
+| **4** | **Import Rules Screen** (`ImportRulesScreen`) | Onboarding Step 3 | Optional `.notiflow` backup import during onboarding |
 | **5** | **Main Navigation Shell** (`MainNavigationShell`) | Container Screen | Bottom tab bar hosting Rules, Activity, and Settings |
 | **6** | **Dashboard / Rules Screen** (`DashboardScreen`) | Tab 1 (Home) | Dynamic time greetings, Intercepted/Permitted metrics, overrides, managed apps list |
 | **7** | **Add Apps Screen** (`AddAppsScreen`) | Sub-Screen | Device app discovery, search filtering, category chips, batch app addition |
@@ -51,17 +51,15 @@ Notiflow consists of **11 dedicated screens/pages** structured across a startup 
 
 ```mermaid
 flowchart TD
-    Start([App Launched]) --> Splash[1. Splash Screen]
-    
-    Splash -->|First Launch?| Onboarding[2. Onboarding Screen]
-    Splash -->|Permission Missing?| Perm[3. Permission Screen]
-    Splash -->|Ready & Authorized| Shell[5. Main Navigation Shell]
+    Start([App Launched]) -->|First Launch?| Onboarding[2. Onboarding Screen]
+    Start -->|Permission Missing?| Perm[3. Permission Screen]
+    Start -->|Ready & Authorized| Shell[5. Main Navigation Shell]
     
     %% Onboarding Flow
     Onboarding -->|Step 1: Value Pillars| OnboardingStep2[Step 2: Grant Permission]
     OnboardingStep2 -->|Android 13+ Restricted?| Sheet1[Restricted Settings Sheet]
-    OnboardingStep2 -->|Granted| ImportRules[4. Import Rules & Presets Screen]
-    ImportRules -->|Apply Preset / Import / Skip| Shell
+    OnboardingStep2 -->|Granted| ImportRules[4. Import Rules Screen]
+    ImportRules -->|Import / Done| Shell
     
     %% Permission Recovery Flow
     Perm -->|Open Android Settings| SystemPerm[Android Notification Settings]
@@ -86,12 +84,12 @@ flowchart TD
     
     %% Settings Sub-flows
     Tab3 -->|Export Rules| ExportSheet[Android Share Sheet: Save .notiflow]
-    Tab3 -->|Import Rules| ImportRules
+    Tab3 -->|Import Rules| FilePicker[System File Picker: .notiflow]
 ```
 
 ### Flow Walkthrough
 1. **Cold Start Flow**:
-   - The user opens Notiflow. The **Splash Screen** animates the Stitch brand emblem, runs a 1.8s startup calibration progress bar, loads preferences, and determines where to route the user.
+   - The user opens Notiflow. There is no splash screen: the app loads preferences and opens the right screen directly.
    - If first run: Dispatches to **Onboarding Screen**.
    - If returning user with permissions revoked (or OEM battery killed): Dispatches to **Permission Screen**.
    - If fully configured: Dispatches into the **Main Navigation Shell**.
@@ -109,7 +107,7 @@ flowchart TD
 4. **Backup & Portability Flow**:
    - User opens **Settings**, scrolls to **Rules Backup & Portability**, and taps **Export .notiflow File**.
    - The app generates a structured backup file containing all app configs and rules, opening the Android share sheet to save to Downloads, Google Drive, or messaging apps.
-   - On a new device or fresh install, the user taps **Import .notiflow File** or chooses one of the curated focus presets to restore their configuration in one click.
+   - On a new device or fresh install, the user taps **Import** in Settings, picks a `.notiflow` file in the system file picker, and the configuration is restored in place.
 
 ---
 
@@ -117,34 +115,13 @@ flowchart TD
 
 ---
 
-### Page 1: Splash Screen (`SplashScreen`)
+### Page 1: Startup Routing (no splash screen)
 
-* **Purpose**: Serves as the brand intro, warms up native services, and executes intelligent route dispatching.
-* **Visual & Functional Elements**:
-  * **Top Brand Meta Bar**:
-    - `DAEMON READY` status pill with a pulsing amber beacon.
-    - App version badge (`v1.4.0`).
-  * **Animated Brand Emblem (`StitchAnimatedIcon`)**:
-    - **Orbital Arc Track (`orbitSpin`)**: 360° continuously rotating schedule arc with a glowing amber beacon dot.
-    - **Radial Glow (`subtlePulse`)**: Ambient amber radial glow breathing behind the icon tile.
-    - **Chime Bounce (`chimeBounce`)**: Micro-floating vertical elevation of the focus shield and silenced bell emblem.
-    - **Entrance Pop-In (`popIn`)**: Smooth scale animation upon launch.
-  * **Typography**:
-    - Headline: `"Notiflow"` (26pt, bold, `#FAFAFA`).
-    - Subtitle: `"Quiet focus, on your schedule"` (14.5pt, `#F59E0B`).
-  * **Startup Calibration Progress Bar**:
-    - Animated progress bar running over 1.8 seconds with live status labels:
-      - `0% – 44%`: *"Synchronizing local schedules..."*
-      - `45% – 81%`: *"Calibrating silent triggers..."*
-      - `82% – 100%`: *"Quiet engine active"*
-  * **Bottom Trust Capsule**:
-    - Security badge: `Icons.shield_outlined` + `"100% ON-DEVICE · ZERO TELEMETRY"`.
-  * **Route Dispatch Logic**:
-    - Awaits `ScheduleRepository.initialize()` and `SharedPreferences`.
-    - If `pref_onboarding_completed == false` $\rightarrow$ navigates to `OnboardingScreen`.
-    - If `isNotificationAccessGranted() == false` $\rightarrow$ navigates to `PermissionScreen`.
-    - Else $\rightarrow$ navigates to `MainNavigationShell`.
-
+* Notiflow has no splash screen. `main()` loads preferences and `ScheduleRepository`, then opens the first screen directly:
+  - If `pref_onboarding_completed == false` $\rightarrow$ `OnboardingScreen`.
+  - If `isNotificationAccessGranted() == false` $\rightarrow$ `PermissionScreen`.
+  - Otherwise $\rightarrow$ `MainNavigationShell`.
+* The Android launch window is a plain app-coloured background (light `#FEF8F6`, dark `#101412`); on Android 12+ the system starting-window icon is hidden.
 ---
 
 ### Page 2: Onboarding Screen (`OnboardingScreen`)
@@ -191,36 +168,13 @@ flowchart TD
 
 ---
 
-### Page 4: Import Rules & Presets Screen (`ImportRulesScreen`)
+### Page 4: Import Rules Screen (`ImportRulesScreen`)
 
-* **Purpose**: Allows users to import existing rules, load curated focus presets, or upload `.notiflow` backup files. Accessible as Step 3 of onboarding or directly from Settings.
+* **Purpose**: Onboarding step three. Lets new users optionally restore a `.notiflow` backup before entering the app.
 * **Visual & Functional Elements**:
-  * **Header**:
-    - Step indicator: `STEP 3 OF 3 · RULES IMPORT` (during onboarding) or back button (from Settings).
-    - Headline: *"Import Rules"*.
-    - Subtitle: *"Start from a curated focus protocol, restore a backup file, or build custom schedules from scratch."*.
-  * **Option 1: Upload `.notiflow` JSON File Card**:
-    - Dashed card with cloud upload icon.
-    - Primary Button: *"Select Backup File"*. Ingests `.notiflow` files directly.
-    - Secondary Link: *"Or paste JSON directly"* opening an in-app paste modal.
-  * **Option 2: Curated Focus Presets (3 Protocols)**:
-    1. **Deep Work Protocol**:
-       - Targets Slack, Microsoft Teams, Gmail.
-       - Mode: BLOCK during 09:00 — 17:00 (Mon–Fri).
-       - Badges: `SLACK: HELD`, `TEAMS: HELD`, `GMAIL: BATCH`, `09:00 — 17:00`.
-       - One-tap button: *"Apply Deep Work Preset"*.
-    2. **Mindful Evening**:
-       - Targets Instagram, X (Twitter), YouTube.
-       - Mode: BLOCK overnight from 20:00 — 08:00 (Everyday).
-       - Badges: `INSTAGRAM: HELD`, `X: HELD`, `YOUTUBE: HELD`, `20:00 — 08:00`.
-       - One-tap button: *"Apply Mindful Evening Preset"*.
-    3. **Minimalist Default**:
-       - Targets WhatsApp with 24/7 quiet focus while passing phone calls and SMS.
-       - Badges: `CALLS: PASS`, `SMS: PASS`, `WHATSAPP: HELD`, `24/7 SHIELD`.
-       - One-tap button: *"Apply Minimalist Preset"*.
-  * **Skip / Manual Option**:
-    - *"Skip & Build Manually"* button for users who prefer configuring custom rules from scratch.
-
+  * `STEP 3 OF 3` pill, *"Import Rules"* headline, and a dashed `.notiflow` upload card that opens the system file picker (tablet also offers *"Or Paste Backup JSON"*).
+  * *"Done"* completes onboarding and opens the Main Navigation Shell.
+* **Settings import**: Settings → Import does not open this screen; it launches the system file picker directly and restores the selected `.notiflow` file in place.
 ---
 
 ### Page 5: Main Navigation Shell (`MainNavigationShell`)
@@ -350,7 +304,7 @@ flowchart TD
     - **Privacy Audit Action**: Top app bar button opening the complete privacy audit sheet.
   * **RULES BACKUP & PORTABILITY (.notiflow file)**:
     - **Export Rules Backup**: One-tap action to serialize all rules into a `.notiflow` JSON file and launch the Android share sheet.
-    - **Import Rules Backup**: One-tap action navigating to `ImportRulesScreen` to restore from a backup file, paste JSON, or apply curated presets.
+    - **Import Rules Backup**: Opens the system file picker directly and restores the selected `.notiflow` backup.
   * **TRIAGE & AUTOMATION PREFERENCES**:
     - **Silence ongoing notifications**: Toggle to filter persistent background notifications.
     - **Silence summary notifications**: Toggle to handle grouped notification bundles.
@@ -374,7 +328,7 @@ flowchart TD
 
 ## 6. Summary of Key App Capabilities
 
-* [x] **11 Dedicated Screens**: Complete coverage from initial splash and onboarding to fine-grained rule editing and rules import/export.
+* [x] **11 Dedicated Screens**: Complete coverage from onboarding to fine-grained rule editing and rules import/export.
 * [x] **Dual Theme Support (Light & Dark)**: Full implementation of Stitch Obsidian Signal (`#09090B` Zinc) and Crisp Light (`#F9F9FB`) themes with high-contrast amber accent (`#F59E0B`).
 * [x] **Rules Portability (.notiflow Backup)**: Full export and import workflows via local file storage, Android share sheet, and in-app JSON paste modal.
 * [x] **Curated Protocols**: Pre-configured templates for *Deep Work*, *Mindful Evening*, and *Minimalist Default*.

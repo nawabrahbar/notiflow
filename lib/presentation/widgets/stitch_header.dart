@@ -83,12 +83,7 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.newsreader(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: textMain,
-                      letterSpacing: -0.3,
-                    ),
+                    style: AppTheme.headerTitleStyle(context, textMain),
                   ),
                 ),
               ],
@@ -111,10 +106,11 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// Interactive Light/Dark mode header toggle faithfully matching Botanical design:
-/// - Displays Sun icon on the left of text when Light mode is active ([☀️ Sun] Light)
-/// - Displays Moon icon on the right of text when Dark mode is active (Dark [🌙 Moon])
-/// - Seamless Botanical container styling
+/// Header Light/Dark toggle matching docs/design-reference:
+/// - Phone light: "[sun] Light" pill on surface-container
+/// - Phone dark: "Dark [moon]" pill with border and amber moon
+/// - Tablet light: "[sun] Light" pill on secondary-fixed
+/// - Tablet dark: "[moon] Dark" pill on surface-container-high in primary
 class StitchThemeSwitch extends StatelessWidget {
   const StitchThemeSwitch({super.key});
 
@@ -126,61 +122,104 @@ class StitchThemeSwitch extends StatelessWidget {
         final platformBrightness = MediaQuery.maybePlatformBrightnessOf(context) ?? Brightness.light;
         final bool isDark = mode == ThemeMode.dark ||
             (mode == ThemeMode.system && platformBrightness == Brightness.dark);
+        final bool isTablet = MediaQuery.sizeOf(context).width >= 600;
 
-        final bg = isDark ? AppTheme.darkSurfaceContainer : AppTheme.lightSurfaceContainer;
-        final borderCol = isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant;
-        final textCol = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
-        final accent = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+        final Widget pill = isTablet
+            ? _buildTabletPill(isDark)
+            : _buildPhonePill(isDark);
 
-        return GestureDetector(
-          onTap: () {
-            updateAppThemeMode(isDark ? ThemeMode.light : ThemeMode.dark);
-          },
-          behavior: HitTestBehavior.opaque,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderCol, width: 1.0),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Sun icon on the left when Light mode is active (hidden in Dark mode)
-                if (!isDark) ...[
-                  Icon(
-                    Icons.wb_sunny_rounded,
-                    size: 14,
-                    color: accent,
-                  ),
-                  const SizedBox(width: 5),
-                ],
-                // Mode text in the middle
-                Text(
-                  isDark ? 'Dark' : 'Light',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: textCol,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                // Moon icon on the right when Dark mode is active (hidden in Light mode)
-                if (isDark) ...[
-                  const SizedBox(width: 5),
-                  Icon(
-                    Icons.nightlight_round,
-                    size: 14,
-                    color: accent,
-                  ),
-                ],
-              ],
-            ),
+        return Semantics(
+          button: true,
+          label: 'Toggle theme',
+          child: GestureDetector(
+            onTap: () {
+              updateAppThemeMode(isDark ? ThemeMode.light : ThemeMode.dark);
+            },
+            behavior: HitTestBehavior.opaque,
+            child: pill,
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPhonePill(bool isDark) {
+    final label = Text(
+      isDark ? 'Dark' : 'Light',
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 11,
+        height: 16 / 11,
+        fontWeight: FontWeight.w600,
+        color: isDark ? const Color(0xFFF3F4F1) : AppTheme.lightOnSurfaceVariant,
+      ),
+    );
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E2621) : AppTheme.lightSurfaceContainer,
+        borderRadius: BorderRadius.circular(999),
+        border: isDark ? Border.all(color: const Color(0xFF2A362F)) : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: isDark
+            ? [
+                label,
+                const SizedBox(width: 6),
+                const Icon(Icons.dark_mode, size: 16, color: Color(0xFFF59E0B)),
+              ]
+            : [
+                const Icon(Icons.light_mode_outlined, size: 16, color: AppTheme.lightPrimary),
+                const SizedBox(width: 6),
+                label,
+              ],
+      ),
+    );
+  }
+
+  Widget _buildTabletPill(bool isDark) {
+    final fg = isDark ? AppTheme.darkPrimary : const Color(0xFF171E06);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF272B29) : const Color(0xFFDEE7BF),
+        borderRadius: BorderRadius.circular(999),
+        border: isDark
+            ? Border.all(color: const Color(0xFF514539).withOpacity(0.4))
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+            size: 18,
+            color: fg,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            isDark ? 'Dark' : 'Light',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              height: 18 / 13,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

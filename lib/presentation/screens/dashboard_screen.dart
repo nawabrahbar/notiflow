@@ -102,31 +102,27 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  ({String text, IconData icon, String sessionTag}) _getGreetingData() {
+  ({String text, IconData icon}) _getGreetingData() {
     final hour = DateTime.now().hour;
     if (hour >= 5 && hour < 12) {
       return (
         text: 'Good morning',
         icon: Icons.light_mode_rounded,
-        sessionTag: 'Botanical Calm · Morning Session',
       );
     } else if (hour >= 12 && hour < 17) {
       return (
         text: 'Good afternoon',
         icon: Icons.wb_sunny_rounded,
-        sessionTag: 'Botanical Calm · Afternoon Session',
       );
     } else if (hour >= 17 && hour < 21) {
       return (
         text: 'Good evening',
         icon: Icons.bedtime_rounded,
-        sessionTag: 'Botanical Calm · Evening Session',
       );
     } else {
       return (
         text: 'Good night',
         icon: Icons.nights_stay_rounded,
-        sessionTag: 'Botanical Calm · Night Session',
       );
     }
   }
@@ -219,12 +215,465 @@ class _DashboardScreenState extends State<DashboardScreen>
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(
-              content: Text('Removed $count apps from Rules page'),
-              backgroundColor: AppTheme.toastWarning,
+              content: Text(
+                'Removed $count apps from Rules page',
+                style: const TextStyle(
+                  color: AppTheme.toastOnSuccess,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              backgroundColor: AppTheme.toastSuccess,
             ),
           );
       }
     }
+  }
+
+  Widget _buildPhoneQuickOverrides(bool isDark) {
+    final globalMute = widget.repository.overrides
+        .where((o) => o.appId == 'global_mute' && o.isActive)
+        .firstOrNull;
+    final labelColor = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
+
+    void toggleMute(Duration duration) {
+      if (globalMute != null && globalMute.durationMinutes == duration.inMinutes) {
+        widget.repository.clearOverride('global_mute');
+      } else {
+        widget.repository.setTemporaryMute(
+          appId: 'global_mute',
+          duration: duration,
+        );
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'QUICK SESSION OVERRIDES',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.0,
+            color: labelColor,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildOverridePill(
+                isDark: isDark,
+                icon: Icons.hourglass_bottom_rounded,
+                label: 'Mute (15m)',
+                isActive: globalMute?.durationMinutes == 15,
+                onTap: () => toggleMute(const Duration(minutes: 15)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildOverridePill(
+                isDark: isDark,
+                icon: Icons.timelapse_rounded,
+                label: 'Mute (30m)',
+                isActive: globalMute?.durationMinutes == 30,
+                onTap: () => toggleMute(const Duration(minutes: 30)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildOverridePill(
+                isDark: isDark,
+                icon: Icons.timer_outlined,
+                label: 'Mute (1h)',
+                isActive: globalMute?.durationMinutes == 60,
+                onTap: () => toggleMute(const Duration(hours: 1)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _buildOverridePill(
+          isDark: isDark,
+          icon: Icons.stars_outlined,
+          label: 'Priority Only · Repeat callers ring through',
+          isActive: widget.repository.vipEmergencyBypass,
+          onTap: () => widget.repository.setVipEmergencyBypass(
+            !widget.repository.vipEmergencyBypass,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOverridePill({
+    required bool isDark,
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    final Color background;
+    final Color foreground;
+    final Color iconColor;
+    final Color? borderColor;
+    if (isDark) {
+      background = isActive ? const Color(0xFF2E3B32) : const Color(0xFF1A211D);
+      foreground = isActive ? const Color(0xFFC5D4BA) : const Color(0xFF9AA79B);
+      iconColor = isActive ? AppTheme.darkPrimaryContainer : foreground;
+      borderColor = isActive ? const Color(0xFF3A4B3F) : const Color(0xFF2A362F);
+    } else {
+      background = isActive
+          ? AppTheme.lightSecondaryContainer
+          : AppTheme.lightSurfaceContainer;
+      foreground = isActive
+          ? AppTheme.lightOnSecondaryContainer
+          : AppTheme.lightOnSurfaceVariant;
+      iconColor = foreground;
+      borderColor = null;
+    }
+
+    return Material(
+      color: background,
+      elevation: 1,
+      shadowColor: Colors.black.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: borderColor == null
+              ? null
+              : BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: borderColor),
+                ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: iconColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: foreground,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricCards({
+    required bool isDark,
+    required bool isTablet,
+    required int blocked,
+    required int allowed,
+  }) {
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted =
+        isDark ? const Color(0xFF9AA79B) : AppTheme.lightOnSurfaceVariant;
+    final mutedChipBg = isDark
+        ? AppTheme.darkPrimaryContainer.withOpacity(0.2)
+        : const Color(0xFFFFDCBD);
+    final mutedChipFg =
+        isDark ? AppTheme.darkPrimary : const Color(0xFF623F18);
+    final mutedChipBorder = isDark
+        ? AppTheme.darkPrimaryContainer.withOpacity(0.3)
+        : Colors.transparent;
+    final alertChipBg =
+        isDark ? const Color(0xFF2E3B32) : AppTheme.lightSecondaryContainer;
+    final alertChipFg =
+        isDark ? const Color(0xFFA7D4A3) : AppTheme.lightOnSecondaryContainer;
+    final alertChipBorder =
+        isDark ? const Color(0xFF3A4B3F) : Colors.transparent;
+
+    if (!isTablet) {
+      final cardBg =
+          isDark ? const Color(0xFF1A211D) : AppTheme.lightSurfaceContainer;
+      final cardBorder = isDark ? const Color(0xFF2A362F) : Colors.transparent;
+
+      Widget phoneCard({
+        required String label,
+        required String chip,
+        required Color chipBg,
+        required Color chipFg,
+        required Color chipBorder,
+        required int count,
+        required String unit,
+      }) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cardBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                blurRadius: 2,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: isDark ? FontWeight.w600 : FontWeight.w700,
+                  color: textMuted,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    '$count',
+                    style: GoogleFonts.newsreader(
+                      fontSize: 26,
+                      height: 34 / 26,
+                      fontWeight: FontWeight.w400,
+                      color: textMain,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    unit,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: textMuted,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: chipBg,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: chipBorder),
+                    ),
+                    child: Text(
+                      chip,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: chipFg,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }
+
+      return Row(
+        children: [
+          Expanded(
+            child: phoneCard(
+              label: 'Intercepted',
+              chip: 'MUTED',
+              chipBg: mutedChipBg,
+              chipFg: mutedChipFg,
+              chipBorder: mutedChipBorder,
+              count: blocked,
+              unit: blocked == 1 ? 'item' : 'items',
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: phoneCard(
+              label: 'Permitted',
+              chip: 'ALERTS',
+              chipBg: alertChipBg,
+              chipFg: alertChipFg,
+              chipBorder: alertChipBorder,
+              count: allowed,
+              unit: allowed == 1 ? 'pass' : 'passes',
+            ),
+          ),
+        ],
+      );
+    }
+
+    final cardBg = isDark
+        ? AppTheme.darkSurfaceContainer
+        : AppTheme.lightSurfaceContainerLowest;
+    final cardBorder = isDark
+        ? AppTheme.darkSurfaceContainerHigh.withOpacity(0.3)
+        : Colors.transparent;
+    final iconMutedBg = isDark
+        ? AppTheme.darkSurfaceContainerHigh
+        : AppTheme.lightSurfaceContainerHigh;
+    final iconMutedFg =
+        isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final secContainer = isDark
+        ? AppTheme.darkSecondaryContainer
+        : AppTheme.lightSecondaryContainer;
+    final onSecContainer = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : AppTheme.lightOnSecondaryContainer;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final secondary = isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary;
+
+    Widget tabletCard({
+      required IconData icon,
+      required Color iconBg,
+      required Color iconFg,
+      required String chip,
+      required Color chipBg,
+      required Color chipFg,
+      required Color chipBorder,
+      required int count,
+      required String label,
+      required Color accent,
+    }) {
+      return Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration:
+                            BoxDecoration(color: iconBg, shape: BoxShape.circle),
+                        child: Icon(icon, size: 20, color: iconFg),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: chipBg,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: chipBorder),
+                        ),
+                        child: Text(
+                          chip,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: chipFg,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '$count',
+                    style: GoogleFonts.newsreader(
+                      fontSize: 48,
+                      height: 56 / 48,
+                      fontWeight: FontWeight.w500,
+                      color: textMain,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: iconMutedFg,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(height: 4, color: accent),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: tabletCard(
+            icon: Icons.notifications_off_outlined,
+            iconBg: iconMutedBg,
+            iconFg: iconMutedFg,
+            chip: 'MUTED',
+            chipBg: isDark
+                ? AppTheme.darkPrimaryContainer.withOpacity(0.3)
+                : const Color(0xFFFFDCBD),
+            chipFg: isDark ? AppTheme.darkPrimary : const Color(0xFF623F18),
+            chipBorder:
+                isDark ? AppTheme.darkPrimary.withOpacity(0.2) : Colors.transparent,
+            count: blocked,
+            label: 'Intercepted',
+            accent: primary.withOpacity(isDark ? 0.3 : 0.2),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: tabletCard(
+            icon: Icons.notifications_active,
+            iconBg: secContainer,
+            iconFg: onSecContainer,
+            chip: 'ALERTS',
+            chipBg: secContainer,
+            chipFg: isDark ? onSecContainer : const Color(0xFF171E06),
+            chipBorder:
+                isDark ? secondary.withOpacity(0.2) : Colors.transparent,
+            count: allowed,
+            label: 'Permitted',
+            accent: secondary.withOpacity(0.3),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -408,30 +857,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                         children: [
                           Row(
                             children: [
-                              Icon(greeting.icon, size: 22, color: primary),
-                              const SizedBox(width: 8),
-                              Expanded(
+                              Flexible(
                                 child: Text(
-                                  greeting.sessionTag,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: textMuted,
-                                    letterSpacing: 0.8,
+                                  greeting.text,
+                                  style: GoogleFonts.newsreader(
+                                    fontSize: isTablet ? 32 : 28,
+                                    fontWeight: FontWeight.w600,
+                                    color: textMain,
+                                    letterSpacing: -0.4,
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 10),
+                              Icon(greeting.icon,
+                                  size: isTablet ? 28 : 24, color: primary),
                             ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            greeting.text,
-                            style: GoogleFonts.newsreader(
-                              fontSize: isTablet ? 32 : 28,
-                              fontWeight: FontWeight.w600,
-                              color: textMain,
-                              letterSpacing: -0.4,
-                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -448,158 +888,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                     const SizedBox(height: 16),
 
                     // Key Metrics (Stacked Bento Split)
-                    Row(
-                      children: [
-                        // Intercepted (Muted)
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: container,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: borderCol, width: 1.0),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: containerHigh,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(Icons.notifications_off_rounded,
-                                          size: 16, color: textMuted),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2.5),
-                                      decoration: BoxDecoration(
-                                        color: primary.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                            color: primary.withOpacity(0.2)),
-                                      ),
-                                      child: Text(
-                                        'MUTED',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: primary,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                Text(
-                                  '${summary.blocked}',
-                                  style: GoogleFonts.newsreader(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w600,
-                                    color: textMain,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Intercepted',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Permitted (Alerts)
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: container,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: borderCol, width: 1.0),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: secContainer,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                          Icons.notifications_active_rounded,
-                                          size: 16,
-                                          color: onSecContainer),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2.5),
-                                      decoration: BoxDecoration(
-                                        color: secContainer,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                            color: secondary.withOpacity(0.2)),
-                                      ),
-                                      child: Text(
-                                        'ALERTS',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: onSecContainer,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                Text(
-                                  '${summary.allowed}',
-                                  style: GoogleFonts.newsreader(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w600,
-                                    color: textMain,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Permitted',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    _buildMetricCards(
+                      isDark: isDark,
+                      isTablet: isTablet,
+                      blocked: summary.blocked,
+                      allowed: summary.allowed,
                     ),
                     const SizedBox(height: 16),
 
                     // Quick Session Overrides Panel
+                    if (!isTablet)
+                      _buildPhoneQuickOverrides(isDark)
+                    else
                     Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
@@ -875,7 +1175,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                           ],
                         ),
-                        TextButton(
+                        if (apps.isNotEmpty)
+                          TextButton(
                           onPressed: widget.onAddAppTap ??
                               () {
                                 Navigator.of(context).push(

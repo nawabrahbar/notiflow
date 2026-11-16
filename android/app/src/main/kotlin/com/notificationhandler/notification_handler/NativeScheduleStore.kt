@@ -228,7 +228,16 @@ class NativeScheduleEvaluator {
         val appOverride = (if (app != null) cachedOverrides[app.id] ?: cachedOverrides[app.packageName] else null)
             ?: cachedOverrides[packageName]
 
-        // 1. Check active per-app override (takes absolute priority over app disabled status and recurring schedules)
+        // 0. A paused (disabled) app always lets notifications through, even while a temporary mute is running
+        if (app != null && !app.enabled) {
+            return NativeEvaluationDecision(
+                shouldBlock = false,
+                isManagedOrOverridden = true,
+                reason = "Unmanaged or paused app"
+            )
+        }
+
+        // 1. Check active per-app override (takes priority over recurring schedules)
         if (appOverride != null && postTimeMs >= appOverride.startMs && postTimeMs < appOverride.endMs) {
             val blocked = appOverride.mode == "block"
             return NativeEvaluationDecision(
@@ -271,14 +280,6 @@ class NativeScheduleEvaluator {
                     ruleName = "Strict Mode"
                 )
             }
-            return NativeEvaluationDecision(
-                shouldBlock = false,
-                isManagedOrOverridden = false,
-                reason = "Unmanaged or paused app"
-            )
-        }
-
-        if (!app.enabled) {
             return NativeEvaluationDecision(
                 shouldBlock = false,
                 isManagedOrOverridden = false,
@@ -534,7 +535,7 @@ class NativeScheduleStore(context: Context) {
             title = title
         )
 
-        // Record notification details when blocked (muted) or when from an actively managed app.
+        // Record blocked notifications and all managed apps, including paused apps.
         // Skip empty group summary container notifications so we don't duplicate real messages.
         val hasContent = title.isNotBlank() || message.isNotBlank()
         val shouldRecord = (decision.shouldBlock || decision.isManagedOrOverridden) &&

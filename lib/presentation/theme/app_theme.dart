@@ -8,13 +8,29 @@ import 'package:google_fonts/google_fonts.dart';
 /// - Typography: Google Fonts Newsreader for display/headlines, Plus Jakarta Sans for body/labels
 /// - Seamless Navigation: Zero header bottom border and zero shadow elevation across all surfaces
 class AppTheme {
+  /// Page title font used in the top header, per docs/design-reference
+  /// (Tangerine Bold, 2.75rem on tablet).
+  static TextStyle headerTitleStyle(BuildContext context, Color color) {
+    final isTablet = MediaQuery.sizeOf(context).width >= 600;
+    return TextStyle(
+      fontFamily: 'Tangerine',
+      fontSize: isTablet ? 44 : 38,
+      fontWeight: FontWeight.w700,
+      height: 1.0,
+      color: color,
+    );
+  }
+
   // Status & Signal Indicators
   static const Color signalSuccess = Color(0xFF22C55E);
   static const Color signalError = Color(0xFFEF4444);
   static const Color signalWarning = Color(0xFFF59E0B);
   static const Color signalHeld = Color(0xFFF87171);
   static const Color signalNeutral = Color(0xFF64748B);
-  static const Color toastSuccess = signalSuccess;
+  static const Color toastSuccess = Color(0xFFCCD5AE);
+  static const Color toastOnSuccess = Color(0xFF3A4128);
+  static const Color permittedSurface = Color(0xFFE9EDC9);
+  static const Color permittedAccent = Color(0xFFCCD5AE);
   static const Color toastWarning = signalWarning;
   static const Color toastError = signalError;
 

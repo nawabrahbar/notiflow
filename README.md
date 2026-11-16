@@ -34,9 +34,9 @@ Every push to `main` is automatically built and published by GitHub Actions. You
 - **Overnight Schedule Math**: Seamlessly handles schedules that cross midnight (e.g., `20:00` to `08:00` the next morning) with day-of-week awareness.
 - **7-Day Recurrence & Quick Presets**: Select individual days (`M` `T` `W` `T` `F` `S` `S`) or one-tap presets (*Everyday*, *Weekdays*, *Weekends*) with custom rule names.
 
-### 2. Muted Notification Activity Log & Local Vault
-- **Full Muted Notification Capture**: Whenever a notification arrives while an app is muted, Notiflow suppresses the alert from your status bar and records its full details locally on-device:
-  - **App Icon & Display Name**
+### 2. Notification Activity Log & Local Vault
+- **Managed App Notification Capture**: Notifications from home-page apps are recorded locally whether silenced, allowed, or paused. Silenced alerts are suppressed from the status bar; allowed and paused alerts pass through normally. Each record includes:
+  - **Original Installed App Icon & Display Name** (with the stored icon as fallback if the app is no longer installed)
   - **Notification Title / Sender** (e.g., contact name, group chat title, or email subject)
   - **Full Message Body** (supports multi-line `EXTRA_BIG_TEXT` and inbox-style lines)
   - **Channel / Subtext** (e.g., conversation or account name)
@@ -48,13 +48,9 @@ Every push to `main` is automatically built and published by GitHub Actions. You
 - **Global Session Overrides**: Engage **Mute All (15m)**, **Mute All (1h)**, or **Pass Calls** directly from the Dashboard with a live countdown banner and one-tap **Restore**.
 - **Per-App Instant Mute Pills**: Temporarily mute any individual app for **15m**, **30m**, **1h**, or **Today 24h** from the App Details screen without altering recurring schedules.
 
-### 4. Rules Backup, Portability (`.notiflow`) & Curated Presets
+### 4. Rules Backup & Portability (`.notiflow`)
 - **Export `.notiflow` Backup File**: Serialize all managed apps, schedules, and preferences into a `.notiflow` file (`notiflow_backup_<timestamp>.notiflow`) and save it directly to your chosen folder on device storage via Android's native Storage Access Framework (`Intent.ACTION_CREATE_DOCUMENT`).
-- **1-Tap Import from Storage or Clipboard**: Restore rules in a single tap by selecting an exported `.notiflow` file from device storage (`Intent.ACTION_OPEN_DOCUMENT`), or paste raw backup JSON text.
-- **3 Built-In Focus Protocols**:
-  - **Deep Work Protocol**: Blocks Slack, Teams, and Gmail from `09:00 – 17:00` (Mon–Fri).
-  - **Mindful Evening**: Blocks Instagram, X, and YouTube overnight from `20:00 – 08:00` (Everyday).
-  - **Minimalist Default**: Holds WhatsApp notifications 24/7 while letting phone calls and SMS pass through.
+- **1-Tap Import from Storage**: Settings → Import opens the system file picker directly (`Intent.ACTION_OPEN_DOCUMENT`) and restores the selected `.notiflow` file in place.
 
 ### 5. 100% On-Device Privacy, Semantic Feedback & Zero Telemetry
 - **Zero Network Access**: `android.permission.INTERNET` is completely omitted from [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml). It is physically impossible for the app to transmit data off your device.
@@ -70,16 +66,16 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 | # | Screen | File | Description |
 | :--- | :--- | :--- | :--- |
-| 1 | **Splash Screen** | [`lib/presentation/screens/splash_screen.dart`](lib/presentation/screens/splash_screen.dart) | Animated Stitch emblem, engine initialization, smart route dispatch |
+| 1 | **Startup Routing** | [`lib/main.dart`](lib/main.dart) | No splash screen; opens Onboarding, Permission, or the main shell directly |
 | 2 | **Onboarding Screen** | [`lib/presentation/screens/onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) | 3-step onboarding with direct 1-tap notification access setup |
 | 3 | **Permission Center** | [`lib/presentation/screens/permission_screen.dart`](lib/presentation/screens/permission_screen.dart) | Quick 2-step permission recovery with auto-return & OEM battery tips |
-| 4 | **Import & Presets** | [`lib/presentation/screens/import_rules_screen.dart`](lib/presentation/screens/import_rules_screen.dart) | `.notiflow` file picker, JSON paste modal, and 3 curated focus presets |
+| 4 | **Import Rules** | [`lib/presentation/screens/import_rules_screen.dart`](lib/presentation/screens/import_rules_screen.dart) | Onboarding step 3 backup import; Settings → Import opens the system file picker directly |
 | 5 | **Navigation Shell** | [`lib/presentation/screens/main_navigation_shell.dart`](lib/presentation/screens/main_navigation_shell.dart) | 4-tab bottom navigation (*Rules*, *Apps*, *Activity*, *Settings*) |
 | 6 | **Dashboard (Rules)** | [`lib/presentation/screens/dashboard_screen.dart`](lib/presentation/screens/dashboard_screen.dart) | Time-based greeting, triage counters, global overrides, managed apps |
 | 7 | **Add Apps Screen** | [`lib/presentation/screens/add_apps_screen.dart`](lib/presentation/screens/add_apps_screen.dart) | Installed app discovery, search, and category filters (*Messaging*, *Social*, etc.) |
 | 8 | **App Details Screen** | [`lib/presentation/screens/app_details_screen.dart`](lib/presentation/screens/app_details_screen.dart) | Real-time triage status card, quick mute pills, multiple schedule rules list, and + Add Schedule button |
 | 9 | **Schedule Editor** | [`lib/presentation/screens/schedule_editor_screen.dart`](lib/presentation/screens/schedule_editor_screen.dart) | Quick Load Template dropdown with deduplication, BLOCK/ALLOW mode, time pickers, overnight badge, and day pills |
-| 10 | **Activity Log** | [`lib/presentation/screens/activity_screen.dart`](lib/presentation/screens/activity_screen.dart) | Muted notification log with full message details and app launcher sheet |
+| 10 | **Activity Log** | [`lib/presentation/screens/activity_screen.dart`](lib/presentation/screens/activity_screen.dart) | Silenced and allowed notifications from managed apps, including paused apps, with full details and app launcher sheet |
 | 11 | **Settings Screen** | [`lib/presentation/screens/settings_screen.dart`](lib/presentation/screens/settings_screen.dart) | Service health, on-device privacy audit, `.notiflow` backup/restore, reset |
 
 ### Native Android Engine (`android/app/src/main/kotlin/...`)

@@ -312,6 +312,16 @@ class ScheduleRepository extends ChangeNotifier {
     return true;
   }
 
+  /// Renames a saved rule template. Blank names are ignored.
+  Future<void> renameRuleTemplate(String templateId, String newName) async {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) return;
+    final index = _ruleTemplates.indexWhere((t) => t.id == templateId);
+    if (index == -1) return;
+    _ruleTemplates[index] = _ruleTemplates[index].copyWith(name: trimmed);
+    await _persist();
+  }
+
   /// Deletes a custom rule template by [templateId] (cannot delete pre-seeded default).
   Future<void> deleteRuleTemplate(String templateId) async {
     if (templateId == RuleTemplate.defaultWorkFocus.id) return;

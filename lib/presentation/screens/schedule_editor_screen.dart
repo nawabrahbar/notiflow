@@ -205,9 +205,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
           const SnackBar(
             content: Text(
               'Schedule rule saved successfully!',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600),
             ),
-            backgroundColor: AppTheme.signalSuccess,
+            backgroundColor: AppTheme.toastSuccess,
           ),
         );
       Navigator.pop(context);
@@ -256,12 +256,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
               Expanded(
                 child: Text(
                   'Schedule Rule Editor',
-                  style: GoogleFonts.newsreader(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
-                    color: textMain,
-                    letterSpacing: -0.3,
-                  ),
+                  style: AppTheme.headerTitleStyle(context, textMain),
                 ),
               ),
               const StitchThemeSwitch(),
@@ -287,83 +282,127 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: _selectedTemplateId != null ? primaryCol : borderCol,
-                    width: _selectedTemplateId != null ? 1.5 : 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.bookmark_border_rounded,
-                      color: primaryCol,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedTemplateId,
-                          hint: Text(
-                            'Choose a rule',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              color: textMuted,
-                            ),
-                          ),
-                          isExpanded: true,
-                          icon: Icon(Icons.expand_more_rounded, color: textMuted, size: 22),
-                          dropdownColor: cardBg,
+              LayoutBuilder(
+                builder: (context, box) {
+                  final menuWidth = box.maxWidth;
+                  RuleTemplate? selectedTemplate;
+                  for (final t in templates) {
+                    if (t.id == _selectedTemplateId) selectedTemplate = t;
+                  }
+                  return MenuAnchor(
+                    alignmentOffset: const Offset(0, 6),
+                    style: MenuStyle(
+                      backgroundColor: WidgetStatePropertyAll(cardBg),
+                      surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+                      elevation: const WidgetStatePropertyAll(6),
+                      minimumSize: WidgetStatePropertyAll(Size(menuWidth, 0)),
+                      maximumSize: WidgetStatePropertyAll(Size(menuWidth, 320)),
+                      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 6)),
+                      shape: WidgetStatePropertyAll(
+                        RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
-                          items: templates.map((tmpl) {
-                            return DropdownMenuItem<String>(
-                              value: tmpl.id,
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      tmpl.name,
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 14.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: textMain,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    '${widget.repository.formatTime(tmpl.startTime)} - ${widget.repository.formatTime(tmpl.endTime)}',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 12,
-                                      color: textMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (templateId) {
-                            if (templateId == null) return;
-                            final tmpl = templates.firstWhere((t) => t.id == templateId);
-                            _onTemplateSelected(tmpl);
-                          },
+                          side: BorderSide(color: borderCol),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                    menuChildren: templates.map((tmpl) {
+                      final isSelected = tmpl.id == _selectedTemplateId;
+                      return MenuItemButton(
+                        key: ValueKey('template-menu-item-${tmpl.id}'),
+                        onPressed: () => _onTemplateSelected(tmpl),
+                        style: ButtonStyle(
+                          minimumSize: WidgetStatePropertyAll(Size(menuWidth, 52)),
+                          padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
+                          backgroundColor: WidgetStatePropertyAll(
+                            isSelected ? primaryCol.withValues(alpha: 0.12) : Colors.transparent,
+                          ),
+                        ),
+                        child: SizedBox(
+                          width: menuWidth - 32,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  tmpl.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: textMain,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${widget.repository.formatTime(tmpl.startTime)} - ${widget.repository.formatTime(tmpl.endTime)}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    builder: (context, controller, _) {
+                      return GestureDetector(
+                        key: const ValueKey('template-dropdown'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: templates.isEmpty
+                            ? null
+                            : () => controller.isOpen ? controller.close() : controller.open(),
+                        child: Container(
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: _selectedTemplateId != null ? primaryCol : borderCol,
+                              width: _selectedTemplateId != null ? 1.5 : 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.bookmark_border_rounded,
+                                color: primaryCol,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  selectedTemplate?.name ?? 'Choose a rule',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: selectedTemplate != null ? 14.5 : 15,
+                                    fontWeight: selectedTemplate != null ? FontWeight.w600 : FontWeight.w500,
+                                    color: selectedTemplate != null ? textMain : textMuted,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                controller.isOpen ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                                color: textMuted,
+                                size: 22,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
               const SizedBox(height: 5),
               Padding(
@@ -403,8 +442,13 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                     ),
                   ],
                 ),
+                height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: TextField(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: TextField(
                   controller: _nameController,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 15,
@@ -413,18 +457,23 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   ),
                   decoration: InputDecoration(
                     border: InputBorder.none,
+                    isCollapsed: true,
                     hintText: 'Enter rule moniker...',
                     hintStyle: GoogleFonts.plusJakartaSans(
                       color: textMuted.withValues(alpha: 0.6),
                       fontSize: 14,
                     ),
-                    suffixIcon: Icon(Icons.edit_note_rounded, color: textMuted, size: 20),
                   ),
                   onChanged: (_) {
                     if (_selectedTemplateId != null) {
                       setState(() => _selectedTemplateId = null);
                     }
                   },
+                ),
+                    ),
+                    const SizedBox(width: 10),
+                    Icon(Icons.edit_note_rounded, color: textMuted, size: 20),
+                  ],
                 ),
               ),
 
@@ -669,38 +718,6 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
-
-              // Save Action Button
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _handleSave,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryCol,
-                    foregroundColor: isDark ? const Color(0xFF482900) : Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          widget.existingRule != null ? 'Update Schedule Rule' : 'Save Schedule Rule',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                ),
-              ),
             ],
           );
 
@@ -969,6 +986,36 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
             ],
           );
 
+          final saveButton = SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _handleSave,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryCol,
+                foregroundColor: isDark ? const Color(0xFF482900) : Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      widget.existingRule != null ? 'Update Schedule Rule' : 'Save Schedule Rule',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+            ),
+          );
+
           if (isTablet) {
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -982,6 +1029,8 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   ],
                 ),
                 const SizedBox(height: 32),
+                saveButton,
+                const SizedBox(height: 32),
               ],
             );
           }
@@ -992,6 +1041,8 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
               templateAndNameColumn,
               const SizedBox(height: 24),
               timingAndRecurrenceColumn,
+              const SizedBox(height: 32),
+              saveButton,
               const SizedBox(height: 32),
             ],
           );
