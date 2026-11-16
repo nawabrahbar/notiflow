@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../theme/app_theme.dart';
@@ -141,28 +142,28 @@ class MainNavigationShellState extends State<MainNavigationShell> {
 
                         // Navigation Destinations
                         _TabletNavRailItem(
-                          icon: Icons.tune_rounded,
+                          icon: Icons.tune,
                           label: 'Rules',
                           isSelected: _currentIndex == 0,
                           onTap: () => switchTab(0),
                         ),
                         const SizedBox(height: 12),
                         _TabletNavRailItem(
-                          icon: Icons.apps_rounded,
+                          icon: Icons.apps,
                           label: 'Apps',
                           isSelected: _currentIndex == 1,
                           onTap: () => switchTab(1),
                         ),
                         const SizedBox(height: 12),
                         _TabletNavRailItem(
-                          icon: Icons.notifications_active_rounded,
+                          icon: Icons.notifications_active_outlined,
                           label: 'Activity',
                           isSelected: _currentIndex == 2,
                           onTap: () => switchTab(2),
                         ),
                         const SizedBox(height: 12),
                         _TabletNavRailItem(
-                          icon: Icons.settings_rounded,
+                          icon: Icons.settings_outlined,
                           label: 'Settings',
                           isSelected: _currentIndex == 3,
                           onTap: () => switchTab(3),
@@ -211,44 +212,60 @@ class MainNavigationShellState extends State<MainNavigationShell> {
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               color: isDark
-                  ? AppTheme.darkSurfaceContainerLow
-                  : AppTheme.lightSurfaceContainerLow,
-              border: Border(
-                top: BorderSide(color: borderCol, width: 1.0),
-              ),
+                  ? const Color(0xFF0F1312).withOpacity(0.9)
+                  : AppTheme.lightSurface.withOpacity(0.9),
+              border: isDark
+                  ? Border(
+                      top: BorderSide(
+                        color: const Color(0xFF2A362F).withOpacity(0.7),
+                        width: 1.0,
+                      ),
+                    )
+                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withOpacity(0.5)
+                      : const Color(0xFF2C2A29).withOpacity(0.05),
+                  blurRadius: isDark ? 16 : 12,
+                  offset: const Offset(0, -2),
+                ),
+              ],
             ),
             child: SafeArea(
               top: false,
               child: SizedBox(
                 height: 64,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
                   children: [
                     _PhoneBottomNavItem(
-                      icon: Icons.tune_rounded,
+                      svg: _NavSvgIcons.rules,
                       label: 'Rules',
                       isSelected: _currentIndex == 0,
                       onTap: () => switchTab(0),
                     ),
                     _PhoneBottomNavItem(
-                      icon: Icons.apps_rounded,
+                      svg: _NavSvgIcons.apps,
                       label: 'Apps',
                       isSelected: _currentIndex == 1,
                       onTap: () => switchTab(1),
                     ),
                     _PhoneBottomNavItem(
-                      icon: Icons.notifications_active_rounded,
+                      svg: _NavSvgIcons.activity,
                       label: 'Activity',
                       isSelected: _currentIndex == 2,
                       onTap: () => switchTab(2),
                     ),
                     _PhoneBottomNavItem(
-                      icon: Icons.settings_rounded,
+                      svg: _NavSvgIcons.settings,
                       label: 'Settings',
                       isSelected: _currentIndex == 3,
                       onTap: () => switchTab(3),
                     ),
                   ],
+                  ),
                 ),
               ),
             ),
@@ -290,8 +307,8 @@ class _TabletNavRailItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 70,
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        width: 80,
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? selectedBg : Colors.transparent,
           borderRadius: BorderRadius.circular(24),
@@ -319,7 +336,7 @@ class _TabletNavRailItem extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 22,
+              size: 24,
               color: isSelected ? selectedText : unselectedText,
             ),
             const SizedBox(height: 4),
@@ -338,14 +355,35 @@ class _TabletNavRailItem extends StatelessWidget {
   }
 }
 
+class _NavSvgIcons {
+  static const _open =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+
+  static const rules = '$_open'
+      '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/>'
+      '<line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/>'
+      '<line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/>'
+      '<line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/>'
+      '<line x1="17" x2="23" y1="16" y2="16"/></svg>';
+
+  static const apps = '$_open'
+      '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/>'
+      '<rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>';
+
+  static const activity = '$_open<path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
+
+  static const settings = '$_open<circle cx="12" cy="12" r="3"/>'
+      '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+}
+
 class _PhoneBottomNavItem extends StatelessWidget {
-  final IconData icon;
+  final String svg;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _PhoneBottomNavItem({
-    required this.icon,
+    required this.svg,
     required this.label,
     required this.isSelected,
     required this.onTap,
@@ -354,45 +392,49 @@ class _PhoneBottomNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final selectedBg = isDark
-        ? AppTheme.darkSecondaryContainer
-        : AppTheme.lightSecondaryContainer;
-    final selectedText = isDark
-        ? AppTheme.darkOnSecondaryContainer
-        : AppTheme.lightOnSecondaryContainer;
-    final unselectedText = isDark
-        ? AppTheme.darkOnSurfaceVariant
-        : AppTheme.lightOnSurfaceVariant;
+    final selectedColor = isDark
+        ? AppTheme.darkPrimaryContainer
+        : AppTheme.lightPrimaryContainer;
+    final unselectedColor =
+        isDark ? const Color(0xFF9AA79B) : AppTheme.lightOnSurfaceVariant;
+    final color = isSelected ? selectedColor : unselectedColor;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              color: isSelected ? selectedBg : Colors.transparent,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              icon,
-              size: 22,
-              color: isSelected ? selectedText : unselectedText,
+    return Expanded(
+      child: Semantics(
+        selected: isSelected,
+        button: true,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SvgPicture.string(
+                    svg,
+                    width: 20,
+                    height: 20,
+                    colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      height: 16 / 11,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? selectedText : unselectedText,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

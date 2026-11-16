@@ -23,7 +23,16 @@ class ScheduleEvaluator {
     required DateTime currentDateTime,
     bool unmanagedAppsUntouched = true,
   }) {
-    // 1. Temporary Override (Takes absolute precedence over normal schedules and disabled state)
+    // 1. A paused (disabled) app always lets notifications through, even
+    // while a temporary mute is still running.
+    if (app != null && !app.enabled) {
+      return const ScheduleDecision(
+        decision: NotificationDecisionType.allow,
+        reason: 'App scheduling is disabled (default allow)',
+      );
+    }
+
+    // 2. Temporary Override (takes precedence over normal schedules)
     if (override != null && override.isActiveAt(currentDateTime)) {
       final localEnd = override.endDateTime.toLocal();
       final h = localEnd.hour.toString().padLeft(2, '0');
@@ -57,13 +66,6 @@ class ScheduleEvaluator {
       return const ScheduleDecision(
         decision: NotificationDecisionType.allow,
         reason: 'App is unmanaged (default allow)',
-      );
-    }
-
-    if (!app.enabled) {
-      return const ScheduleDecision(
-        decision: NotificationDecisionType.allow,
-        reason: 'App scheduling is disabled (default allow)',
       );
     }
 

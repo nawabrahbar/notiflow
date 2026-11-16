@@ -160,7 +160,6 @@ lib/
 │   └── ios_notification_platform.dart
 └── presentation/
     ├── screens/
-    │   ├── splash/
     │   ├── onboarding/
     │   ├── permission/
     │   ├── dashboard/

@@ -68,10 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
           child: switch (_currentStep) {
             1 => _buildStepOne(isDark),
             2 => _buildStepTwo(isDark),
-            _ => ImportRulesScreen(
-                repository: widget.repository,
-                isFromOnboarding: true,
-              ),
+            _ => ImportRulesScreen(repository: widget.repository),
           },
         ),
       ),

@@ -239,7 +239,7 @@ class NativeScheduleEvaluatorTest {
     }
 
     @Test
-    fun testPerAppOverrideAppliesEvenIfAppDisabled() {
+    fun testPausedAppAllowsAndRemainsEligibleForActivityLogDuringMute() {
         val evaluator = NativeScheduleEvaluator()
         val now = System.currentTimeMillis()
         val future = now + 30 * 60 * 1000L
@@ -266,7 +266,44 @@ class NativeScheduleEvaluatorTest {
 
         val testTime = now + 10 * 60 * 1000L
         val decision = evaluator.evaluateNotification("com.discord", testTime)
-        assertTrue("Manual temporary mute override must take precedence even if app is disabled", decision.shouldBlock)
+        assertFalse("A paused app must let notifications through even while a temporary mute is active", decision.shouldBlock)
+        assertTrue("Paused home-page apps must still be included in the activity log", decision.isManagedOrOverridden)
+    }
+
+    @Test
+    fun testHomePageAppsRemainEligibleForActivityLogRegardlessOfSchedule() {
+        for (enabled in listOf(true, false)) {
+            for (mode in listOf("allDayAllow", "allDayBlock")) {
+                val evaluator = NativeScheduleEvaluator()
+                evaluator.parsePayload("""
+                    {
+                        "managedApps": [
+                            {"id": "app", "packageName": "com.example", "enabled": $enabled}
+                        ],
+                        "schedules": [
+                            {
+                                "id": "rule",
+                                "appId": "app",
+                                "enabled": true,
+                                "mode": "$mode",
+                                "startTime": {"hour": 0, "minute": 0},
+                                "endTime": {"hour": 23, "minute": 59},
+                                "daysOfWeek": [1, 2, 3, 4, 5, 6, 7]
+                            }
+                        ],
+                        "overrides": []
+                    }
+                """.trimIndent())
+
+                val decision = evaluator.evaluateNotification("com.example", System.currentTimeMillis())
+                assertTrue("Managed app must be logged (enabled=$enabled, mode=$mode)", decision.isManagedOrOverridden)
+                if (enabled && mode == "allDayBlock") {
+                    assertTrue(decision.shouldBlock)
+                } else {
+                    assertFalse(decision.shouldBlock)
+                }
+            }
+        }
     }
 
     @Test

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
@@ -35,16 +36,24 @@ class AppDetailsScreen extends StatelessWidget {
         lower.contains('message')) {
       return Icons.chat_bubble_rounded;
     }
-    if (lower.contains('slack') || lower.contains('team') || lower.contains('meet')) {
+    if (lower.contains('slack') ||
+        lower.contains('team') ||
+        lower.contains('meet')) {
       return Icons.workspaces_rounded;
     }
-    if (lower.contains('mail') || lower.contains('gmail') || lower.contains('outlook')) {
+    if (lower.contains('mail') ||
+        lower.contains('gmail') ||
+        lower.contains('outlook')) {
       return Icons.mail_rounded;
     }
-    if (lower.contains('insta') || lower.contains('photo') || lower.contains('camera')) {
+    if (lower.contains('insta') ||
+        lower.contains('photo') ||
+        lower.contains('camera')) {
       return Icons.photo_camera_rounded;
     }
-    if (lower.contains('tweet') || lower.contains('twitter') || lower.contains('x')) {
+    if (lower.contains('tweet') ||
+        lower.contains('twitter') ||
+        lower.contains('x')) {
       return Icons.tag_rounded;
     }
     return Icons.apps_rounded;
@@ -54,15 +63,29 @@ class AppDetailsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
-    final cardBg = isDark ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow;
-    final cardBgHighest = isDark ? AppTheme.darkSurfaceContainerHighest : AppTheme.lightSurfaceContainer;
-    final borderCol = isDark ? AppTheme.darkOutlineVariant : AppTheme.lightOutlineVariant;
+    final cardBg = isDark
+        ? AppTheme.darkSurfaceContainerLow
+        : AppTheme.lightSurfaceContainerLow;
+    final cardBgHighest = isDark
+        ? AppTheme.darkSurfaceContainerHighest
+        : AppTheme.lightSurfaceContainer;
+    final borderCol = isDark
+        ? AppTheme.darkOutlineVariant
+        : AppTheme.lightOutlineVariant;
     final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
-    final textMuted = isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final textMuted = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
     final primaryCol = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
-    final primaryContainerCol = isDark ? AppTheme.darkPrimaryContainer : AppTheme.lightPrimaryContainer;
-    final secondaryContainerCol = isDark ? AppTheme.darkSecondaryContainer : AppTheme.lightSecondaryContainer;
-    final onSecondaryContainerCol = isDark ? AppTheme.darkOnSecondaryContainer : AppTheme.lightOnSecondaryContainer;
+    final primaryContainerCol = isDark
+        ? AppTheme.darkPrimaryContainer
+        : AppTheme.lightPrimaryContainer;
+    final secondaryContainerCol = isDark
+        ? AppTheme.darkSecondaryContainer
+        : AppTheme.lightSecondaryContainer;
+    final onSecondaryContainerCol = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : AppTheme.lightOnSecondaryContainer;
 
     return ListenableBuilder(
       listenable: repository,
@@ -111,7 +134,8 @@ class AppDetailsScreen extends StatelessWidget {
                         } else {
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
-                              builder: (_) => MainNavigationShell(repository: repository),
+                              builder: (_) =>
+                                  MainNavigationShell(repository: repository),
                             ),
                           );
                         }
@@ -122,12 +146,7 @@ class AppDetailsScreen extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'App Details',
-                        style: GoogleFonts.newsreader(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w500,
-                          color: textMain,
-                          letterSpacing: -0.3,
-                        ),
+                        style: AppTheme.headerTitleStyle(context, textMain),
                       ),
                     ),
                     const StitchThemeSwitch(),
@@ -151,7 +170,9 @@ class AppDetailsScreen extends StatelessWidget {
                         border: Border.all(color: borderCol),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                            color: Colors.black.withValues(
+                              alpha: isDark ? 0.2 : 0.03,
+                            ),
                             blurRadius: 4,
                             offset: const Offset(0, 1),
                           ),
@@ -163,7 +184,9 @@ class AppDetailsScreen extends StatelessWidget {
                             width: 52,
                             height: 52,
                             decoration: BoxDecoration(
-                              color: isDark ? AppTheme.darkSurfaceContainer : AppTheme.lightSurfaceContainer,
+                              color: isDark
+                                  ? AppTheme.darkSurfaceContainer
+                                  : AppTheme.lightSurfaceContainer,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(color: borderCol, width: 1.0),
                             ),
@@ -176,7 +199,9 @@ class AppDetailsScreen extends StatelessWidget {
                                     fit: BoxFit.cover,
                                   )
                                 : Icon(
-                                    _getDefaultIconForApp(currentApp.displayName),
+                                    _getDefaultIconForApp(
+                                      currentApp.displayName,
+                                    ),
                                     color: textMain,
                                     size: 26,
                                   ),
@@ -211,7 +236,10 @@ class AppDetailsScreen extends StatelessWidget {
                           ),
                           StitchSwitch(
                             value: currentApp.enabled,
-                            onChanged: (val) => repository.toggleAppMonitoring(currentApp.id, val),
+                            onChanged: (val) => repository.toggleAppMonitoring(
+                              currentApp.id,
+                              val,
+                            ),
                           ),
                         ],
                       ),
@@ -220,94 +248,129 @@ class AppDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 18),
 
                     // Real-Time Triage Status Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isSilenced
-                            ? (isDark
-                                ? AppTheme.signalHeld.withValues(alpha: 0.12)
-                                : const Color(0xFFFEE2E2))
-                            : (isDark
-                                ? AppTheme.signalSuccess.withValues(alpha: 0.12)
-                                : const Color(0xFFDCFCE7)),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isSilenced
-                              ? AppTheme.signalHeld.withValues(alpha: 0.4)
-                              : AppTheme.signalSuccess.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isSilenced ? Icons.do_not_disturb_on_rounded : Icons.check_circle_rounded,
-                            color: isSilenced ? AppTheme.signalHeld : AppTheme.signalSuccess,
-                            size: 24,
+                    Builder(
+                      builder: (context) {
+                        final permittedInk = isDark
+                            ? AppTheme.permittedAccent
+                            : AppTheme.toastOnSuccess;
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isSilenced
+                                ? (isDark
+                                      ? AppTheme.signalHeld.withValues(
+                                          alpha: 0.12,
+                                        )
+                                      : const Color(0xFFFEE2E2))
+                                : (isDark
+                                      ? AppTheme.permittedAccent.withValues(
+                                          alpha: 0.12,
+                                        )
+                                      : AppTheme.permittedSurface),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isSilenced
+                                  ? AppTheme.signalHeld.withValues(alpha: 0.4)
+                                  : (isDark
+                                        ? AppTheme.permittedAccent.withValues(
+                                            alpha: 0.4,
+                                          )
+                                        : AppTheme.permittedAccent),
+                            ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                          child: Row(
+                            children: [
+                              Icon(
+                                isSilenced
+                                    ? Icons.do_not_disturb_on_rounded
+                                    : Icons.check_circle_rounded,
+                                color: isSilenced
+                                    ? AppTheme.signalHeld
+                                    : permittedInk,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        isSilenced ? 'Currently Silenced' : 'Currently Permitted',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 14.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: textMain,
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            isSilenced
+                                                ? 'Currently Silenced'
+                                                : 'Currently Permitted',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 14.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: textMain,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isSilenced
+                                                ? AppTheme.signalHeld
+                                                      .withValues(alpha: 0.2)
+                                                : (isDark
+                                                      ? AppTheme.permittedAccent
+                                                            .withValues(
+                                                              alpha: 0.25,
+                                                            )
+                                                      : AppTheme
+                                                            .permittedAccent),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            isSilenced ? 'MUTED' : 'ALERTS',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.5,
+                                              color: isSilenced
+                                                  ? AppTheme.signalHeld
+                                                  : permittedInk,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: isSilenced
-                                            ? AppTheme.signalHeld.withValues(alpha: 0.2)
-                                            : AppTheme.signalSuccess.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        isSilenced ? 'MUTED' : 'ALERTS',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.5,
-                                          color: isSilenced ? AppTheme.signalHeld : AppTheme.signalSuccess,
-                                        ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      decision.reason,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 12.5,
+                                        color: textMuted,
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  decision.reason,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12.5,
-                                    color: textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 22),
 
-                    // Quick Temporary Block · Instant Override
+                    // Quick Temporary Block
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Flexible(
                           child: Text(
-                            'QUICK TEMPORARY BLOCK · INSTANT OVERRIDE',
+                            'QUICK TEMPORARY BLOCK',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
@@ -318,14 +381,19 @@ class AppDetailsScreen extends StatelessWidget {
                         ),
                         if (override != null && override.isActive)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: isDark
                                   ? AppTheme.signalHeld.withValues(alpha: 0.2)
                                   : const Color(0xFFFEE2E2),
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
-                                color: AppTheme.signalHeld.withValues(alpha: 0.4),
+                                color: AppTheme.signalHeld.withValues(
+                                  alpha: 0.4,
+                                ),
                               ),
                             ),
                             child: Text(
@@ -343,34 +411,45 @@ class AppDetailsScreen extends StatelessWidget {
                     const SizedBox(height: 10),
                     Builder(
                       builder: (context) {
-                        final isStandardPill = override != null &&
+                        final isStandardPill =
+                            override != null &&
                             override.mode == OverrideMode.block &&
                             (override.durationMinutes == 15 ||
-                             override.durationMinutes == 30 ||
-                             override.durationMinutes == 60);
+                                override.durationMinutes == 30 ||
+                                override.durationMinutes == 60);
 
-                        final isCustomActive = override != null &&
+                        final isCustomActive =
+                            override != null &&
                             override.mode == OverrideMode.block &&
                             !isStandardPill;
 
-                        final customHours = isCustomActive ? (override.durationMinutes / 60).round() : null;
+                        final customHours = isCustomActive
+                            ? (override.durationMinutes / 60).round()
+                            : null;
                         final customPillLabel = isCustomActive
-                            ? (customHours != null && customHours >= 1 ? '${customHours}h Mute' : '${override.durationMinutes}m Mute')
+                            ? (customHours != null && customHours >= 1
+                                  ? '${customHours}h Mute'
+                                  : '${override.durationMinutes}m Mute')
                             : '+ Custom';
 
                         return Row(
                           children: [
                             _buildOverridePill(
                               label: '15m Mute',
-                              isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 15,
+                              isActive:
+                                  override?.mode == OverrideMode.block &&
+                                  override?.durationMinutes == 15,
                               onTap: () {
-                                if (override?.mode == OverrideMode.block && override?.durationMinutes == 15) {
+                                if (override?.mode == OverrideMode.block &&
+                                    override?.durationMinutes == 15) {
                                   repository.clearOverride(currentApp.id);
                                   ScaffoldMessenger.of(context)
                                     ..hideCurrentSnackBar()
                                     ..showSnackBar(
                                       SnackBar(
-                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        content: Text(
+                                          'Cleared temporary override for "${currentApp.displayName}"',
+                                        ),
                                         backgroundColor: AppTheme.signalNeutral,
                                       ),
                                     );
@@ -382,9 +461,9 @@ class AppDetailsScreen extends StatelessWidget {
                                   ScaffoldMessenger.of(context)
                                     ..hideCurrentSnackBar()
                                     ..showSnackBar(
-                                      SnackBar(
-                                        content: Text('Muted "${currentApp.displayName}" for 15 minutes'),
-                                        backgroundColor: AppTheme.signalHeld,
+                                      _muteSnackBar(
+                                        'Muted "${currentApp.displayName}" for 15 minutes',
+                                        isDark,
                                       ),
                                     );
                                 }
@@ -398,15 +477,20 @@ class AppDetailsScreen extends StatelessWidget {
                             const SizedBox(width: 8),
                             _buildOverridePill(
                               label: '30m Mute',
-                              isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 30,
+                              isActive:
+                                  override?.mode == OverrideMode.block &&
+                                  override?.durationMinutes == 30,
                               onTap: () {
-                                if (override?.mode == OverrideMode.block && override?.durationMinutes == 30) {
+                                if (override?.mode == OverrideMode.block &&
+                                    override?.durationMinutes == 30) {
                                   repository.clearOverride(currentApp.id);
                                   ScaffoldMessenger.of(context)
                                     ..hideCurrentSnackBar()
                                     ..showSnackBar(
                                       SnackBar(
-                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        content: Text(
+                                          'Cleared temporary override for "${currentApp.displayName}"',
+                                        ),
                                         backgroundColor: AppTheme.signalNeutral,
                                       ),
                                     );
@@ -418,9 +502,9 @@ class AppDetailsScreen extends StatelessWidget {
                                   ScaffoldMessenger.of(context)
                                     ..hideCurrentSnackBar()
                                     ..showSnackBar(
-                                      SnackBar(
-                                        content: Text('Muted "${currentApp.displayName}" for 30 minutes'),
-                                        backgroundColor: AppTheme.signalHeld,
+                                      _muteSnackBar(
+                                        'Muted "${currentApp.displayName}" for 30 minutes',
+                                        isDark,
                                       ),
                                     );
                                 }
@@ -434,15 +518,20 @@ class AppDetailsScreen extends StatelessWidget {
                             const SizedBox(width: 8),
                             _buildOverridePill(
                               label: '1h Mute',
-                              isActive: override?.mode == OverrideMode.block && override?.durationMinutes == 60,
+                              isActive:
+                                  override?.mode == OverrideMode.block &&
+                                  override?.durationMinutes == 60,
                               onTap: () {
-                                if (override?.mode == OverrideMode.block && override?.durationMinutes == 60) {
+                                if (override?.mode == OverrideMode.block &&
+                                    override?.durationMinutes == 60) {
                                   repository.clearOverride(currentApp.id);
                                   ScaffoldMessenger.of(context)
                                     ..hideCurrentSnackBar()
                                     ..showSnackBar(
                                       SnackBar(
-                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        content: Text(
+                                          'Cleared temporary override for "${currentApp.displayName}"',
+                                        ),
                                         backgroundColor: AppTheme.signalNeutral,
                                       ),
                                     );
@@ -454,9 +543,9 @@ class AppDetailsScreen extends StatelessWidget {
                                   ScaffoldMessenger.of(context)
                                     ..hideCurrentSnackBar()
                                     ..showSnackBar(
-                                      SnackBar(
-                                        content: Text('Muted "${currentApp.displayName}" for 1 hour'),
-                                        backgroundColor: AppTheme.signalHeld,
+                                      _muteSnackBar(
+                                        'Muted "${currentApp.displayName}" for 1 hour',
+                                        isDark,
                                       ),
                                     );
                                 }
@@ -471,7 +560,6 @@ class AppDetailsScreen extends StatelessWidget {
                             _buildOverridePill(
                               label: customPillLabel,
                               isActive: isCustomActive,
-                              icon: isCustomActive ? null : Icons.add_rounded,
                               onTap: () {
                                 if (isCustomActive) {
                                   repository.clearOverride(currentApp.id);
@@ -479,7 +567,9 @@ class AppDetailsScreen extends StatelessWidget {
                                     ..hideCurrentSnackBar()
                                     ..showSnackBar(
                                       SnackBar(
-                                        content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                        content: Text(
+                                          'Cleared temporary override for "${currentApp.displayName}"',
+                                        ),
                                         backgroundColor: AppTheme.signalNeutral,
                                       ),
                                     );
@@ -516,56 +606,20 @@ class AppDetailsScreen extends StatelessWidget {
                             ..hideCurrentSnackBar()
                             ..showSnackBar(
                               SnackBar(
-                                content: Text('Cleared temporary override for "${currentApp.displayName}"'),
+                                content: Text(
+                                  'Cleared temporary override for "${currentApp.displayName}"',
+                                ),
                                 backgroundColor: AppTheme.signalNeutral,
                               ),
                             );
                         },
                         icon: const Icon(Icons.refresh_rounded, size: 16),
                         label: const Text('Clear Temporary Override'),
-                        style: TextButton.styleFrom(foregroundColor: primaryCol),
+                        style: TextButton.styleFrom(
+                          foregroundColor: primaryCol,
+                        ),
                       ),
                     ],
-
-                    const SizedBox(height: 24),
-
-                    // Destructive "Remove from Rules Page" Button
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        await repository.deleteAppsAndRules([currentApp.id]);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context)
-                          ..hideCurrentSnackBar()
-                          ..showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Removed "${currentApp.displayName}" from Rules page!',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              backgroundColor: AppTheme.signalWarning,
-                            ),
-                          );
-                        if (Navigator.of(context).canPop()) {
-                          Navigator.of(context).pop();
-                        } else {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) => MainNavigationShell(repository: repository),
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.delete_sweep_rounded, size: 18, color: Color(0xFFEF4444)),
-                      label: const Text('Remove from Rules Page', style: TextStyle(color: Color(0xFFEF4444))),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFEF4444), width: 1.0),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                    ),
                   ],
                 );
 
@@ -573,60 +627,35 @@ class AppDetailsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Active Schedule Rules (N) Section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Active Schedule Rules (${rules.length})',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.newsreader(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: textMain,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => ScheduleEditorScreen(
-                                  repository: repository,
-                                  targetApp: currentApp,
-                                  existingRule: null,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            '+ Add Schedule',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.w700,
-                              color: primaryCol,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'ACTIVE SCHEDULE RULES (${rules.length})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                        color: textMuted,
+                      ),
                     ),
                     const SizedBox(height: 8),
 
                     // Multi-Schedule Rules List
                     if (rules.isEmpty) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 28,
+                          horizontal: 16,
+                        ),
                         decoration: BoxDecoration(
                           color: cardBg,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: borderCol),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.2 : 0.03,
+                              ),
                               blurRadius: 4,
                               offset: const Offset(0, 1),
                             ),
@@ -634,7 +663,11 @@ class AppDetailsScreen extends StatelessWidget {
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.event_busy_rounded, color: textMuted, size: 36),
+                            Icon(
+                              Icons.event_busy_rounded,
+                              color: textMuted,
+                              size: 36,
+                            ),
                             const SizedBox(height: 10),
                             Text(
                               'No schedule rules configured',
@@ -647,7 +680,10 @@ class AppDetailsScreen extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               'Define custom quiet hours to automatically silence notifications.',
-                              style: GoogleFonts.plusJakartaSans(fontSize: 13, color: textMuted),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                color: textMuted,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -655,7 +691,8 @@ class AppDetailsScreen extends StatelessWidget {
                       ),
                     ] else ...[
                       ...rules.map((rule) {
-                        final isBlock = rule.mode == ScheduleMode.blockDuring ||
+                        final isBlock =
+                            rule.mode == ScheduleMode.blockDuring ||
                             rule.mode == ScheduleMode.allDayBlock;
 
                         return Container(
@@ -667,7 +704,9 @@ class AppDetailsScreen extends StatelessWidget {
                             border: Border.all(color: borderCol),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                                color: Colors.black.withValues(
+                                  alpha: isDark ? 0.2 : 0.03,
+                                ),
                                 blurRadius: 4,
                                 offset: const Offset(0, 1),
                               ),
@@ -677,7 +716,8 @@ class AppDetailsScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(
                                     child: GestureDetector(
@@ -685,11 +725,12 @@ class AppDetailsScreen extends StatelessWidget {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (_) => ScheduleEditorScreen(
-                                              repository: repository,
-                                              targetApp: currentApp,
-                                              existingRule: rule,
-                                            ),
+                                            builder: (_) =>
+                                                ScheduleEditorScreen(
+                                                  repository: repository,
+                                                  targetApp: currentApp,
+                                                  existingRule: rule,
+                                                ),
                                           ),
                                         );
                                       },
@@ -700,10 +741,13 @@ class AppDetailsScreen extends StatelessWidget {
                                             width: 36,
                                             height: 36,
                                             decoration: BoxDecoration(
-                                              color: secondaryContainerCol.withValues(alpha: 0.7),
-                                              borderRadius: BorderRadius.circular(10),
+                                              color: secondaryContainerCol
+                                                  .withValues(alpha: 0.7),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                               border: Border.all(
-                                                color: onSecondaryContainerCol.withValues(alpha: 0.25),
+                                                color: onSecondaryContainerCol
+                                                    .withValues(alpha: 0.25),
                                               ),
                                             ),
                                             child: Icon(
@@ -717,19 +761,28 @@ class AppDetailsScreen extends StatelessWidget {
                                           const SizedBox(width: 10),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  (rule.name != null && rule.name!.trim().isNotEmpty)
+                                                  (rule.name != null &&
+                                                          rule.name!
+                                                              .trim()
+                                                              .isNotEmpty)
                                                       ? rule.name!.trim()
-                                                      : (isBlock ? 'Silent Hold Window' : 'Allow Window'),
+                                                      : (isBlock
+                                                            ? 'Silent Hold Window'
+                                                            : 'Allow Window'),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: GoogleFonts.plusJakartaSans(
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: textMain,
-                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style:
+                                                      GoogleFonts.plusJakartaSans(
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: textMain,
+                                                      ),
                                                 ),
                                                 const SizedBox(height: 2),
                                                 Row(
@@ -744,29 +797,44 @@ class AppDetailsScreen extends StatelessWidget {
                                                       child: Text(
                                                         '${repository.formatTime(rule.startTime)} → ${repository.formatTime(rule.endTime)}',
                                                         maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                          fontSize: 12.5,
-                                                          fontWeight: FontWeight.w500,
-                                                          color: textMuted,
-                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style:
+                                                            GoogleFonts.plusJakartaSans(
+                                                              fontSize: 12.5,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
+                                                              color: textMuted,
+                                                            ),
                                                       ),
                                                     ),
                                                     if (rule.isOvernight) ...[
                                                       const SizedBox(width: 6),
                                                       Container(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 5,
+                                                              vertical: 1,
+                                                            ),
                                                         decoration: BoxDecoration(
                                                           color: cardBgHighest,
-                                                          borderRadius: BorderRadius.circular(4),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
                                                         ),
                                                         child: Text(
                                                           '+1 DAY',
-                                                          style: GoogleFonts.plusJakartaSans(
-                                                            fontSize: 9,
-                                                            fontWeight: FontWeight.w700,
-                                                            color: primaryCol,
-                                                          ),
+                                                          style:
+                                                              GoogleFonts.plusJakartaSans(
+                                                                fontSize: 9,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                                color:
+                                                                    primaryCol,
+                                                              ),
                                                         ),
                                                       ),
                                                     ],
@@ -782,82 +850,110 @@ class AppDetailsScreen extends StatelessWidget {
                                   const SizedBox(width: 8),
                                   StitchSwitch(
                                     value: rule.enabled,
-                                    onChanged: (val) => repository.toggleRuleEnabled(rule.id, val),
+                                    onChanged: (val) => repository
+                                        .toggleRuleEnabled(rule.id, val),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 10),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                          color: isBlock
-                                              ? secondaryContainerCol
-                                              : (isDark
-                                                  ? const Color(0xFF052E16)
-                                                  : const Color(0xFFDCFCE7)),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Container(
-                                              width: 5,
-                                              height: 5,
-                                              decoration: BoxDecoration(
-                                                color: isBlock
-                                                    ? onSecondaryContainerCol
-                                                    : const Color(0xFF22C55E),
-                                                shape: BoxShape.circle,
-                                              ),
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isBlock
+                                                ? secondaryContainerCol
+                                                : (isDark
+                                                      ? const Color(0xFF052E16)
+                                                      : const Color(
+                                                          0xFFDCFCE7,
+                                                        )),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
                                             ),
-                                            const SizedBox(width: 5),
-                                            Text(
-                                              isBlock ? 'Silent Hold' : 'Allow Window',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: isBlock
-                                                    ? onSecondaryContainerCol
-                                                    : const Color(0xFF16A34A),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 5,
+                                                height: 5,
+                                                decoration: BoxDecoration(
+                                                  color: isBlock
+                                                      ? onSecondaryContainerCol
+                                                      : const Color(0xFF22C55E),
+                                                  shape: BoxShape.circle,
+                                                ),
                                               ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                isBlock
+                                                    ? 'Silent Hold'
+                                                    : 'Allow Window',
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isBlock
+                                                      ? onSecondaryContainerCol
+                                                      : const Color(0xFF16A34A),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Flexible(
+                                          child: Text(
+                                            _formatDaysSummary(rule.daysOfWeek),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              color: textMuted,
                                             ),
-                                          ],
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _formatDaysSummary(rule.daysOfWeek),
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          color: textMuted,
-                                        ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                   Row(
+                                    mainAxisSize: MainAxisSize.min,
                                     children: [
                                       IconButton(
-                                        icon: Icon(Icons.edit_outlined, size: 18, color: textMuted),
+                                        icon: Icon(
+                                          Icons.edit_outlined,
+                                          size: 18,
+                                          color: textMuted,
+                                        ),
                                         tooltip: 'Edit Schedule',
                                         onPressed: () {
                                           Navigator.push(
                                             context,
                                             MaterialPageRoute(
-                                              builder: (_) => ScheduleEditorScreen(
-                                                repository: repository,
-                                                targetApp: currentApp,
-                                                existingRule: rule,
-                                              ),
+                                              builder: (_) =>
+                                                  ScheduleEditorScreen(
+                                                    repository: repository,
+                                                    targetApp: currentApp,
+                                                    existingRule: rule,
+                                                  ),
                                             ),
                                           );
                                         },
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 32,
+                                          minHeight: 32,
+                                        ),
                                         padding: EdgeInsets.zero,
+                                        style: const ButtonStyle(
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
                                       ),
                                       IconButton(
                                         icon: const Icon(
@@ -876,16 +972,26 @@ class AppDetailsScreen extends StatelessWidget {
                                                 content: Text(
                                                   'Schedule rule removed.',
                                                   style: TextStyle(
-                                                    color: Colors.white,
+                                                    color:
+                                                        AppTheme.toastOnSuccess,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
-                                                backgroundColor: AppTheme.signalSuccess,
+                                                backgroundColor:
+                                                    AppTheme.toastSuccess,
                                               ),
                                             );
                                         },
-                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 32,
+                                          minHeight: 32,
+                                        ),
                                         padding: EdgeInsets.zero,
+                                        alignment: Alignment.centerRight,
+                                        style: const ButtonStyle(
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -915,7 +1021,10 @@ class AppDetailsScreen extends StatelessWidget {
                       },
                       behavior: HitTestBehavior.opaque,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
                           color: cardBg,
                           borderRadius: BorderRadius.circular(16),
@@ -926,7 +1035,9 @@ class AppDetailsScreen extends StatelessWidget {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.2 : 0.03,
+                              ),
                               blurRadius: 4,
                               offset: const Offset(0, 1),
                             ),
@@ -971,12 +1082,67 @@ class AppDetailsScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            Icon(Icons.chevron_right_rounded, color: textMuted, size: 20),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: textMuted,
+                              size: 20,
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ],
+                );
+
+                // Destructive "Remove from Rules Page" Button
+                final removeFromRulesButton = OutlinedButton.icon(
+                  onPressed: () async {
+                    await repository.deleteAppsAndRules([currentApp.id]);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Removed "${currentApp.displayName}" from Rules page!',
+                            style: const TextStyle(
+                              color: AppTheme.toastOnSuccess,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          backgroundColor: AppTheme.toastSuccess,
+                        ),
+                      );
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              MainNavigationShell(repository: repository),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.delete_sweep_rounded,
+                    size: 18,
+                    color: Color(0xFFEF4444),
+                  ),
+                  label: const Text(
+                    'Remove from Rules Page',
+                    style: TextStyle(color: Color(0xFFEF4444)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(
+                      color: Color(0xFFEF4444),
+                      width: 1.0,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
                 );
 
                 final saveChangesButton = SizedBox(
@@ -989,7 +1155,8 @@ class AppDetailsScreen extends StatelessWidget {
                       } else {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (_) => MainNavigationShell(repository: repository),
+                            builder: (_) =>
+                                MainNavigationShell(repository: repository),
                           ),
                         );
                       }
@@ -1017,7 +1184,10 @@ class AppDetailsScreen extends StatelessWidget {
 
                 if (isTablet) {
                   return ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 16,
+                    ),
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1028,6 +1198,8 @@ class AppDetailsScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 20),
+                      removeFromRulesButton,
+                      const SizedBox(height: 12),
                       saveChangesButton,
                       const SizedBox(height: 32),
                     ],
@@ -1035,12 +1207,17 @@ class AppDetailsScreen extends StatelessWidget {
                 }
 
                 return ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
                   children: [
                     leftCardColumn,
                     const SizedBox(height: 28),
                     rightRulesColumn,
                     const SizedBox(height: 20),
+                    removeFromRulesButton,
+                    const SizedBox(height: 12),
                     saveChangesButton,
                     const SizedBox(height: 32),
                   ],
@@ -1097,7 +1274,10 @@ class AppDetailsScreen extends StatelessWidget {
           builder: (context, setDialogState) {
             final now = DateTime.now();
             final endTime = now.add(Duration(hours: selectedHours));
-            final formattedEndTime = repository.formatTimeOfDay(endTime.hour, endTime.minute);
+            final formattedEndTime = repository.formatTimeOfDay(
+              endTime.hour,
+              endTime.minute,
+            );
 
             const quickPresets = [2, 3, 4, 8, 12, 24];
 
@@ -1117,7 +1297,11 @@ class AppDetailsScreen extends StatelessWidget {
                       color: primaryCol.withValues(alpha: isDark ? 0.2 : 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.hourglass_top_rounded, color: primaryCol, size: 20),
+                    child: Icon(
+                      Icons.hourglass_top_rounded,
+                      color: primaryCol,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1167,16 +1351,21 @@ class AppDetailsScreen extends StatelessWidget {
                       alignment: WrapAlignment.center,
                       children: quickPresets.map((h) {
                         final isSelected = selectedHours == h;
-                        final label = h == 8 ? '8h Work' : (h == 24 ? '24h Day' : '${h}h');
+                        final label = h == 8
+                            ? '8h Work'
+                            : (h == 24 ? '24h Day' : '${h}h');
                         return ChoiceChip(
                           label: Text(label),
                           labelStyle: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w600,
                             color: isSelected ? primaryCol : textMain,
                           ),
                           selected: isSelected,
-                          onSelected: (_) => setDialogState(() => selectedHours = h),
+                          onSelected: (_) =>
+                              setDialogState(() => selectedHours = h),
                           backgroundColor: isDark
                               ? AppTheme.darkSurfaceContainerHigh
                               : AppTheme.lightSurfaceContainerHigh,
@@ -1187,14 +1376,19 @@ class AppDetailsScreen extends StatelessWidget {
                             color: isSelected ? primaryCol : borderCol,
                             width: isSelected ? 1.5 : 1.0,
                           ),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           showCheckmark: false,
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark
                             ? AppTheme.darkSurfaceContainerHigh
@@ -1209,7 +1403,9 @@ class AppDetailsScreen extends StatelessWidget {
                             onPressed: selectedHours > 2
                                 ? () => setDialogState(() => selectedHours--)
                                 : null,
-                            icon: const Icon(Icons.remove_circle_outline_rounded),
+                            icon: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                            ),
                             color: primaryCol,
                             disabledColor: textMuted.withValues(alpha: 0.3),
                             tooltip: 'Decrease 1 hour',
@@ -1280,9 +1476,9 @@ class AppDetailsScreen extends StatelessWidget {
                     ScaffoldMessenger.of(context)
                       ..hideCurrentSnackBar()
                       ..showSnackBar(
-                        SnackBar(
-                          content: Text('Muted "${app.displayName}" for $selectedHours hours'),
-                          backgroundColor: AppTheme.signalHeld,
+                        _muteSnackBar(
+                          'Muted "${app.displayName}" for $selectedHours hours',
+                          isDark,
                         ),
                       );
                   },
@@ -1296,8 +1492,13 @@ class AppDetailsScreen extends StatelessWidget {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryCol,
-                    foregroundColor: isDark ? AppTheme.darkBackground : Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    foregroundColor: isDark
+                        ? AppTheme.darkBackground
+                        : Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1326,10 +1527,13 @@ class AppDetailsScreen extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: isActive
-                ? (isDark ? primaryCol.withValues(alpha: 0.25) : primaryCol.withValues(alpha: 0.15))
+                ? (isDark
+                      ? primaryCol.withValues(alpha: 0.25)
+                      : primaryCol.withValues(alpha: 0.15))
                 : cardBg,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -1365,4 +1569,28 @@ class AppDetailsScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Mute confirmations use the shared success toast colour.
+SnackBar _muteSnackBar(String message, bool isDark) {
+  const foreground = AppTheme.toastOnSuccess;
+  return SnackBar(
+    content: Row(
+      children: [
+        Icon(Icons.stars_outlined, size: 18, color: foreground),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            message,
+            style: GoogleFonts.plusJakartaSans(
+              color: foreground,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+    backgroundColor: AppTheme.toastSuccess,
+  );
 }

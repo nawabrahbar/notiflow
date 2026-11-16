@@ -1,8 +1,14 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/repositories/schedule_repository.dart';
-import 'presentation/screens/splash_screen.dart';
+import 'platform/platform_factory.dart';
+import 'presentation/screens/main_navigation_shell.dart';
+import 'presentation/screens/onboarding_screen.dart';
+import 'presentation/screens/permission_screen.dart';
 import 'presentation/theme/app_theme.dart';
 
 /// App-wide theme mode controller for real-time switching between
@@ -28,8 +34,22 @@ Future<void> updateAppThemeMode(ThemeMode mode) async {
   await prefs.setString('pref_theme_mode', key);
 }
 
+/// Phones (shortest side under 600dp) stay in portrait; tablets may rotate.
+List<DeviceOrientation> allowedOrientations(double shortestSideDp) {
+  if (shortestSideDp > 0 && shortestSideDp < 600) {
+    return const [DeviceOrientation.portraitUp];
+  }
+  return DeviceOrientation.values;
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final display = PlatformDispatcher.instance.displays.firstOrNull;
+  if (display != null) {
+    final logical = display.size / display.devicePixelRatio;
+    await SystemChrome.setPreferredOrientations(
+        allowedOrientations(logical.shortestSide));
+  }
   GoogleFonts.config.allowRuntimeFetching = false;
 
   final prefs = await SharedPreferences.getInstance();
@@ -43,14 +63,37 @@ void main() async {
   }
 
   final repository = ScheduleRepository();
+  await repository.initialize();
+  final home = await resolveStartScreen(repository, prefs);
 
-  runApp(NotificationHandlerApp(repository: repository));
+  runApp(NotificationHandlerApp(repository: repository, home: home));
+}
+
+/// Picks the first screen directly, with no intermediate splash screen.
+Future<Widget> resolveStartScreen(
+  ScheduleRepository repository,
+  SharedPreferences prefs,
+) async {
+  if (!(prefs.getBool('pref_onboarding_completed') ?? false)) {
+    return OnboardingScreen(repository: repository);
+  }
+  final isGranted =
+      await PlatformFactory.createPlatformService().isNotificationAccessGranted();
+  if (!isGranted) {
+    return PermissionScreen(repository: repository, isInitialSetup: false);
+  }
+  return MainNavigationShell(repository: repository);
 }
 
 class NotificationHandlerApp extends StatelessWidget {
   final ScheduleRepository repository;
+  final Widget home;
 
-  const NotificationHandlerApp({super.key, required this.repository});
+  const NotificationHandlerApp({
+    super.key,
+    required this.repository,
+    required this.home,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +106,7 @@ class NotificationHandlerApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: currentMode,
-          home: SplashScreen(repository: repository),
+          home: home,
         );
       },
     );

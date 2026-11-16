@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../../platform/android_notification_platform.dart';
+import '../../platform/notification_platform_interface.dart';
+import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 
@@ -30,6 +32,7 @@ class ActivityScreenState extends State<ActivityScreen>
     with WidgetsBindingObserver {
   String _selectedFilter = 'all'; // 'all', 'silenced', 'allowed'
   final List<Map<String, dynamic>> _events = [];
+  Future<List<DiscoveredAppInfo>>? _installedApplications;
 
   @override
   void initState() {
@@ -55,6 +58,7 @@ class ActivityScreenState extends State<ActivityScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _installedApplications = null;
       _loadNativeEvents();
     }
   }
@@ -94,38 +98,21 @@ class ActivityScreenState extends State<ActivityScreen>
     return Icons.notifications_paused_rounded;
   }
 
+  /// Formats as "12 Sept, 11:40 PM" (or "12 Sept, 23:40" in 24-hour mode).
   String _formatShortTime(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final eventDay = DateTime(dt.year, dt.month, dt.day);
-    final diffDays = today.difference(eventDay).inDays;
-
-    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    final hm =
-        '${hour12.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $period';
-
-    if (diffDays == 0) {
-      return hm;
-    } else if (diffDays == 1) {
-      return 'Yesterday · $hm';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'
+    ];
+    final mm = dt.minute.toString().padLeft(2, '0');
+    final String hm;
+    if (widget.repository.use24HourFormat) {
+      hm = '${dt.hour.toString().padLeft(2, '0')}:$mm';
     } else {
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec'
-      ];
-      return '${months[dt.month - 1]} ${dt.day} · $hm';
+      final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      hm = '$hour12:$mm ${dt.hour >= 12 ? 'PM' : 'AM'}';
     }
+    return '${dt.day} ${months[dt.month - 1]}, $hm';
   }
 
   String _formatFullDateTime(DateTime dt) {
@@ -155,6 +142,12 @@ class ActivityScreenState extends State<ActivityScreen>
         await AndroidNotificationPlatform.fetchNativeActivityLog();
     if (!mounted) return;
 
+    final installedApps = await (_installedApplications ??=
+        PlatformFactory.createPlatformService().getInstalledApplications());
+    if (!mounted) return;
+    final installedByPkg = {
+      for (final app in installedApps) app.packageName: app,
+    };
     final Map<String, ManagedApp> appsByPkg = {
       for (final a in widget.repository.managedApps) a.packageName: a,
     };
@@ -165,10 +158,12 @@ class ActivityScreenState extends State<ActivityScreen>
         ..addAll(nativeLogs.map((raw) {
           final pkg = raw['packageName'] as String? ?? 'Unknown App';
           final managedApp = appsByPkg[pkg];
+          final installedApp = installedByPkg[pkg];
           final rawAppName = (raw['appName'] as String?)?.trim() ?? '';
           final displayName = managedApp?.displayName ??
+              installedApp?.displayName ??
               (rawAppName.isNotEmpty ? rawAppName : pkg);
-          final iconBytes = managedApp?.iconBytes;
+          final iconBytes = installedApp?.iconBytes ?? managedApp?.iconBytes;
 
           final tsMs = (raw['timestampMs'] as num?)?.toInt() ?? 0;
           final dt = DateTime.fromMillisecondsSinceEpoch(tsMs);
@@ -273,7 +268,7 @@ class ActivityScreenState extends State<ActivityScreen>
                 ..hideCurrentSnackBar()
                 ..showSnackBar(
                   SnackBar(
-                    content: const Text('Triage activity log cleared.'),
+                    content: const Text('Triage activity log cleared.', style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600)),
                     backgroundColor: AppTheme.toastSuccess,
                   ),
                 );
@@ -528,9 +523,11 @@ class ActivityScreenState extends State<ActivityScreen>
                     horizontal: isTablet ? 24 : 16,
                     vertical: 8,
                   ),
-                  child: Column(
+                  child: !isTablet
+                      ? _buildPhoneLayout(isDark, events)
+                      : Column(
                     children: [
-                      // Top 3 Bento Metrics (Intercepted, Permitted, Leak Rate)
+                      // Bento Metrics (Intercepted, Permitted)
                       Row(
                         children: [
                           Expanded(
@@ -562,22 +559,6 @@ class ActivityScreenState extends State<ActivityScreen>
                               textMain: textMain,
                               textMuted: textMuted,
                               accent: onSecContainer,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _buildMetricCard(
-                              title: 'Privacy Node',
-                              count: '100%',
-                              tag: 'LOCAL',
-                              icon: Icons.shield_rounded,
-                              isDark: isDark,
-                              container: container,
-                              containerHigh: secContainer,
-                              borderCol: borderCol,
-                              textMain: textMain,
-                              textMuted: textMuted,
-                              accent: secondary,
                             ),
                           ),
                         ],
@@ -835,6 +816,395 @@ class ActivityScreenState extends State<ActivityScreen>
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneLayout(bool isDark, List<Map<String, dynamic>> events) {
+    final textMain =
+        isDark ? const Color(0xFFF3F4F1) : AppTheme.lightOnSurface;
+    final textMuted = isDark
+        ? AppTheme.darkOnSurfaceVariant
+        : AppTheme.lightOnSurfaceVariant;
+    final chipBg =
+        isDark ? const Color(0xFF1E2621) : AppTheme.lightSurfaceContainer;
+    final chipBorder = isDark ? const Color(0xFF2A362F) : Colors.transparent;
+
+    Widget filterPill(String key, String label, int count) {
+      final selected = _selectedFilter == key;
+      return GestureDetector(
+        onTap: () => setState(() => _selectedFilter = key),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark
+                    ? AppTheme.darkPrimaryContainer
+                    : AppTheme.lightPrimaryContainer)
+                : chipBg,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: selected ? Colors.transparent : chipBorder),
+          ),
+          child: Text(
+            '$label $count',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected
+                  ? (isDark
+                      ? const Color(0xFF2B1700)
+                      : AppTheme.lightOnPrimaryContainer)
+                  : (isDark ? const Color(0xFFE0E3E0) : textMuted),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              filterPill('all', 'All', _events.length),
+              const SizedBox(width: 8),
+              filterPill('silenced', 'Silenced', _silencedCount),
+              const SizedBox(width: 8),
+              filterPill('allowed', 'Allowed', _allowedCount),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Text(
+              'Recorded',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: textMain,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: textMuted.withOpacity(0.6),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                '${events.length} ${events.length == 1 ? 'Event' : 'Events'}',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  color: textMuted,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: _confirmClearActivity,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: chipBg,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: chipBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.delete_sweep_outlined,
+                        size: 15,
+                        color: isDark
+                            ? AppTheme.darkPrimary
+                            : AppTheme.lightPrimary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Clear Log',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppTheme.darkPrimary
+                            : AppTheme.lightPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: events.isEmpty
+              ? _buildPhoneEmptyState(isDark, textMain, textMuted)
+              : ListView.separated(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  itemCount: events.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) =>
+                      _buildPhoneEventCard(events[index], isDark, textMain,
+                          textMuted),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneEmptyState(bool isDark, Color textMain, Color textMuted) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF1A211D)
+              : AppTheme.lightSurfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: isDark ? const Color(0xFF2A362F) : Colors.transparent),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppTheme.darkSecondaryContainer
+                    : AppTheme.lightSecondaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.notifications_paused_outlined,
+                  size: 24,
+                  color: isDark
+                      ? AppTheme.darkOnSecondaryContainer
+                      : AppTheme.lightOnSecondaryContainer),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'All caught up',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: textMain,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'No notifications matching this filter or the log was recently refreshed.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: textMuted,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneEventCard(Map<String, dynamic> evt, bool isDark,
+      Color textMain, Color textMuted) {
+    final isBlocked = evt['isBlocked'] as bool? ?? false;
+    final iconBytes = evt['iconBytes'] as Uint8List?;
+    final title = (evt['notifTitle'] as String? ?? '').trim();
+    final message = (evt['notifMessage'] as String? ?? '').trim();
+    final reason = (evt['reason'] as String? ?? '').trim();
+
+    final Color badgeBg;
+    final Color badgeFg;
+    final Color badgeBorder;
+    final Color badgeDot;
+    if (isBlocked) {
+      badgeBg = isDark
+          ? AppTheme.darkSecondaryContainer.withOpacity(0.6)
+          : AppTheme.lightSecondaryContainer;
+      badgeFg = isDark
+          ? AppTheme.darkOnSecondaryContainer
+          : AppTheme.lightOnSecondaryContainer;
+      badgeBorder = isDark
+          ? AppTheme.darkOnSecondaryContainer.withOpacity(0.2)
+          : Colors.transparent;
+      badgeDot = isDark
+          ? AppTheme.darkPrimaryContainer
+          : AppTheme.lightPrimaryContainer;
+    } else {
+      badgeBg = isDark
+          ? AppTheme.darkPrimaryContainer.withOpacity(0.2)
+          : const Color(0xFFFFDCBD);
+      badgeFg = isDark ? AppTheme.darkPrimary : const Color(0xFF623F18);
+      badgeBorder = isDark
+          ? AppTheme.darkPrimaryContainer.withOpacity(0.3)
+          : Colors.transparent;
+      badgeDot = isDark ? const Color(0xFFA7D4A3) : AppTheme.lightSecondary;
+    }
+
+    return InkWell(
+      onTap: () => _showNotificationDetailsSheet(evt, isDark),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF1A211D)
+              : AppTheme.lightSurfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: isDark ? const Color(0xFF2A362F) : Colors.transparent),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppTheme.darkSurfaceContainerHigh
+                        : AppTheme.lightSurfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: iconBytes != null
+                      ? Image.memory(iconBytes,
+                          width: 34, height: 34, fit: BoxFit.cover)
+                      : Icon(evt['icon'] as IconData? ?? Icons.notifications,
+                          size: 18, color: textMain),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        evt['appName'] as String? ?? 'App',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: textMain,
+                          height: 1.3,
+                        ),
+                      ),
+                      Text(
+                        evt['time'] as String? ?? '',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          color: textMuted,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: badgeBg,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: badgeBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                            color: badgeDot, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isBlocked ? 'SILENCED' : 'ALLOWED',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: badgeFg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (title.isNotEmpty || message.isNotEmpty || reason.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF222B25)
+                      : AppTheme.lightSurfaceContainer,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF2A362F).withOpacity(0.5)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (title.isNotEmpty)
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: textMain,
+                        ),
+                      ),
+                    if (message.isNotEmpty || title.isEmpty) ...[
+                      if (title.isNotEmpty) const SizedBox(height: 2),
+                      Text(
+                        message.isNotEmpty ? message : reason,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: textMuted,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

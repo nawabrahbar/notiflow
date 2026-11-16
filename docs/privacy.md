@@ -21,7 +21,7 @@ When the Android `NotificationListenerService` intercepts an incoming notificati
   - `sbn.key` (String): Used to invoke `cancelNotification(key)` when a block rule or mute override applies.
   - System timestamp & category: Compared against the user's local schedule and urgent repeated call bypass window.
 - **Strictly Private On-Device Activity Log**:
-  - Triaged notification events for managed apps (capped at the most recent 150 events) are stored strictly in private app sandbox storage (`MODE_PRIVATE` `SharedPreferences`) so users can review missed alerts in the **Activity** tab and clear them at any time.
+  - Silenced and allowed notification events for managed apps, including paused apps (capped at the most recent 150 events), are stored strictly in private app sandbox storage (`MODE_PRIVATE` `SharedPreferences`) so users can review alerts in the **Activity** tab and clear them at any time.
   - Cloud backup and device-to-device extraction are explicitly disabled (`android:allowBackup="false"` and `data_extraction_rules.xml`).
 
 ### 2.3 Release-Safe Logging

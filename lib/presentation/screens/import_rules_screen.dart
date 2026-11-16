@@ -3,22 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
-import '../../domain/models/rule_preset.dart';
 import '../theme/app_theme.dart';
-import '../widgets/stitch_header.dart';
 import 'main_navigation_shell.dart';
 
-/// Screen 4 / Step 3: Import Rules Screen.
-/// Matches Stitch redesign: obsidian signal theme with amber accents,
-/// curated preset selection, and custom .notiflow JSON file import.
+/// Onboarding step three: optional .notiflow backup import.
 class ImportRulesScreen extends StatefulWidget {
   final ScheduleRepository repository;
-  final bool isFromOnboarding;
 
   const ImportRulesScreen({
     super.key,
     required this.repository,
-    this.isFromOnboarding = false,
   });
 
   @override
@@ -26,245 +20,9 @@ class ImportRulesScreen extends StatefulWidget {
 }
 
 class _ImportRulesScreenState extends State<ImportRulesScreen> {
-  String _selectedPresetId = 'deep_work';
   bool _isProcessing = false;
   String? _statusMessage;
   bool _isSuccessMessage = true;
-
-  final List<RulePreset> _presets = RulePreset.curatedPresets;
-
-  Future<String?> _showUninstalledChoiceSheet(List<ManagedApp> uninstalled) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark
-        ? AppTheme.darkSurfaceContainerLow
-        : AppTheme.lightSurfaceContainerLow;
-    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
-    final textMuted = isDark
-        ? AppTheme.darkOnSurfaceVariant
-        : AppTheme.lightOnSurfaceVariant;
-    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
-    final secContainer = isDark
-        ? AppTheme.darkSecondaryContainer
-        : AppTheme.lightSecondaryContainer;
-    final onSecContainer = isDark
-        ? AppTheme.darkOnSecondaryContainer
-        : AppTheme.lightOnSecondaryContainer;
-    final borderCol = isDark
-        ? AppTheme.darkOutlineVariant.withOpacity(0.3)
-        : AppTheme.lightOutlineVariant.withOpacity(0.35);
-
-    return showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: borderCol),
-        ),
-        padding: const EdgeInsets.fromLTRB(22, 16, 22, 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppTheme.darkSurfaceContainerHigh
-                      : AppTheme.lightSurfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: primary.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.apps_outage_rounded,
-                      color: primary, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Uninstalled Apps (${uninstalled.length})',
-                        style: GoogleFonts.newsreader(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: textMain,
-                        ),
-                      ),
-                      Text(
-                        'Detected in backup, but not installed on this device',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          color: textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: (isDark
-                        ? AppTheme.darkSurfaceContainer
-                        : AppTheme.lightSurfaceContainer)
-                    .withOpacity(0.7),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: borderCol),
-              ),
-              child: Text(
-                'Apps: ${uninstalled.map((a) => a.displayName).take(5).join(', ')}${uninstalled.length > 5 ? ' ...and ${uninstalled.length - 5} more' : ''}',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: textMain,
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-
-            // Option 1: Keep in Vault (Recommended)
-            InkWell(
-              onTap: () => Navigator.pop(ctx, 'vault'),
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: secContainer.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: (isDark
-                              ? AppTheme.darkSecondary
-                              : AppTheme.lightSecondary)
-                          .withOpacity(0.4)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.inventory_2_outlined,
-                        color: onSecContainer, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Keep in Vault',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: textMain,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: secContainer,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'RECOMMENDED',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    color: onSecContainer,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'Keep rules in local database. Hidden from Rules page now, and auto-applied when you install the app.',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11.5,
-                              color: textMuted,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: onSecContainer),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Option 2: Exclude Apps
-            InkWell(
-              onTap: () => Navigator.pop(ctx, 'exclude'),
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppTheme.darkSurfaceContainer
-                      : AppTheme.lightSurfaceContainer,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderCol),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.remove_circle_outline_rounded,
-                        color: textMuted, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Exclude These Apps',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: textMain,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'Discard rules for uninstalled apps and only import rules for apps installed on this device.',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 11.5,
-                              color: textMuted,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: textMuted),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Future<void> _handlePickFromDevice() async {
     final rawContent = await widget.repository.pickBackupRawContent();
@@ -294,7 +52,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     bool excludeUninstalled = false;
 
     if (uninstalled.isNotEmpty && mounted) {
-      final choice = await _showUninstalledChoiceSheet(uninstalled);
+      final choice = await showUninstalledBackupChoiceSheet(context, uninstalled);
       if (choice == null) {
         setState(() => _isProcessing = false);
         return;
@@ -328,7 +86,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: const Text('Backup file restored successfully!'),
+            content: const Text('Backup file restored successfully!', style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600)),
             backgroundColor: AppTheme.toastSuccess,
           ),
         );
@@ -345,381 +103,143 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     }
   }
 
-  Future<void> _handleChooseFile() async {
-    // Show modal allowing user to either pick a .notiflow file or paste JSON
-    final TextEditingController jsonController = TextEditingController();
-
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final sheetBg = isDark
-            ? AppTheme.darkSurfaceContainerLow
-            : AppTheme.lightSurfaceContainerLow;
-        final textColor =
-            isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
-        final subTextColor = isDark
-            ? AppTheme.darkOnSurfaceVariant
-            : AppTheme.lightOnSurfaceVariant;
-        final borderCol = isDark
-            ? AppTheme.darkOutlineVariant.withOpacity(0.3)
-            : AppTheme.lightOutlineVariant.withOpacity(0.35);
-        final primary =
-            isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
-        final onPrimary =
-            isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnPrimary;
-
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              color: sheetBg,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              border: Border.all(color: borderCol),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppTheme.darkSurfaceContainerHigh
-                          : AppTheme.lightSurfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Import .notiflow Backup',
-                  style: GoogleFonts.newsreader(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Select a .notiflow file from device storage or paste your backup JSON content below.',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 13,
-                    color: subTextColor,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context, '__PICK_FILE__');
-                    },
-                    icon: Icon(Icons.folder_open_rounded, size: 18, color: primary),
-                    label: Text(
-                      'Select .notiflow File from Storage',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w600,
-                        color: textColor,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: borderCol),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: jsonController,
-                  maxLines: 6,
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 12,
-                    color: textColor,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: '{\n  "app": "Notiflow",\n  "schedules": [...]\n}',
-                    hintStyle: GoogleFonts.jetBrainsMono(
-                      color: subTextColor.withOpacity(0.6),
-                      fontSize: 12,
-                    ),
-                    filled: true,
-                    fillColor: isDark
-                        ? AppTheme.darkSurfaceContainerLowest
-                        : AppTheme.lightSurfaceContainerLowest,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: borderCol),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primary, width: 1.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: textColor,
-                          side: BorderSide(color: borderCol),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final text = jsonController.text.trim();
-                          if (text.isNotEmpty) {
-                            Navigator.pop(context, text);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primary,
-                          foregroundColor: onPrimary,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: Text(
-                          'Restore JSON',
-                          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (result == '__PICK_FILE__') {
-      await _handlePickFromDevice();
-      return;
-    }
-
-    if (result != null && result.isNotEmpty) {
-      await _processBackupContent(result);
-    }
-  }
-
-  Future<void> _handleApplyPreset() async {
-    setState(() {
-      _isProcessing = true;
-      _statusMessage = null;
-    });
-
-    final preset = _presets.firstWhere(
-      (p) => p.id == _selectedPresetId,
-      orElse: () => _presets.first,
-    );
-
-    await widget.repository.applyPreset(preset, replaceAll: false);
-
-    setState(() {
-      _isProcessing = false;
-    });
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            'Applied "${preset.title}" rules!',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-          ),
-          backgroundColor: AppTheme.signalSuccess,
-        ),
-      );
-    await _finishFlow();
-  }
-
   Future<void> _finishFlow() async {
-    if (widget.isFromOnboarding) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('pref_onboarding_completed', true);
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => MainNavigationShell(repository: widget.repository),
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('pref_onboarding_completed', true);
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MainNavigationShell(repository: widget.repository),
+      ),
+      (route) => false,
+    );
+  }
+
+  Future<void> _handlePasteBackupJson() async {
+    final controller = TextEditingController();
+    String? content;
+    try {
+      content = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Paste Backup JSON'),
+          content: SizedBox(
+            width: 480,
+            child: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 8,
+              decoration: const InputDecoration(
+                hintText: 'Paste your exported .notiflow JSON',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('Restore'),
+            ),
+          ],
         ),
-        (route) => false,
       );
-    } else {
-      Navigator.pop(context);
+    } finally {
+      controller.dispose();
+    }
+
+    if (content != null && content.trim().isNotEmpty) {
+      await _processBackupContent(content);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildImportPage(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF09090B) : const Color(0xFFF9F9FB);
-    final cardBg = isDark ? const Color(0xFF18181B) : Colors.white;
-    final borderCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE2E2E4);
-    final textMain = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D);
-    final textMuted = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF47464B);
-    final amber = const Color(0xFFF59E0B);
+    final background =
+        isDark ? AppTheme.darkBackground : AppTheme.lightBackground;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted =
+        isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final onPrimary = isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnPrimary;
+    final isTablet = MediaQuery.sizeOf(context).width >= 600;
+    final border = isDark
+        ? AppTheme.darkOutlineVariant.withValues(alpha: 0.45)
+        : AppTheme.lightPrimaryContainer.withValues(alpha: 0.45);
+    final stepColor = isDark
+        ? AppTheme.darkSecondaryContainer
+        : const Color(0xFFFAEDCD);
+    final stepTextColor = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : const Color(0xFF9C5B28);
 
     return Scaffold(
-      backgroundColor: bg,
-      appBar: StitchHeader(
-        title: widget.isFromOnboarding ? 'Setup Rules' : 'Import Rules',
-      ),
+      backgroundColor: background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Step Pill
-              if (widget.isFromOnboarding)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: borderCol),
-                  ),
-                  child: Text(
-                    'STEP 3 OF 3 · RULES IMPORT',
-                    style: GoogleFonts.jetBrainsMono(
-                      color: amber,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 12),
-
-              // Title & Subtitle
-              Text(
-                'Import Rules',
-                style: GoogleFonts.inter(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: textMain,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Restore rules from an exported backup or start fresh with defaults.',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: textMuted,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Status message banner if any
-              if (_statusMessage != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _isSuccessMessage
-                        ? (isDark ? const Color(0xFF052E16) : const Color(0xFFDCFCE7))
-                        : (isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2)),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _isSuccessMessage
-                          ? const Color(0xFF22C55E)
-                          : const Color(0xFFEF4444),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _isSuccessMessage ? Icons.check_circle_rounded : Icons.error_outline_rounded,
-                        color: _isSuccessMessage
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFFEF4444),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _statusMessage!,
-                          style: GoogleFonts.inter(
-                            color: _isSuccessMessage
-                                ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534))
-                                : (isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B)),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // Card: Import .notiflow Backup File
-              Container(
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderCol),
-                ),
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: isTablet ? 28 : 20),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(top: isTablet ? 28 : 24),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(10),
+                        Text(
+                          'Notiflow',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
                           ),
-                          child: Icon(Icons.file_upload_outlined, color: amber, size: 20),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: stepColor,
+                            borderRadius: BorderRadius.circular(999),
+                            border: isDark
+                                ? Border.all(
+                                    color: AppTheme.darkSecondary
+                                        .withValues(alpha: 0.22),
+                                  )
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                'Import .notiflow Backup File',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: textMain,
+                              if (isTablet) ...[
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? AppTheme.darkSecondary
+                                        : AppTheme.lightSecondary,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
+                                const SizedBox(width: 7),
+                              ],
                               Text(
-                                'Select an exported .notiflow backup file from your device storage to restore rules.',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: textMuted,
-                                  height: 1.3,
+                                isTablet
+                                    ? 'STEP 3 OF 3 · RULES IMPORT'
+                                    : 'STEP 3 OF 3',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.55,
+                                  color: stepTextColor,
                                 ),
                               ),
                             ],
@@ -727,259 +247,667 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _isProcessing ? null : _handlePickFromDevice,
-                        icon: const Icon(Icons.folder_open_rounded, size: 18),
-                        label: Text(
-                          'Select .notiflow File',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: amber,
-                          foregroundColor: const Color(0xFF09090B),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _isProcessing ? null : _handleChooseFile,
-                        icon: const Icon(Icons.data_object_rounded, size: 18),
-                        label: Text(
-                          'Or Paste Backup JSON',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: isDark ? const Color(0xFFFAFAFA) : const Color(0xFF1A1C1D),
-                          side: BorderSide(color: borderCol),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 28),
-
-              // Divider with Presets Label
-              Row(
-                children: [
-                  Expanded(child: Divider(color: borderCol)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'OR START WITH CURATED PRESETS',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: textMuted,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
                   ),
-                  Expanded(child: Divider(color: borderCol)),
-                ],
-              ),
-
-              const SizedBox(height: 18),
-
-              // Curated Presets Cards
-              ..._presets.map((preset) {
-                final isSelected = _selectedPresetId == preset.id;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedPresetId = preset.id;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isSelected ? amber : borderCol,
-                        width: isSelected ? 1.8 : 1,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(
+                        top: isTablet ? 42 : 46,
+                        bottom: 18,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: amber.withValues(alpha: 0.12),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              )
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? (isDark ? const Color(0xFF272014) : const Color(0xFFFEF3C7))
-                                    : (isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0)),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Icon(
-                                preset.icon,
-                                color: isSelected ? amber : textMuted,
-                                size: 20,
-                              ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Import Rules',
+                            style: GoogleFonts.newsreader(
+                              fontSize: isTablet ? 38 : 32,
+                              height: 1.2,
+                              color: textMain,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Restore rules from an exported backup or start fresh with defaults.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: isTablet ? 17 : 15.5,
+                              height: 1.55,
+                              color: textMuted,
+                            ),
+                          ),
+                          SizedBox(height: isTablet ? 42 : 34),
+                          _buildImportCard(
+                            isTablet: isTablet,
+                            isDark: isDark,
+                            textMain: textMain,
+                            textMuted: textMuted,
+                            primary: primary,
+                            onPrimary: onPrimary,
+                            border: border,
+                          ),
+                          if (_statusMessage != null) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: _isSuccessMessage
+                                    ? (isDark
+                                        ? const Color(0xFF173124)
+                                        : const Color(0xFFE7F2E4))
+                                    : (isDark
+                                        ? const Color(0xFF3A211F)
+                                        : const Color(0xFFFCE9E6)),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _isSuccessMessage
+                                      ? AppTheme.signalSuccess
+                                      : AppTheme.signalError,
+                                ),
+                              ),
                               child: Text(
-                                preset.title,
-                                style: GoogleFonts.inter(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w700,
+                                _statusMessage!,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
                                   color: textMain,
                                 ),
                               ),
                             ),
-                            Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isSelected ? amber : Colors.transparent,
-                                border: Border.all(
-                                  color: isSelected ? amber : textMuted,
-                                  width: 2,
-                                ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (isTablet) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        'You can always configure filters, apps, and silent alerts later in Settings.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          color: textMuted,
+                        ),
+                      ),
+                    ),
+                  ],
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: 8,
+                      bottom: isTablet ? 24 : 18,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: _isProcessing ? null : _finishFlow,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDark
+                              ? AppTheme.darkPrimaryContainer
+                              : AppTheme.lightPrimaryContainer,
+                          foregroundColor: isDark
+                              ? AppTheme.darkOnPrimary
+                              : AppTheme.lightOnPrimaryContainer,
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Done',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
                               ),
-                              child: isSelected
-                                  ? const Icon(
-                                      Icons.check,
-                                      size: 14,
-                                      color: Color(0xFF09090B),
-                                    )
-                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            Icon(
+                              isTablet
+                                  ? Icons.arrow_forward_rounded
+                                  : Icons.check_rounded,
+                              size: 21,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          preset.description,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: textMuted,
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: preset.badges.map((b) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF27272A) : const Color(0xFFEEEEF0),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                b,
-                                style: GoogleFonts.jetBrainsMono(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: isSelected ? amber : textMuted,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-
-              const SizedBox(height: 24),
-
-              // Bottom Actions
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isProcessing ? null : _handleApplyPreset,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: amber,
-                    foregroundColor: const Color(0xFF09090B),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Apply Preset & Finish',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward_rounded, size: 18),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: _finishFlow,
-                  child: Text(
-                    widget.isFromOnboarding ? 'Set Up Rules Later' : 'Cancel',
-                    style: GoogleFonts.inter(
-                      color: textMuted,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImportCard({
+    required bool isTablet,
+    required bool isDark,
+    required Color textMain,
+    required Color textMuted,
+    required Color primary,
+    required Color onPrimary,
+    required Color border,
+  }) {
+    final card = Container(
+      height: isTablet ? null : 300,
+      padding: EdgeInsets.symmetric(
+        horizontal: isTablet ? 32 : 24,
+        vertical: isTablet ? 32 : 24,
+      ),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppTheme.darkSurfaceContainerLow
+            : AppTheme.lightSurfaceContainerLow,
+        borderRadius: BorderRadius.circular(isTablet ? 20 : 24),
+        border: Border.all(color: border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.035),
+            blurRadius: isDark ? 28 : 32,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: primary.withValues(alpha: isDark ? 0.06 : 0.08),
+            blurRadius: 28,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: isTablet ? 88 : 80,
+            height: isTablet ? 88 : 80,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppTheme.darkPrimary.withValues(alpha: 0.16)
+                  : const Color(0xFFFFF3DF),
+              borderRadius:
+                  BorderRadius.circular(isTablet ? 44 : 20),
+              border: Border.all(
+                color: primary.withValues(alpha: isDark ? 0.36 : 0.6),
+              ),
+            ),
+            child: Icon(
+              Icons.cloud_upload_rounded,
+              color: primary,
+              size: isTablet ? 42 : 38,
+            ),
+          ),
+          SizedBox(height: isTablet ? 22 : 28),
+          Text(
+            'Import .notiflow Backup File',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: isTablet ? 20 : 19,
+              fontWeight: FontWeight.w700,
+              color: textMain,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            isTablet
+                ? 'Select an exported .notiflow backup file from your device storage to restore rules.'
+                : 'Tap to browse device storage or restore your exported focus rules',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              height: 1.55,
+              color: textMuted,
+            ),
+          ),
+          if (isTablet) ...[
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isProcessing ? null : _handlePickFromDevice,
+                    icon: const Icon(Icons.folder_open_rounded),
+                    label: const Text('Select .notiflow File'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed:
+                        _isProcessing ? null : _handlePasteBackupJson,
+                    icon: Icon(
+                      Icons.data_object_rounded,
+                      color: isDark
+                          ? AppTheme.darkSecondary
+                          : AppTheme.lightSecondary,
+                    ),
+                    label: const Text('Or Paste Backup JSON'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: textMain,
+                      side: BorderSide(color: border),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (_isProcessing) ...[
+            const SizedBox(height: 16),
+            const CircularProgressIndicator(),
+          ],
+        ],
+      ),
+    );
+
+    if (isTablet) return card;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _isProcessing ? null : _handlePickFromDevice,
+        borderRadius: BorderRadius.circular(24),
+        child: card,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => _buildImportPage(context);
+}
+
+/// Settings import: opens the system file picker and restores the chosen
+/// .notiflow backup directly. Returns true when the backup was restored.
+Future<bool> restoreBackupFromFile(
+  BuildContext context,
+  ScheduleRepository repository,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  void toast(String message, {required bool success}) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: TextStyle(
+              color: success ? AppTheme.toastOnSuccess : Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: success ? AppTheme.toastSuccess : AppTheme.toastError,
+        ),
+      );
+  }
+
+  final navigator = Navigator.of(context, rootNavigator: true);
+  var progressVisible = false;
+  void showProgress() {
+    if (progressVisible || !context.mounted) return;
+    progressVisible = true;
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const _ImportProgressDialog(),
+    );
+  }
+
+  void hideProgress() {
+    if (!progressVisible) return;
+    progressVisible = false;
+    navigator.pop();
+  }
+
+  try {
+    // Shown before the picker so it is already visible while the chosen
+    // file is read once the picker closes.
+    showProgress();
+    final rawContent = await repository.pickBackupRawContent();
+    if (rawContent == null || !context.mounted) return false;
+    if (rawContent.trim().isEmpty) {
+      hideProgress();
+      toast('Selected backup file is empty.', success: false);
+      return false;
+    }
+
+    final uninstalled =
+        await repository.detectUninstalledAppsInBackup(rawContent);
+    var excludeUninstalled = false;
+    if (uninstalled.isNotEmpty) {
+      hideProgress();
+      if (!context.mounted) return false;
+      final choice =
+          await showUninstalledBackupChoiceSheet(context, uninstalled);
+      if (choice == null) return false;
+      excludeUninstalled = choice == 'exclude';
+      showProgress();
+    }
+
+    final success = await repository.importRulesJson(
+      rawContent,
+      replaceAll: true,
+      vaultUninstalled: !excludeUninstalled,
+      excludeUninstalled: excludeUninstalled,
+    );
+    hideProgress();
+    toast(
+      success
+          ? 'Backup file restored successfully!'
+          : 'Invalid .notiflow backup file.',
+      success: success,
+    );
+    return success;
+  } finally {
+    hideProgress();
+  }
+}
+
+class _ImportProgressDialog extends StatelessWidget {
+  const _ImportProgressDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? AppTheme.darkSurfaceContainerLow
+        : AppTheme.lightSurfaceContainerLow;
+    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+    final textMuted =
+        isDark ? AppTheme.darkOnSurfaceVariant : AppTheme.lightOnSurfaceVariant;
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        backgroundColor: bg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3, color: primary),
               ),
-
-              const SizedBox(height: 20),
-
-              // Bottom trust indicator
-              Center(
-                child: Row(
+              const SizedBox(width: 18),
+              Flexible(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.shield_outlined, size: 13, color: textMuted),
-                    const SizedBox(width: 6),
                     Text(
-                      '100% ON-DEVICE · ZERO TELEMETRY',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
+                      'Importing backup…',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: textMain,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Restoring your apps and rules. Please wait.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12.5,
                         color: textMuted,
-                        letterSpacing: 0.8,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+Future<String?> showUninstalledBackupChoiceSheet(
+  BuildContext context,
+  List<ManagedApp> uninstalled,
+) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final bg = isDark
+      ? AppTheme.darkSurfaceContainerLow
+      : AppTheme.lightSurfaceContainerLow;
+  final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
+  final textMuted = isDark
+      ? AppTheme.darkOnSurfaceVariant
+      : AppTheme.lightOnSurfaceVariant;
+  final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+  final secContainer = isDark
+      ? AppTheme.darkSecondaryContainer
+      : AppTheme.lightSecondaryContainer;
+  final onSecContainer = isDark
+      ? AppTheme.darkOnSecondaryContainer
+      : AppTheme.lightOnSecondaryContainer;
+  final borderCol = isDark
+      ? AppTheme.darkOutlineVariant.withOpacity(0.3)
+      : AppTheme.lightOutlineVariant.withOpacity(0.35);
+
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: borderCol),
+      ),
+      padding: const EdgeInsets.fromLTRB(22, 16, 22, 30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppTheme.darkSurfaceContainerHigh
+                    : AppTheme.lightSurfaceContainerHigh,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.apps_outage_rounded,
+                    color: primary, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Uninstalled Apps (${uninstalled.length})',
+                      style: GoogleFonts.newsreader(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: textMain,
+                      ),
+                    ),
+                    Text(
+                      'Detected in backup, but not installed on this device',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        color: textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: (isDark
+                      ? AppTheme.darkSurfaceContainer
+                      : AppTheme.lightSurfaceContainer)
+                  .withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderCol),
+            ),
+            child: Text(
+              'Apps: ${uninstalled.map((a) => a.displayName).take(5).join(', ')}${uninstalled.length > 5 ? ' ...and ${uninstalled.length - 5} more' : ''}',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: textMain,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Option 1: Keep in Vault (Recommended)
+          InkWell(
+            onTap: () => Navigator.pop(ctx, 'vault'),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: secContainer.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: (isDark
+                            ? AppTheme.darkSecondary
+                            : AppTheme.lightSecondary)
+                        .withOpacity(0.4)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.inventory_2_outlined,
+                      color: onSecContainer, size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Keep in Vault',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: textMain,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: secContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'RECOMMENDED',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: onSecContainer,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Keep rules in local database. Hidden from Rules page now, and auto-applied when you install the app.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            color: textMuted,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: onSecContainer),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Option 2: Exclude Apps
+          InkWell(
+            onTap: () => Navigator.pop(ctx, 'exclude'),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? AppTheme.darkSurfaceContainer
+                    : AppTheme.lightSurfaceContainer,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: borderCol),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.remove_circle_outline_rounded,
+                      color: textMuted, size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Exclude These Apps',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Discard rules for uninstalled apps and only import rules for apps installed on this device.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            color: textMuted,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: textMuted),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

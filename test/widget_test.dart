@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
@@ -6,6 +6,7 @@ import 'package:notification_handler/domain/models/managed_app.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
 import 'package:notification_handler/domain/models/temporary_override.dart';
 import 'package:notification_handler/main.dart';
+import 'package:notification_handler/presentation/screens/onboarding_screen.dart';
 import 'package:notification_handler/platform/notification_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,21 +46,22 @@ class MockPlatformService implements NotificationPlatformInterface {
 }
 
 void main() {
-  testWidgets('NotificationHandlerApp launches to splash screen', (WidgetTester tester) async {
+  testWidgets('NotificationHandlerApp opens the start screen with no splash', (WidgetTester tester) async {
     GoogleFonts.config.allowRuntimeFetching = false;
-    SharedPreferences.setMockInitialValues({'pref_onboarding_completed': true});
+    SharedPreferences.setMockInitialValues({});
 
-    final mockPlatform = MockPlatformService();
-    final repository = ScheduleRepository(platformService: mockPlatform);
+    final repository = ScheduleRepository(platformService: MockPlatformService());
+    final prefs = await SharedPreferences.getInstance();
+    final home = await resolveStartScreen(repository, prefs);
+    expect(home, isA<OnboardingScreen>());
 
-    await tester.pumpWidget(NotificationHandlerApp(repository: repository));
+    await tester.pumpWidget(NotificationHandlerApp(repository: repository, home: home));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Notiflow'), findsOneWidget);
+    expect(find.byType(OnboardingScreen), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
   });
 }
