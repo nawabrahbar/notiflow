@@ -1,6 +1,11 @@
+import 'dart:typed_data';
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
+import 'package:notification_handler/domain/models/bulk_apply.dart';
 import 'package:notification_handler/domain/models/managed_app.dart';
+import 'package:notification_handler/domain/models/rule_template.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
 import 'package:notification_handler/domain/models/temporary_override.dart';
 import 'package:notification_handler/platform/notification_platform_interface.dart';
@@ -23,8 +28,23 @@ class MockPlatformService implements NotificationPlatformInterface {
   @override
   Future<void> openAppDetailsSettings() async {}
 
+  List<DiscoveredAppInfo> installedApps = [];
+
   @override
-  Future<List<DiscoveredAppInfo>> getInstalledApplications() async => [];
+  Future<List<DiscoveredAppInfo>> getInstalledApplications() async =>
+      installedApps;
+
+  @override
+  Future<List<DiscoveredAppInfo>> getInstalledAppsLite() async => [];
+
+  @override
+  Future<Map<String, Uint8List>> getAppIcons(List<String> packageNames) async => {};
+
+  @override
+  Future<Map<String, bool>> getInstalledStatus(List<String> packageNames) async => {};
+
+  @override
+  Future<PackageChanges?> getChangedPackages(int sequenceNumber) async => null;
 
   bool lastUnmanagedAppsUntouched = true;
   bool lastVipEmergencyBypass = true;
@@ -315,5 +335,236 @@ void main() {
     }
     ''';
     expect(await repository.importRulesJson(badDaysJson), false);
+  });
+
+  group('importRulesWithReport', () {
+    String backup() {
+      ManagedApp app(String id) => ManagedApp(
+            id: id,
+            packageName: 'com.$id',
+            displayName: id.toUpperCase(),
+            enabled: true,
+            createdAt: DateTime(2026),
+            updatedAt: DateTime(2026),
+          );
+      Map<String, dynamic> rule(String id, String appId) => {
+            'id': id,
+            'appId': appId,
+            'mode': 'blockDuring',
+            'startTime': {'hour': 9, 'minute': 0},
+            'endTime': {'hour': 17, 'minute': 0},
+            'daysOfWeek': [1, 2, 3],
+            'createdAt': '2026-10-05T10:00:00.000',
+            'updatedAt': '2026-10-05T10:00:00.000',
+          };
+      return jsonEncode({
+        'managedApps': [app('a').toJson(), app('b').toJson()],
+        'schedules': [rule('r1', 'a'), rule('r2', 'a'), rule('r3', 'b')],
+        'ruleTemplates': [RuleTemplate.defaultWorkFocus.toJson()],
+      });
+    }
+
+    setUp(() {
+      mockPlatform.installedApps = [
+        DiscoveredAppInfo(packageName: 'com.a', displayName: 'A'),
+      ];
+    });
+
+    test('lists installed apps as imported and vaulted apps as waiting', () async {
+      final report = await repository.importRulesWithReport(backup());
+      expect(report!.imported.map((a) => a.app.id), ['a']);
+      expect(report.imported.single.ruleCount, 2);
+      expect(report.waiting.map((a) => a.app.id), ['b']);
+      expect(report.waiting.single.ruleCount, 1);
+      expect(report.skipped, isEmpty);
+      expect(report.savedRules, [RuleTemplate.defaultWorkFocus.name]);
+    });
+
+    test('lists excluded apps as skipped', () async {
+      final report = await repository.importRulesWithReport(
+        backup(),
+        vaultUninstalled: false,
+        excludeUninstalled: true,
+      );
+      expect(report!.imported.map((a) => a.app.id), ['a']);
+      expect(report.waiting, isEmpty);
+      expect(report.skipped.map((a) => a.app.id), ['b']);
+      expect(repository.managedApps.map((a) => a.id), ['a']);
+    });
+
+    test('returns null for an invalid backup', () async {
+      expect(await repository.importRulesWithReport('not json'), isNull);
+    });
+  });
+
+  test('Legacy "Work Focus Hours" default is renamed; a custom default name is kept', () async {
+    final legacy = RuleTemplate.defaultWorkFocus.copyWith(name: 'Work Focus Hours');
+    SharedPreferences.setMockInitialValues({
+      'pref_rule_templates': jsonEncode([legacy.toJson()]),
+    });
+    final migrated = ScheduleRepository(platformService: mockPlatform);
+    await migrated.initialize();
+    expect(migrated.ruleTemplates.single.name, 'Focus Hours');
+
+    final custom = RuleTemplate.defaultWorkFocus.copyWith(name: 'Office');
+    SharedPreferences.setMockInitialValues({
+      'pref_rule_templates': jsonEncode([custom.toJson()]),
+    });
+    final kept = ScheduleRepository(platformService: mockPlatform);
+    await kept.initialize();
+    expect(kept.ruleTemplates.single.name, 'Office');
+  });
+
+  test('updateRuleTemplate edits a saved rule but never the default', () async {
+    final now = DateTime.now();
+    final template = RuleTemplate(
+      id: 'template_custom',
+      name: 'Night',
+      mode: ScheduleMode.blockDuring,
+      startTime: const TimeOfDayValue(hour: 22, minute: 0),
+      endTime: const TimeOfDayValue(hour: 6, minute: 0),
+      daysOfWeek: const {1, 2, 3},
+      createdAt: now,
+    );
+    await repository.saveRuleTemplate(template);
+
+    final edited = template.copyWith(
+      name: '  Late Night  ',
+      mode: ScheduleMode.allowDuring,
+      startTime: const TimeOfDayValue(hour: 23, minute: 30),
+      daysOfWeek: const {6, 7},
+      allowVipContacts: false,
+    );
+    expect(await repository.updateRuleTemplate(edited), isTrue);
+    final saved = repository.ruleTemplates.firstWhere((t) => t.id == template.id);
+    expect(saved.name, 'Late Night');
+    expect(saved.mode, ScheduleMode.allowDuring);
+    expect(saved.startTime.hour, 23);
+    expect(saved.startTime.minute, 30);
+    expect(saved.daysOfWeek, {6, 7});
+    expect(saved.allowVipContacts, isFalse);
+
+    expect(await repository.updateRuleTemplate(edited.copyWith(name: '  ')), isFalse);
+    expect(
+      await repository.updateRuleTemplate(
+        RuleTemplate.defaultWorkFocus.copyWith(daysOfWeek: const {7}),
+      ),
+      isFalse,
+    );
+    expect(repository.ruleTemplates.first.daysOfWeek, {1, 2, 3, 4, 5});
+
+    final asDefault = edited.copyWith(
+      mode: RuleTemplate.defaultWorkFocus.mode,
+      startTime: RuleTemplate.defaultWorkFocus.startTime,
+      endTime: RuleTemplate.defaultWorkFocus.endTime,
+      daysOfWeek: RuleTemplate.defaultWorkFocus.daysOfWeek,
+    );
+    expect(repository.findDuplicateTemplate(asDefault)?.id, RuleTemplate.defaultWorkFocus.id);
+    expect(repository.findDuplicateTemplate(saved), isNull);
+  });
+
+  group('bulk apply', () {
+    final night = RuleTemplate(
+      id: 'tpl_night',
+      name: 'Night',
+      mode: ScheduleMode.blockDuring,
+      startTime: const TimeOfDayValue(hour: 22, minute: 0),
+      endTime: const TimeOfDayValue(hour: 7, minute: 0),
+      daysOfWeek: {1, 2, 3, 4, 5, 6, 7},
+      allowVipContacts: false,
+      createdAt: DateTime(2026),
+    );
+    final focus = RuleTemplate.defaultWorkFocus;
+    const slack = BulkApplyTarget(packageName: 'com.slack', displayName: 'Slack');
+    const mail = BulkApplyTarget(packageName: 'com.mail', displayName: 'Mail');
+
+    setUp(() async {
+      await repository.addApp(ManagedApp(
+        id: 'app_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
+      await repository.saveRule(
+        ScheduleRule(
+          id: 'existing',
+          appId: 'app_slack',
+          mode: focus.mode,
+          startTime: focus.startTime,
+          endTime: focus.endTime,
+          daysOfWeek: focus.daysOfWeek,
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        ),
+        autoSaveTemplate: false,
+      );
+    });
+
+    test('preview and apply skip duplicates and add unmanaged apps', () async {
+      final preview =
+          repository.previewBulkApply([focus, night], ['com.slack', 'com.mail']);
+      expect(preview.toAdd, 3);
+      expect(preview.skipped, 1);
+
+      final result = await repository.applyTemplatesToApps(
+        templates: [focus, night],
+        targets: [slack, mail],
+      );
+      expect(result.addedCount, 3);
+      expect(result.skippedCount, 1);
+
+      final slackResult = result.apps.firstWhere((a) => a.app.id == 'app_slack');
+      expect(slackResult.appAdded, isFalse);
+      expect(slackResult.skipped.single.id, focus.id);
+      expect(slackResult.addedRules.single.name, 'Night');
+      expect(slackResult.addedRules.single.allowVipContacts, isFalse);
+
+      final mailApp = repository.managedApps.firstWhere((a) => a.packageName == 'com.mail');
+      expect(repository.getRulesForApp(mailApp.id).length, 2);
+      expect(repository.getRulesForApp('app_slack').length, 2);
+
+      final again = await repository.applyTemplatesToApps(
+        templates: [focus, night],
+        targets: [slack, mail],
+      );
+      expect(again.addedCount, 0);
+      expect(again.skippedCount, 4);
+    });
+
+    test('undo removes only batch rules and only apps the batch added', () async {
+      final result = await repository.applyTemplatesToApps(
+        templates: [night],
+        targets: [slack, mail],
+      );
+      final added = {for (final a in result.apps) if (a.appAdded) a.app.id};
+      final ids = [for (final a in result.apps) ...a.addedRules.map((r) => r.id)];
+
+      await repository.removeBulkAppliedRules(ids, addedAppIds: added);
+
+      expect(repository.schedules.map((r) => r.id), ['existing']);
+      expect(repository.managedApps.map((a) => a.packageName), ['com.slack']);
+    });
+
+    test('pre-existing app stays when its last rule is undone', () async {
+      await repository.deleteRule('existing');
+      await repository.addApp(ManagedApp(
+        id: 'app_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
+      final result = await repository.applyTemplatesToApps(
+        templates: [night],
+        targets: [slack],
+      );
+      expect(result.apps.single.appAdded, isFalse);
+      await repository.removeBulkAppliedRules(
+        result.apps.single.addedRules.map((r) => r.id),
+      );
+      expect(repository.managedApps.single.id, 'app_slack');
+      expect(repository.schedules, isEmpty);
+    });
   });
 }

@@ -120,7 +120,12 @@
       Notiflow uses Android's standard <code>&lt;queries&gt;</code> launcher intent filter (<code>CATEGORY_LAUNCHER</code>)—without requesting the broad <code>QUERY_ALL_PACKAGES</code> permission—solely on-device to list your installed launcher applications (app name, package name, and icon) so you can select which apps to schedule or mute. Your installed app list is never transmitted off your device.
     </p>
 
-    <h3>C. User-Initiated Backup Export &amp; Import (Storage Access Framework)</h3>
+    <h3>C. Notifications (<code>POST_NOTIFICATIONS</code>) and Restart (<code>RECEIVE_BOOT_COMPLETED</code>)</h3>
+    <p>
+      When a schedule ends, Notiflow returns the notifications it held back and posts one &ldquo;quiet hours ended&rdquo; summary. It contains app names and counts only&mdash;no sender names or message text&mdash;and the lock-screen version shows only the total. Android 13+ asks you to allow this, and you can turn it off in <strong>Settings &rarr; Catch-up Digest</strong>. The restart permission only re-schedules a pending summary after the phone restarts.
+    </p>
+
+    <h3>D. User-Initiated Backup Export &amp; Import (Storage Access Framework)</h3>
     <p>
       When you export or import a <code>.notiflow</code> backup file, Notiflow uses Android's built-in system file picker (<code>ACTION_CREATE_DOCUMENT</code> / <code>ACTION_OPEN_DOCUMENT</code>) to read or write only the specific backup file you select.
     </p>

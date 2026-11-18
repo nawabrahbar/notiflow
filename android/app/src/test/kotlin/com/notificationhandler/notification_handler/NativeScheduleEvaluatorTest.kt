@@ -1,5 +1,6 @@
 package com.notificationhandler.notification_handler
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -363,5 +364,49 @@ class NativeScheduleEvaluatorTest {
         val secondCall = evaluator.evaluateNotification("com.slack", callTime2, category = "call", title = "Alice")
         assertTrue(firstCall.shouldBlock)
         assertTrue("Second call within 3 mins must still be blocked when global vipEmergencyBypass is false", secondCall.shouldBlock)
+    }
+
+    private fun globalMutePayload(bypass: Boolean) = """
+        {
+            "managedApps": [],
+            "schedules": [],
+            "overrides": [
+                {
+                    "id": "ov_global",
+                    "appId": "global_mute",
+                    "mode": "block",
+                    "startDateTime": "2026-01-01T00:00:00Z",
+                    "endDateTime": "2030-01-01T00:00:00Z"
+                }
+            ],
+            "vipEmergencyBypass": $bypass
+        }
+    """.trimIndent()
+
+    @Test
+    fun testRepeatCallerRingsThroughDuringGlobalMute() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload(globalMutePayload(bypass = true))
+        val t1 = java.time.Instant.parse("2026-06-01T12:00:00Z").toEpochMilli()
+
+        val first = evaluator.evaluateNotification("com.google.android.dialer", t1, category = "call", title = "Mom")
+        val second = evaluator.evaluateNotification("com.google.android.dialer", t1 + 90_000L, category = "call", title = "Mom")
+        val chat = evaluator.evaluateNotification("com.whatsapp", t1 + 100_000L, category = "msg", title = "Mom")
+
+        assertTrue("First call is silenced by Quick Mute", first.shouldBlock)
+        assertFalse("Second call within 3 mins must ring through", second.shouldBlock)
+        assertEquals("Urgent Call Bypass", second.ruleName)
+        assertTrue("Non-call notifications stay muted", chat.shouldBlock)
+    }
+
+    @Test
+    fun testRepeatCallerStaysMutedDuringGlobalMuteWhenBypassOff() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload(globalMutePayload(bypass = false))
+        val t1 = java.time.Instant.parse("2026-06-01T12:00:00Z").toEpochMilli()
+
+        evaluator.evaluateNotification("com.google.android.dialer", t1, category = "call", title = "Mom")
+        val second = evaluator.evaluateNotification("com.google.android.dialer", t1 + 90_000L, category = "call", title = "Mom")
+        assertTrue(second.shouldBlock)
     }
 }

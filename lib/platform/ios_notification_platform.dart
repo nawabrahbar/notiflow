@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import '../domain/models/managed_app.dart';
 import '../domain/models/schedule_rule.dart';
 import '../domain/models/temporary_override.dart';
@@ -27,6 +28,20 @@ class IosNotificationPlatform implements NotificationPlatformInterface {
 
   @override
   Future<List<DiscoveredAppInfo>> getInstalledApplications() async => [];
+
+  @override
+  Future<List<DiscoveredAppInfo>> getInstalledAppsLite() async => [];
+
+  @override
+  Future<Map<String, Uint8List>> getAppIcons(List<String> packageNames) async =>
+      {};
+
+  @override
+  Future<Map<String, bool>> getInstalledStatus(List<String> packageNames) async =>
+      {};
+
+  @override
+  Future<PackageChanges?> getChangedPackages(int sequenceNumber) async => null;
 
   @override
   Future<void> syncSchedules({

@@ -1,8 +1,12 @@
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
+import '../../data/services/installed_apps_cache.dart';
+import '../../domain/engine/app_category.dart';
 import '../../platform/notification_platform_interface.dart';
-import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import 'app_details_screen.dart';
@@ -22,25 +26,100 @@ class AddAppsScreen extends StatefulWidget {
     this.isEmbedded = false,
   });
 
+  @visibleForTesting
+  static void clearInstalledAppsCache() =>
+      InstalledAppsCache.instance.resetForTest();
+
   @override
   State<AddAppsScreen> createState() => _AddAppsScreenState();
 }
 
 class _AddAppsScreenState extends State<AddAppsScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  late final NotificationPlatformInterface _platform;
+  // Space kept free at the end of the list so the last app can scroll
+  // fully above the floating search bar.
+  static const double _searchBarReserve = 72;
 
-  List<DiscoveredAppInfo> _installedApps = [];
-  bool _isLoading = true;
+  // Fast scrolls (pixels per frame) skip icon fetching for rows flying past.
+  static const double _flingDelta = 60;
+
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final InstalledAppsCache _cache = InstalledAppsCache.instance;
   String _selectedCategory = 'all';
+
+  // Icon batching: icons are requested for [_iconStart, _iconEnd) of the
+  // filtered list, about two screens at a time. See docs/installed-apps-cache.md.
+  List<DiscoveredAppInfo> _shownApps = const [];
+  String _shownKey = '';
+  int _iconStart = 0;
+  int _iconEnd = 0;
+  double _viewportHeight = 0;
+  bool _tabletLayout = false;
 
   @override
   void initState() {
     super.initState();
-    _platform = PlatformFactory.createPlatformService();
-    _loadInstalledApps();
+    _cache.addListener(_onCacheChanged);
+    _cache.ensureLoaded();
     _searchController.addListener(() => setState(() {}));
     widget.repository.addListener(_onRepositoryChanged);
+  }
+
+  void _onCacheChanged() {
+    if (mounted) setState(() {});
+  }
+
+  double get _rowExtent => _tabletLayout ? 92 : 80;
+  int get _columns => _tabletLayout ? 2 : 1;
+  int get _perScreen =>
+      math.max(1, (_viewportHeight / _rowExtent).ceil()) * _columns;
+
+  void _requestIcons(int from, int to) {
+    final apps = _shownApps;
+    if (apps.isEmpty) return;
+    final start = from.clamp(0, apps.length);
+    final end = to.clamp(start, apps.length);
+    if (start >= end) return;
+    _iconStart = start;
+    _iconEnd = end;
+    _cache.loadIcons(apps.sublist(start, end).map((a) => a.packageName));
+  }
+
+  (int, int) _visibleRange(ScrollMetrics m) {
+    final first = (m.pixels / _rowExtent).floor() * _columns;
+    final last =
+        ((m.pixels + m.viewportDimension) / _rowExtent).ceil() * _columns;
+    return (math.max(0, first), last);
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    final (first, last) = _visibleRange(n.metrics);
+    if (n is ScrollUpdateNotification) {
+      if ((n.scrollDelta ?? 0).abs() > _flingDelta) return false;
+      if (last > (_iconStart + _iconEnd) / 2 || first < _iconStart) {
+        _requestIcons(first, last + 2 * _perScreen);
+      }
+    } else if (n is ScrollEndNotification) {
+      _requestIcons(first, last + _perScreen);
+    }
+    return false;
+  }
+
+  /// Search, category or list changes restart batching from what is on screen.
+  void _syncShownApps(List<DiscoveredAppInfo> apps, String key) {
+    _shownApps = apps;
+    if (key == _shownKey) return;
+    _shownKey = key;
+    _iconStart = 0;
+    _iconEnd = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || key != _shownKey) return;
+      final offset =
+          _scrollController.hasClients ? _scrollController.offset : 0.0;
+      final first = (offset / _rowExtent).floor() * _columns;
+      _requestIcons(first, first + 2 * _perScreen);
+    });
   }
 
   @override
@@ -59,59 +138,12 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
   @override
   void dispose() {
     widget.repository.removeListener(_onRepositoryChanged);
+    _cache.removeListener(_onCacheChanged);
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadInstalledApps() async {
-    setState(() => _isLoading = true);
-    try {
-      final apps = await _platform.getInstalledApplications();
-      if (mounted) {
-        setState(() {
-          _installedApps = apps;
-          _isLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  String _getAppCategory(String name, String packageName) {
-    final combined = '${name.toLowerCase()} ${packageName.toLowerCase()}';
-    if (combined.contains('whatsapp') ||
-        combined.contains('telegram') ||
-        combined.contains('signal') ||
-        combined.contains('message') ||
-        combined.contains('chat') ||
-        combined.contains('sms')) {
-      return 'messaging';
-    }
-    if (combined.contains('insta') ||
-        combined.contains('facebook') ||
-        combined.contains('twitter') ||
-        combined.contains('x.com') ||
-        combined.contains('tiktok') ||
-        combined.contains('youtube') ||
-        combined.contains('snapchat') ||
-        combined.contains('reddit')) {
-      return 'social';
-    }
-    if (combined.contains('slack') ||
-        combined.contains('teams') ||
-        combined.contains('meet') ||
-        combined.contains('zoom') ||
-        combined.contains('jira') ||
-        combined.contains('notion') ||
-        combined.contains('trello') ||
-        combined.contains('gmail') ||
-        combined.contains('outlook') ||
-        combined.contains('mail')) {
-      return 'productivity';
-    }
-    return 'system';
-  }
 
   IconData _getDefaultIconForApp(String name) {
     final lower = name.toLowerCase();
@@ -176,17 +208,19 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
     final managedPackageNames =
         widget.repository.managedApps.map((a) => a.packageName).toSet();
 
-    final filteredApps = _installedApps.where((app) {
+    final filteredApps = _cache.apps.where((app) {
       final matchesQuery = query.isEmpty ||
           app.displayName.toLowerCase().contains(query) ||
           app.packageName.toLowerCase().contains(query);
 
-      final category = _getAppCategory(app.displayName, app.packageName);
+      final category = appCategoryFor(app);
       final matchesCategory =
           _selectedCategory == 'all' || category == _selectedCategory;
 
       return matchesQuery && matchesCategory;
     }).toList();
+    _syncShownApps(filteredApps,
+        '$query|$_selectedCategory|${filteredApps.length}|${_cache.apps.length}');
 
     return Scaffold(
       backgroundColor: bg,
@@ -208,52 +242,14 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                   ),
                   child: Column(
                     children: [
-                      // Search Bar & Filter Chips Controls
+                      // Filter Chips Controls
                       Column(
                         children: [
-                          // Search Box
-                          Container(
-                            decoration: BoxDecoration(
-                              color: containerLow,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: borderCol, width: 1.0),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: TextField(
-                              controller: _searchController,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 14,
-                                color: textMain,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Search applications...',
-                                hintStyle: GoogleFonts.plusJakartaSans(
-                                  color: textMuted,
-                                  fontSize: 14,
-                                ),
-                                prefixIcon: Icon(Icons.search_rounded,
-                                    color: textMuted, size: 20),
-                                prefixIconConstraints: const BoxConstraints(
-                                    minWidth: 32, minHeight: 32),
-                                suffixIcon: query.isNotEmpty
-                                    ? IconButton(
-                                        icon: Icon(Icons.close_rounded,
-                                            color: textMuted, size: 18),
-                                        onPressed: () =>
-                                            _searchController.clear(),
-                                      )
-                                    : null,
-                                border: InputBorder.none,
-                                contentPadding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-
                           // Category Filter Chips Row
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
+                            // Let chips scroll under the page padding up to the screen edges.
+                            clipBehavior: Clip.none,
                             child: Row(
                               children: [
                                 _buildCategoryChip('all', 'ALL APPS', isDark),
@@ -265,6 +261,8 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                 const SizedBox(width: 8),
                                 _buildCategoryChip(
                                     'productivity', 'PRODUCTIVITY', isDark),
+                                const SizedBox(width: 8),
+                                _buildCategoryChip('other', 'OTHER', isDark),
                                 const SizedBox(width: 8),
                                 _buildCategoryChip('system', 'SYSTEM', isDark),
                               ],
@@ -312,9 +310,36 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Applications List / Tablet 2-Column Responsive Grid
+                      // Applications list scrolls under a frosted search bar,
+                      // fading out at both edges like the launcher app drawer.
                       Expanded(
-                        child: _isLoading
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ShaderMask(
+                                blendMode: BlendMode.dstIn,
+                                shaderCallback: (bounds) {
+                                  final h = bounds.height <= 0 ? 1.0 : bounds.height;
+                                  double at(double px) =>
+                                      (px / h).clamp(0.0, 1.0).toDouble();
+                                  return LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: const [
+                                      Colors.transparent,
+                                      Colors.black,
+                                      Colors.black,
+                                      Colors.transparent,
+                                    ],
+                                    stops: [
+                                      0,
+                                      at(14),
+                                      at(h - _searchBarReserve - 8),
+                                      at(h - 12),
+                                    ],
+                                  ).createShader(bounds);
+                                },
+                                child: !_cache.isLoaded
                             ? Center(
                                 child: CircularProgressIndicator(color: primary),
                               )
@@ -337,10 +362,17 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                       ],
                                     ),
                                   )
-                                : isTablet
+                                : LayoutBuilder(
+                                    builder: (context, listConstraints) {
+                                    _viewportHeight = listConstraints.maxHeight;
+                                    _tabletLayout = isTablet;
+                                    return NotificationListener<ScrollNotification>(
+                                    onNotification: _onScroll,
+                                    child: isTablet
                                     ? GridView.builder(
+                                        controller: _scrollController,
                                         padding: const EdgeInsets.only(
-                                            top: 4, bottom: 24),
+                                            top: 4, bottom: _searchBarReserve),
                                         gridDelegate:
                                             const SliverGridDelegateWithFixedCrossAxisCount(
                                           crossAxisCount: 2,
@@ -371,8 +403,9 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                         },
                                       )
                                     : ListView.builder(
+                                        controller: _scrollController,
                                         padding: const EdgeInsets.only(
-                                            top: 4, bottom: 24),
+                                            top: 4, bottom: _searchBarReserve),
                                         itemCount: filteredApps.length,
                                         itemBuilder: (context, index) {
                                           return Padding(
@@ -399,6 +432,61 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                           );
                                         },
                                       ),
+                                    );
+                                    },
+                                  ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                                  child: Container(
+                        decoration: BoxDecoration(
+                          color: containerLow.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: borderCol, width: 1.0),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: TextField(
+                          controller: _searchController,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            color: textMain,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Search',
+                            hintStyle: GoogleFonts.plusJakartaSans(
+                              color: textMuted,
+                              fontSize: 14,
+                            ),
+                            prefixIcon: Icon(Icons.search_rounded,
+                                color: textMuted, size: 20),
+                            prefixIconConstraints: const BoxConstraints(
+                                minWidth: 32, minHeight: 32),
+                            suffixIcon: query.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(Icons.close_rounded,
+                                        color: textMuted, size: 18),
+                                    onPressed: () =>
+                                        _searchController.clear(),
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -468,6 +556,7 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
     required Color secContainer,
     required Color onSecContainer,
   }) {
+    final iconBytes = _cache.iconFor(app.packageName) ?? app.iconBytes;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -493,9 +582,9 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             clipBehavior: Clip.antiAlias,
-            child: app.iconBytes != null
+            child: iconBytes != null
                 ? Image.memory(
-                    app.iconBytes!,
+                    iconBytes,
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
@@ -526,7 +615,7 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _getAppCategory(app.displayName, app.packageName).toUpperCase(),
+                  appCategoryFor(app).toUpperCase(),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -614,10 +703,11 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                 ),
               ),
               onPressed: () async {
+                await _cache.loadIcons([app.packageName]);
                 final managedApp = await widget.repository.addAppFromPackage(
                   displayName: app.displayName,
                   packageName: app.packageName,
-                  iconBytes: app.iconBytes,
+                  iconBytes: _cache.iconFor(app.packageName) ?? app.iconBytes,
                 );
                 if (context.mounted) {
                   Navigator.of(context).push(

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/engine/schedule_evaluator.dart';
+import '../../domain/models/bulk_apply.dart';
+import '../../domain/models/import_report.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_decision.dart';
 import '../../domain/models/schedule_rule.dart';
@@ -102,11 +104,7 @@ class ScheduleRepository extends ChangeNotifier {
       }
     }
 
-    // Ensure the pre-seeded default template (Work Focus Hours 9am-5pm Mon-Fri) is always present
-    if (_ruleTemplates.isEmpty ||
-        !_ruleTemplates.any((t) => t.id == RuleTemplate.defaultWorkFocus.id)) {
-      _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
-    }
+    _ensureDefaultTemplate();
 
     final overridesJson = prefs.getString(_keyOverrides);
     if (overridesJson != null) {
@@ -312,14 +310,55 @@ class ScheduleRepository extends ChangeNotifier {
     return true;
   }
 
-  /// Renames a saved rule template. Blank names are ignored.
-  Future<void> renameRuleTemplate(String templateId, String newName) async {
-    final trimmed = newName.trim();
-    if (trimmed.isEmpty) return;
-    final index = _ruleTemplates.indexWhere((t) => t.id == templateId);
-    if (index == -1) return;
-    _ruleTemplates[index] = _ruleTemplates[index].copyWith(name: trimmed);
+  /// Keeps the pre-seeded default template present and renames the legacy
+  /// "Work Focus Hours" name to "Focus Hours" (custom names are kept).
+  void _ensureDefaultTemplate() {
+    final index =
+        _ruleTemplates.indexWhere((t) => t.id == RuleTemplate.defaultWorkFocus.id);
+    if (index == -1) {
+      _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
+    } else if (_ruleTemplates[index].name == _legacyDefaultTemplateName) {
+      _ruleTemplates[index] =
+          _ruleTemplates[index].copyWith(name: RuleTemplate.defaultWorkFocus.name);
+    }
+  }
+
+  static const String _legacyDefaultTemplateName = 'Work Focus Hours';
+
+  /// Returns another saved rule with the same mode, times and days as
+  /// [template], or null.
+  RuleTemplate? findDuplicateTemplate(RuleTemplate template) {
+    for (final t in _ruleTemplates) {
+      if (t.id == template.id) continue;
+      if (t.matchesConfiguration(
+        targetMode: template.mode,
+        targetStartTime: template.startTime,
+        targetEndTime: template.endTime,
+        targetDaysOfWeek: template.daysOfWeek,
+      )) {
+        return t;
+      }
+    }
+    return null;
+  }
+
+  /// Replaces a saved rule's name, mode, times, days and VIP setting.
+  /// The pre-seeded default cannot be edited; blank names and empty days are ignored.
+  /// Schedules already applied to apps are not changed.
+  Future<bool> updateRuleTemplate(RuleTemplate template) async {
+    if (template.id == RuleTemplate.defaultWorkFocus.id) return false;
+    final name = template.name.trim();
+    if (name.isEmpty || template.daysOfWeek.isEmpty) return false;
+    final index = _ruleTemplates.indexWhere((t) => t.id == template.id);
+    if (index == -1) return false;
+    final existing = _ruleTemplates[index];
+    _ruleTemplates[index] = template.copyWith(
+      name: name,
+      isPreSeeded: existing.isPreSeeded,
+      createdAt: existing.createdAt,
+    );
     await _persist();
+    return true;
   }
 
   /// Deletes a custom rule template by [templateId] (cannot delete pre-seeded default).
@@ -355,6 +394,122 @@ class ScheduleRepository extends ChangeNotifier {
     _schedules.removeWhere((r) => idSet.contains(r.appId));
     for (final id in idSet) {
       _overrides.remove(id);
+    }
+    await _persist();
+  }
+
+  ManagedApp? _managedAppForPackage(String packageName) {
+    final lower = packageName.toLowerCase();
+    for (final a in _managedApps) {
+      if (a.packageName.toLowerCase() == lower) return a;
+    }
+    return null;
+  }
+
+  /// How many schedules applying [templates] to [packageNames] would create,
+  /// and how many would be skipped because the app already has them.
+  ({int toAdd, int skipped}) previewBulkApply(
+    List<RuleTemplate> templates,
+    Iterable<String> packageNames,
+  ) {
+    var toAdd = 0;
+    var skipped = 0;
+    for (final pkg in packageNames) {
+      final app = _managedAppForPackage(pkg);
+      final rules = app == null ? const <ScheduleRule>[] : getRulesForApp(app.id);
+      for (final t in templates) {
+        if (templateAlreadyApplied(t, rules)) {
+          skipped++;
+        } else {
+          toAdd++;
+        }
+      }
+    }
+    return (toAdd: toAdd, skipped: skipped);
+  }
+
+  /// Applies every saved rule in [templates] to every app in [targets] in one
+  /// save. Unmanaged apps are added first; schedules an app already has are
+  /// skipped.
+  Future<BulkApplyResult> applyTemplatesToApps({
+    required List<RuleTemplate> templates,
+    required List<BulkApplyTarget> targets,
+  }) async {
+    final now = DateTime.now();
+    final stamp = now.millisecondsSinceEpoch;
+    var seq = 0;
+    final results = <BulkApplyAppResult>[];
+
+    for (final target in targets) {
+      var app = _managedAppForPackage(target.packageName);
+      final appAdded = app == null;
+      if (app == null) {
+        app = ManagedApp(
+          id: 'app_${target.packageName}_${stamp}_${seq++}',
+          packageName: target.packageName,
+          displayName: target.displayName,
+          iconBytes: target.iconBytes,
+          enabled: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        _managedApps.add(app);
+      } else if (app.isDormantVault) {
+        // The picker only lists installed apps, so a vaulted entry is live again.
+        final index = _managedApps.indexOf(app);
+        app = app.copyWith(isDormantVault: false, updatedAt: now);
+        _managedApps[index] = app;
+      }
+
+      final existing = getRulesForApp(app.id);
+      final added = <ScheduleRule>[];
+      final skipped = <RuleTemplate>[];
+      for (final t in templates) {
+        if (templateAlreadyApplied(t, existing) ||
+            templateAlreadyApplied(t, added)) {
+          skipped.add(t);
+          continue;
+        }
+        added.add(ScheduleRule(
+          id: 'rule_${app.id}_${stamp}_${seq++}',
+          appId: app.id,
+          name: t.name,
+          mode: t.mode,
+          startTime: t.startTime,
+          endTime: t.endTime,
+          daysOfWeek: Set<int>.from(t.daysOfWeek),
+          allowVipContacts: t.allowVipContacts,
+          createdAt: now,
+          updatedAt: now,
+        ));
+      }
+      _schedules.addAll(added);
+      results.add(BulkApplyAppResult(
+        app: app,
+        appAdded: appAdded,
+        addedRules: added,
+        skipped: skipped,
+      ));
+    }
+
+    await _persist();
+    return BulkApplyResult(results);
+  }
+
+  /// Removes schedules created by a bulk apply. Apps in [addedAppIds] (added by
+  /// that batch) are removed too once they have no schedules left; apps that
+  /// were managed before are always kept.
+  Future<void> removeBulkAppliedRules(
+    Iterable<String> ruleIds, {
+    Set<String> addedAppIds = const {},
+  }) async {
+    final ids = ruleIds.toSet();
+    _schedules.removeWhere((r) => ids.contains(r.id));
+    for (final appId in addedAppIds) {
+      if (!_schedules.any((r) => r.appId == appId)) {
+        _managedApps.removeWhere((a) => a.id == appId);
+        _overrides.remove(appId);
+      }
     }
     await _persist();
   }
@@ -400,6 +555,25 @@ class ScheduleRepository extends ChangeNotifier {
       createdAt: now,
     );
     await setOverride(override);
+  }
+
+  /// Pushes the end of the active override for [appId] out by [extra].
+  /// Starts a fresh mute if nothing is active.
+  Future<void> extendTemporaryMute({required String appId, required Duration extra}) async {
+    final current = _overrides[appId];
+    if (current == null || !current.isActive) {
+      await setTemporaryMute(appId: appId, duration: extra);
+      return;
+    }
+    _overrides[appId] = TemporaryOverride(
+      id: current.id,
+      appId: current.appId,
+      mode: current.mode,
+      startDateTime: current.startDateTime,
+      endDateTime: current.endDateTime.add(extra),
+      createdAt: current.createdAt,
+    );
+    await _persist();
   }
 
   /// Sets a temporary allow override for [appId] lasting [duration].
@@ -542,7 +716,7 @@ class ScheduleRepository extends ChangeNotifier {
   String exportRulesJson() {
     final payload = {
       'app': 'Notiflow',
-      'version': '1.6.0',
+      'version': '1.6.1',
       'format': 'notiflow-backup-v1',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'managedApps': _managedApps.map((a) => a.toJson()).toList(),
@@ -668,11 +842,28 @@ class ScheduleRepository extends ChangeNotifier {
     bool vaultUninstalled = true,
     bool excludeUninstalled = false,
   }) async {
+    final report = await importRulesWithReport(
+      rawJson,
+      replaceAll: replaceAll,
+      vaultUninstalled: vaultUninstalled,
+      excludeUninstalled: excludeUninstalled,
+    );
+    return report != null;
+  }
+
+  /// Same as [importRulesJson], but returns what was imported, kept for later
+  /// (uninstalled, vaulted) or skipped. Returns null when the backup is invalid.
+  Future<ImportReport?> importRulesWithReport(
+    String rawJson, {
+    bool replaceAll = true,
+    bool vaultUninstalled = true,
+    bool excludeUninstalled = false,
+  }) async {
     try {
       final sanitized = rawJson.trim().replaceFirst(RegExp(r'^\uFEFF'), '');
       final decoded = jsonDecode(sanitized);
       if (decoded is! Map<String, dynamic>) {
-        return false;
+        return null;
       }
 
       final List<dynamic>? appsList = decoded['managedApps'] as List<dynamic>?;
@@ -680,7 +871,7 @@ class ScheduleRepository extends ChangeNotifier {
       final List<dynamic>? templatesList = decoded['ruleTemplates'] as List<dynamic>?;
 
       if (appsList == null && schedulesList == null && templatesList == null) {
-        return false;
+        return null;
       }
 
       final importedApps = appsList != null
@@ -698,6 +889,32 @@ class ScheduleRepository extends ChangeNotifier {
       // Handle uninstalled apps:
       final installed = await _platformService.getInstalledApplications();
       final installedPkgs = installed.map((a) => a.packageName.toLowerCase()).toSet();
+
+      bool isMissing(ManagedApp a) =>
+          installed.isNotEmpty &&
+          !installedPkgs.contains(a.packageName.toLowerCase());
+      ImportReportApp summarize(ManagedApp a) => ImportReportApp(
+            app: a,
+            ruleCount: importedSchedules.where((r) => r.appId == a.id).length,
+          );
+      final report = ImportReport(
+        imported: [
+          for (final a in importedApps)
+            if (!isMissing(a) || (!excludeUninstalled && !vaultUninstalled))
+              summarize(a),
+        ],
+        waiting: [
+          if (!excludeUninstalled && vaultUninstalled)
+            for (final a in importedApps)
+              if (isMissing(a)) summarize(a),
+        ],
+        skipped: [
+          if (excludeUninstalled)
+            for (final a in importedApps)
+              if (isMissing(a)) summarize(a),
+        ],
+        savedRules: [for (final t in importedTemplates) t.name],
+      );
 
       if (installed.isNotEmpty) {
         if (excludeUninstalled) {
@@ -751,10 +968,7 @@ class ScheduleRepository extends ChangeNotifier {
       }
 
       // Always ensure the default pre-seeded template exists
-      if (_ruleTemplates.isEmpty ||
-          !_ruleTemplates.any((t) => t.id == RuleTemplate.defaultWorkFocus.id)) {
-        _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
-      }
+      _ensureDefaultTemplate();
 
       if (decoded.containsKey('unmanagedAppsUntouched')) {
         _unmanagedAppsUntouched = decoded['unmanagedAppsUntouched'] as bool? ?? true;
@@ -773,10 +987,10 @@ class ScheduleRepository extends ChangeNotifier {
       }
 
       await _persist();
-      return true;
+      return report;
     } catch (e) {
       debugPrint('Failed to parse and import .notiflow JSON: $e');
-      return false;
+      return null;
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
@@ -5,11 +6,13 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'data/repositories/schedule_repository.dart';
+import 'platform/android_notification_platform.dart';
 import 'platform/platform_factory.dart';
 import 'presentation/screens/main_navigation_shell.dart';
 import 'presentation/screens/onboarding_screen.dart';
 import 'presentation/screens/permission_screen.dart';
 import 'presentation/theme/app_theme.dart';
+import 'presentation/widgets/app_toast.dart';
 
 /// App-wide theme mode controller for real-time switching between
 /// System, Light Mode, and Dark Mode.
@@ -32,6 +35,7 @@ Future<void> updateAppThemeMode(ThemeMode mode) async {
       break;
   }
   await prefs.setString('pref_theme_mode', key);
+  await AndroidNotificationPlatform.setAppThemeMode(key);
 }
 
 /// Phones (shortest side under 600dp) stay in portrait; tablets may rotate.
@@ -61,6 +65,7 @@ void main() async {
   } else {
     themeModeNotifier.value = ThemeMode.system;
   }
+  unawaited(AndroidNotificationPlatform.setAppThemeMode(savedTheme));
 
   final repository = ScheduleRepository();
   await repository.initialize();
@@ -107,6 +112,7 @@ class NotificationHandlerApp extends StatelessWidget {
           darkTheme: AppTheme.darkTheme,
           themeMode: currentMode,
           home: home,
+          builder: (context, child) => AppToastHost(child: child!),
         );
       },
     );

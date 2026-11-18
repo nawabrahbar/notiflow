@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_toast.dart';
+import '../widgets/import_summary_sheet.dart';
 import 'main_navigation_shell.dart';
 
 /// Onboarding step three: optional .notiflow backup import.
@@ -28,14 +30,11 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     final rawContent = await widget.repository.pickBackupRawContent();
     if (!mounted || rawContent == null) return;
     if (rawContent.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Selected backup file is empty.'),
-            backgroundColor: AppTheme.toastError,
-          ),
-        );
+      AppToast.show(
+        context,
+        message: 'Selected backup file is empty.',
+        type: AppToastType.error,
+      );
       return;
     }
     await _processBackupContent(rawContent);
@@ -60,7 +59,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
       excludeUninstalled = (choice == 'exclude');
     }
 
-    final success = await widget.repository.importRulesJson(
+    final report = await widget.repository.importRulesWithReport(
       rawContent,
       replaceAll: true,
       vaultUninstalled: !excludeUninstalled,
@@ -68,6 +67,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     );
 
     if (!mounted) return;
+    final success = report != null;
     setState(() {
       _isProcessing = false;
       if (success) {
@@ -82,35 +82,35 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     });
 
     if (success) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Backup file restored successfully!', style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600)),
-            backgroundColor: AppTheme.toastSuccess,
-          ),
-        );
-      await _finishFlow();
+      final viewRules = await showImportSummarySheet(context, report,
+          repository: widget.repository);
+      await _finishFlow(
+        initialIndex: viewRules
+            ? MainNavigationShell.rulesTab
+            : MainNavigationShell.dashboardTab,
+      );
     } else {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Invalid .notiflow backup file.'),
-            backgroundColor: AppTheme.toastError,
-          ),
-        );
+      AppToast.show(
+        context,
+        message: 'Invalid .notiflow backup file.',
+        type: AppToastType.error,
+      );
     }
   }
 
-  Future<void> _finishFlow() async {
+  Future<void> _finishFlow({
+    int initialIndex = MainNavigationShell.dashboardTab,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('pref_onboarding_completed', true);
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (context) => MainNavigationShell(repository: widget.repository),
+        builder: (context) => MainNavigationShell(
+          repository: widget.repository,
+          initialIndex: initialIndex,
+        ),
       ),
       (route) => false,
     );
@@ -534,22 +534,13 @@ Future<bool> restoreBackupFromFile(
   BuildContext context,
   ScheduleRepository repository,
 ) async {
-  final messenger = ScaffoldMessenger.of(context);
+  final overlay = Overlay.of(context, rootOverlay: true);
   void toast(String message, {required bool success}) {
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: TextStyle(
-              color: success ? AppTheme.toastOnSuccess : Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          backgroundColor: success ? AppTheme.toastSuccess : AppTheme.toastError,
-        ),
-      );
+    AppToast.showOn(
+      overlay,
+      message: message,
+      type: success ? AppToastType.success : AppToastType.error,
+    );
   }
 
   final navigator = Navigator.of(context, rootNavigator: true);
@@ -596,20 +587,24 @@ Future<bool> restoreBackupFromFile(
       showProgress();
     }
 
-    final success = await repository.importRulesJson(
+    final report = await repository.importRulesWithReport(
       rawContent,
       replaceAll: true,
       vaultUninstalled: !excludeUninstalled,
       excludeUninstalled: excludeUninstalled,
     );
     hideProgress();
-    toast(
-      success
-          ? 'Backup file restored successfully!'
-          : 'Invalid .notiflow backup file.',
-      success: success,
-    );
-    return success;
+    if (report == null) {
+      toast('Invalid .notiflow backup file.', success: false);
+      return false;
+    }
+    if (context.mounted) {
+      final shell = MainNavigationShell.of(context);
+      final viewRules = await showImportSummarySheet(context, report,
+          repository: repository);
+      if (viewRules) shell?.switchTab(MainNavigationShell.rulesTab);
+    }
+    return true;
   } finally {
     hideProgress();
   }

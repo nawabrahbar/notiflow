@@ -5,12 +5,16 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../data/services/in_app_update_service.dart';
 import '../../domain/models/rule_template.dart';
 import '../../domain/models/schedule_rule.dart';
+import '../../platform/android_notification_platform.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
+import '../widgets/app_toast.dart';
+import '../widgets/import_summary_sheet.dart';
 import 'import_rules_screen.dart';
+import 'schedule_editor_screen.dart';
 
 /// Settings screen matching Botanical Sanctuary & Botanical Nocturne specifications.
 /// Fully responsive across Phone (<600dp) and Tablet (≥600dp, 6:6 two-column bento).
@@ -19,6 +23,7 @@ import 'import_rules_screen.dart';
 /// - Rules Backup & Portability (.notiflow export, smart import)
 /// - Dormant Vault Status (uninstalled app rules auto-applied upon install)
 /// - Triage & Automation (unmanaged apps untouched, emergency repeated call bypass)
+/// - Catch-up Digest notification (Android only, with notification permission state)
 /// - In-App Update Checker (Play Core IPC, zero INTERNET permission)
 /// - Zero Telemetry & On-Device Security Audit
 /// - Danger Zone reset
@@ -41,6 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   late final NotificationPlatformInterface _platform;
   bool _isAccessGranted = false;
   bool _isCheckingUpdate = false;
+  DigestNotificationSettings? _digestSettings;
 
   @override
   void initState() {
@@ -65,11 +71,34 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _checkStatus() async {
     final granted = await _platform.isNotificationAccessGranted();
+    final digest = await AndroidNotificationPlatform.fetchDigestSettings();
     if (mounted) {
       setState(() {
         _isAccessGranted = granted;
+        _digestSettings = digest;
       });
     }
+  }
+
+  Future<void> _setDigestEnabled(bool enabled) async {
+    final current = _digestSettings;
+    if (current == null) return;
+    setState(() {
+      _digestSettings = DigestNotificationSettings(
+        enabled: enabled,
+        permissionGranted: current.permissionGranted,
+      );
+    });
+    await AndroidNotificationPlatform.setDigestEnabled(enabled);
+    if (enabled && !current.permissionGranted) {
+      await AndroidNotificationPlatform.requestNotificationPermission();
+    }
+    await _checkStatus();
+  }
+
+  Future<void> _allowDigestNotifications() async {
+    await AndroidNotificationPlatform.requestNotificationPermission();
+    await _checkStatus();
   }
 
   Future<void> _openSettings() async {
@@ -80,32 +109,14 @@ class _SettingsScreenState extends State<SettingsScreen>
     try {
       final savedFile = await widget.repository.exportRulesToFile();
       if (!mounted || savedFile == null || savedFile.isEmpty) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              'Backup saved to: $savedFile',
-              style: const TextStyle(
-                  color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: AppTheme.toastSuccess,
-          ),
-        );
+      AppToast.show(context, message: 'Backup saved to: $savedFile');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                'Failed to export backup file: $e',
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-              backgroundColor: AppTheme.signalError,
-            ),
-          );
+        AppToast.show(
+          context,
+          message: 'Failed to export backup file: $e',
+          type: AppToastType.error,
+        );
       }
     }
   }
@@ -200,27 +211,17 @@ class _SettingsScreenState extends State<SettingsScreen>
           await service.performImmediateUpdate();
         }
       } else {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text('Notiflow is up to date (v1.6.0).', style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600)),
-              backgroundColor: AppTheme.toastSuccess,
-            ),
-          );
+        AppToast.show(context, message: 'Notiflow is up to date (v1.6.1).');
       }
     } catch (_) {
       if (!mounted) return;
       setState(() => _isCheckingUpdate = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Update check unavailable offline or when not installed via Google Play.'),
-            backgroundColor: AppTheme.signalWarning,
-          ),
-        );
+      AppToast.show(
+        context,
+        message:
+            'Update check unavailable offline or when not installed via Google Play.',
+        type: AppToastType.warning,
+      );
     }
   }
 
@@ -283,18 +284,11 @@ class _SettingsScreenState extends State<SettingsScreen>
               Navigator.of(ctx).pop();
               await widget.repository.resetAllRules();
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'All rules and schedules have been reset.',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w700),
-                    ),
-                    backgroundColor: AppTheme.signalWarning,
-                  ),
-                );
+              AppToast.show(
+                context,
+                message: 'All rules and schedules have been reset.',
+                type: AppToastType.warning,
+              );
             },
             child: Text('Reset All',
                 style: GoogleFonts.plusJakartaSans(
@@ -410,6 +404,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                     _buildSavedRulesSection(p),
                     const SizedBox(height: 24),
                     _buildTriageSection(p),
+                    if (_digestSettings != null) ...[
+                      const SizedBox(height: 24),
+                      _buildDigestSection(p, _digestSettings!),
+                    ],
                     const SizedBox(height: 24),
                     _buildIntegritySection(p),
                     const SizedBox(height: 24),
@@ -424,6 +422,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                 _buildEngineSection(p),
                 const SizedBox(height: 32),
                 _buildTriageSection(p),
+                if (_digestSettings != null) ...[
+                  const SizedBox(height: 32),
+                  _buildDigestSection(p, _digestSettings!),
+                ],
                 const SizedBox(height: 32),
                 _buildDangerZoneSection(p),
               ];
@@ -605,7 +607,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final granted = _isAccessGranted;
     final title = granted ? 'Focus Shield Active' : 'Focus Shield Paused';
     final body = granted
-        ? 'NotificationListenerService intercepting real-time bundles'
+        ? 'Filtering your notifications. You can turn this off anytime from Manage Access.'
         : 'Notification access is off. Grant access to start filtering.';
     final statusPill = _pill(
       granted ? 'ACTIVE' : 'NEEDS ACCESS',
@@ -890,19 +892,27 @@ class _SettingsScreenState extends State<SettingsScreen>
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Rename',
-            style: iconButtonStyle,
-            icon: Icon(Icons.edit_outlined, size: 20, color: p.textMuted),
-            onPressed: () => _showRenameTemplateDialog(template, p.isDark),
-          ),
-          if (!isDefault)
+          if (!isDefault) ...[
+            IconButton(
+              tooltip: 'Edit',
+              style: iconButtonStyle,
+              icon: Icon(Icons.edit_outlined, size: 20, color: p.textMuted),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ScheduleEditorScreen(
+                    repository: repo,
+                    editingTemplate: template,
+                  ),
+                ),
+              ),
+            ),
             IconButton(
               tooltip: 'Delete',
               style: iconButtonStyle,
               icon: Icon(Icons.delete_outline_rounded, size: 20, color: p.error),
               onPressed: () => _showDeleteTemplateDialog(template, p.isDark),
             ),
+          ],
         ],
       ),
     );
@@ -917,75 +927,6 @@ class _SettingsScreenState extends State<SettingsScreen>
       return 'Weekends';
     }
     return '${days.length} days/wk';
-  }
-
-  void _showRenameTemplateDialog(RuleTemplate template, bool isDark) {
-    final bg = isDark
-        ? AppTheme.darkSurfaceContainerLow
-        : AppTheme.lightSurfaceContainerLow;
-    final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
-    final textMuted = isDark
-        ? AppTheme.darkOnSurfaceVariant
-        : AppTheme.lightOnSurfaceVariant;
-    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
-    var draftName = template.name;
-
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        Future<void> submit() async {
-          final name = draftName.trim();
-          if (name.isEmpty) return;
-          Navigator.of(ctx).pop();
-          await widget.repository.renameRuleTemplate(template.id, name);
-        }
-
-        return AlertDialog(
-          backgroundColor: bg,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Text(
-            'Rename Saved Rule',
-            style: GoogleFonts.newsreader(
-                fontWeight: FontWeight.w600, fontSize: 20, color: textMain),
-          ),
-          content: TextFormField(
-            initialValue: template.name,
-            autofocus: true,
-            onChanged: (value) => draftName = value,
-            textCapitalization: TextCapitalization.words,
-            onFieldSubmitted: (_) => submit(),
-            style: GoogleFonts.plusJakartaSans(
-                fontSize: 15, fontWeight: FontWeight.w600, color: textMain),
-            decoration: InputDecoration(
-              hintText: 'Rule name',
-              hintStyle: GoogleFonts.plusJakartaSans(color: textMuted),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Cancel',
-                  style: GoogleFonts.plusJakartaSans(
-                      color: textMuted, fontWeight: FontWeight.w600)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primary,
-                foregroundColor:
-                    isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnPrimary,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: submit,
-              child: Text('Save',
-                  style:
-                      GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700)),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   void _showDeleteTemplateDialog(RuleTemplate template, bool isDark) {
@@ -1122,45 +1063,58 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
         ),
-        if (dormantCount > 0) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: _cardDecoration(p),
-            child: Row(
-              children: [
-                _iconBox(Icons.inventory_2_outlined,
-                    bg: p.isTablet ? p.inner : p.lowest,
-                    fg: p.isDark ? p.primaryContainer : p.primary,
-                    circle: p.isTablet),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text('Dormant Vault Active',
-                                style: _titleStyle(p, size: 14)),
-                          ),
-                          const SizedBox(width: 6),
-                          _pill('$dormantCount APPS',
-                              bg: p.high, fg: p.textMuted),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Rules for $dormantCount uninstalled apps are parked and will auto-apply when installed.',
-                        style: _bodyStyle(p),
-                      ),
-                    ],
+        SizedBox(height: p.isTablet ? 16 : 12),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const ValueKey('settings-dormant-vault'),
+            onTap: () => showDormantVaultSheet(
+              context,
+              repository: widget.repository,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            child: Ink(
+              padding: EdgeInsets.all(p.isTablet ? 20 : 14),
+              decoration: _cardDecoration(p),
+              child: Row(
+                children: [
+                  _iconBox(Icons.inventory_2_outlined,
+                      bg: p.isTablet ? p.inner : p.lowest,
+                      fg: p.isDark ? p.primaryContainer : p.primary,
+                      circle: p.isTablet),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text('Dormant Vault',
+                                  style: _titleStyle(p, size: 14)),
+                            ),
+                            const SizedBox(width: 6),
+                            _pill('$dormantCount ${dormantCount == 1 ? 'APP' : 'APPS'}',
+                                bg: p.high, fg: p.textMuted),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dormantCount == 0
+                              ? 'No uninstalled apps. Rules you keep for apps that aren\'t installed will be parked here.'
+                              : 'Rules for $dormantCount uninstalled ${dormantCount == 1 ? 'app is' : 'apps are'} parked and will auto-apply when installed.',
+                          style: _bodyStyle(p),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Icon(Icons.chevron_right_rounded, color: p.textMuted),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ],
     );
   }
@@ -1368,6 +1322,81 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Section: Catch-up Digest
+  // ---------------------------------------------------------------------------
+  Widget _buildDigestSection(
+      _SettingsPalette p, DigestNotificationSettings digest) {
+    final needsPermission = digest.enabled && !digest.permissionGranted;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionLabel(p, 'Catch-up Digest'),
+        Container(
+          padding: EdgeInsets.all(p.isTablet ? 20 : 16),
+          decoration: _cardDecoration(p),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildToggleRow(
+                p,
+                key: const ValueKey('toggle-digest'),
+                icon: Icons.notifications_active_outlined,
+                iconBg: p.isTablet ? p.inner : p.lowest,
+                iconFg: p.isTablet
+                    ? p.textMain
+                    : (p.isDark ? p.primaryContainer : p.primary),
+                title: 'Notify When Quiet Hours End',
+                badge: !digest.enabled
+                    ? null
+                    : digest.permissionGranted
+                        ? _pill('ALLOWED',
+                            bg: p.secContainer, fg: p.onSecContainer)
+                        : _pill('NEEDS PERMISSION',
+                            bg: p.errorContainer, fg: p.error),
+                description:
+                    'Silenced notifications return after a schedule ends, '
+                    'with one Notiflow summary instead of a burst of alerts.',
+                value: digest.enabled,
+                onChanged: _setDigestEnabled,
+              ),
+              if (needsPermission) ...[
+                const SizedBox(height: 16),
+                _divider(p),
+                const SizedBox(height: 12),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    key: const ValueKey('settings-digest-allow'),
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: _allowDigestNotifications,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.notifications_none_rounded,
+                              size: 19, color: p.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text('Allow Notiflow Notifications',
+                                style: _titleStyle(p,
+                                    size: 14, color: p.primary)),
+                          ),
+                          Icon(Icons.chevron_right_rounded,
+                              size: 18, color: p.primary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildToggleRow(
     _SettingsPalette p, {
     required Key key,
@@ -1448,7 +1477,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       required Color iconBg,
       required Color iconFg,
       required String title,
-      required Widget pill,
+      Widget? pill,
       required String body,
     }) {
       return Row(
@@ -1463,14 +1492,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               children: [
                 Row(
                   children: [
-                    Flexible(
+                    Expanded(
                       child: Text(title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: _titleStyle(p)),
                     ),
-                    const SizedBox(width: 8),
-                    pill,
+                    if (pill != null) ...[
+                      const SizedBox(width: 8),
+                      pill,
+                    ],
                   ],
                 ),
                 const SizedBox(height: 3),
@@ -1490,7 +1521,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       icon: p.isTablet ? Icons.enhanced_encryption_outlined : Icons.lock_outline_rounded,
       iconBg: p.isTablet ? p.tertiaryFixed : p.primaryFixed,
       iconFg: p.isTablet ? p.tertiary : p.primary,
-      title: 'Encrypted Local Storage',
+      title: p.isTablet ? 'Encrypted Local Storage' : 'Encrypted Locally',
       pill: _pill('AES-256', bg: p.isTablet ? p.inner : p.high, fg: p.textMuted),
       body: 'Zero cloud accounts · 24 KB local database',
     );
@@ -1499,10 +1530,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       iconBg: p.isTablet ? p.secContainer : p.tertiaryFixed,
       iconFg: p.isTablet ? p.onSecContainer : p.tertiary,
       title: 'Zero Telemetry Guarantee',
-      pill: p.isTablet
-          ? _pill('0.00 B', bg: p.inner, fg: p.textMuted)
-          : _pill('0.00 B', bg: p.secContainer, fg: p.onSecContainer),
-      body: 'No internet permission declared in AndroidManifest',
+      body: p.isTablet
+          ? 'No internet needed. Your data stays on this device.'
+          : 'No internet needed. Your data stays on this phone.',
     );
 
     if (!p.isTablet) {

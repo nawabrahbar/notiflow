@@ -26,14 +26,18 @@ To function as an automatic notification scheduler and blocker on Android, Notif
 - **Why it is required:** Android requires Notification Listener access so Notiflow can detect when a managed application posts a notification during an active mute schedule or focus override, suppress/cancel that notification during your scheduled block window, and record the muted notification in your on-device **Activity** tab so you can review what you missed later.
 - **How your data is handled:**
   - Notification metadata (app package name, title, message text, and timestamp) is evaluated **in memory on your device** against your local schedules.
-  - Muted notification logs are stored locally inside the app's private Android storage (`SharedPreferences`) and are capped automatically.
+  - Notification logs are stored locally in a private on-device database inside the app's Android sandbox and are deleted automatically after 30 days (or immediately when you clear the log).
   - Notification data **never leaves your device**.
 
 ### B. Installed Launcher Applications Discovery (`<queries>` Intent Filter)
 - **Why it is required:** Notiflow declares a standard `<queries>` intent filter for launchable apps (`android.intent.action.MAIN` / `android.intent.category.LAUNCHER`)—without requesting the broad `QUERY_ALL_PACKAGES` permission—so you can view your installed applications (name, package identifier, and icon) and choose which apps to manage or mute on a schedule.
 - **How your data is handled:** Your installed app list is read locally on your device to render the app picker UI and is never uploaded or shared anywhere.
 
-### C. Storage Access Framework (Export & Import `.notiflow` Backup Files)
+### C. Notifications (`android.permission.POST_NOTIFICATIONS`) and Restart (`android.permission.RECEIVE_BOOT_COMPLETED`)
+- **Why it is required:** When a schedule ends, Notiflow returns the notifications it held back and posts one "quiet hours ended" summary. Android 13+ asks you to allow this; you can turn it off in **Settings → Catch-up Digest**. The restart permission lets Notiflow re-schedule a pending summary after the phone restarts.
+- **How your data is handled:** The summary contains app names and counts only—no sender names or message text—and the lock-screen version shows only the total. Nothing leaves your device.
+
+### D. Storage Access Framework (Export & Import `.notiflow` Backup Files)
 - **Why it is required:** When you explicitly tap **Export .notiflow File** or **Select .notiflow File**, Android's system file picker (`ACTION_CREATE_DOCUMENT` / `ACTION_OPEN_DOCUMENT`) is used to save or load your rules backup file in the folder you select. Notiflow cannot access any other files on your device.
 
 ---

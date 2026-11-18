@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#101412</color>
+    <!-- Launcher icon: always the light design. -->
+    <color name="ic_launcher_background">#FAF2D5</color>
     <color name="app_launch_background">#FEF8F6</color>
+    <!-- Launch screen follows Notiflow's own light/dark toggle. -->
+    <color name="splash_background_light">#FEF8F6</color>
+    <color name="splash_background_dark">#101412</color>
+    <color name="splash_icon_background_dark">#181C1A</color>
 </resources>

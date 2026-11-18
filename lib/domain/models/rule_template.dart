@@ -24,10 +24,10 @@ class RuleTemplate {
     required this.createdAt,
   });
 
-  /// The single pre-seeded default template: Work Focus Hours (09:00 AM to 05:00 PM, Mon-Fri).
+  /// The single pre-seeded default template: Focus Hours (09:00 AM to 05:00 PM, Mon-Fri).
   static final RuleTemplate defaultWorkFocus = RuleTemplate(
     id: 'template_work_focus',
-    name: 'Work Focus Hours',
+    name: 'Focus Hours',
     mode: ScheduleMode.blockDuring,
     startTime: const TimeOfDayValue(hour: 9, minute: 0),
     endTime: const TimeOfDayValue(hour: 17, minute: 0),

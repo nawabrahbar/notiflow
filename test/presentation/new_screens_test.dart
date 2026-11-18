@@ -1,11 +1,14 @@
 import 'package:flutter/services.dart';
+import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:notification_handler/data/services/installed_apps_cache.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
+import 'package:notification_handler/domain/models/bulk_apply.dart';
 import 'package:notification_handler/domain/models/managed_app.dart';
 import 'package:notification_handler/domain/models/rule_template.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
@@ -18,10 +21,15 @@ import 'package:notification_handler/presentation/screens/main_navigation_shell.
 import 'package:notification_handler/presentation/screens/onboarding_screen.dart';
 import 'package:notification_handler/presentation/screens/activity_screen.dart';
 import 'package:notification_handler/presentation/screens/add_apps_screen.dart';
+import 'package:notification_handler/presentation/screens/bulk_apply_screen.dart';
 import 'package:notification_handler/presentation/screens/permission_screen.dart';
 import 'package:notification_handler/presentation/screens/settings_screen.dart';
 import 'package:notification_handler/presentation/screens/app_details_screen.dart';
 import 'package:notification_handler/presentation/screens/schedule_editor_screen.dart';
+import 'package:notification_handler/domain/models/import_report.dart';
+import 'package:notification_handler/presentation/widgets/app_toast.dart';
+import 'package:notification_handler/presentation/widgets/import_summary_sheet.dart';
+import 'package:notification_handler/presentation/widgets/quick_mute_card.dart';
 import 'package:notification_handler/presentation/widgets/stitch_header.dart';
 import 'package:notification_handler/presentation/widgets/stitch_switch.dart';
 import 'package:notification_handler/presentation/theme/app_theme.dart';
@@ -44,8 +52,57 @@ class MockPlatformService implements NotificationPlatformInterface {
   @override
   Future<void> openAppDetailsSettings() async {}
 
+  Completer<void>? installedAppsGate;
+
   @override
-  Future<List<DiscoveredAppInfo>> getInstalledApplications() async => installedApps;
+  Future<List<DiscoveredAppInfo>> getInstalledApplications() async {
+    await installedAppsGate?.future;
+    return installedApps;
+  }
+
+  /// Packages reported as not installed by [getInstalledStatus].
+  Set<String> uninstalledPackages = {};
+
+  @override
+  Future<List<DiscoveredAppInfo>> getInstalledAppsLite() async {
+    await installedAppsGate?.future;
+    return [
+      for (final a in installedApps)
+        DiscoveredAppInfo(
+          packageName: a.packageName,
+          displayName: a.displayName,
+          isSystemApp: a.isSystemApp,
+          androidCategory: a.androidCategory,
+        ),
+    ];
+  }
+
+  @override
+  Future<Map<String, Uint8List>> getAppIcons(List<String> packageNames) async {
+    iconRequests++;
+    return {
+      for (final a in installedApps)
+        if (packageNames.contains(a.packageName) && a.iconBytes != null)
+          a.packageName: a.iconBytes!,
+    };
+  }
+
+  @override
+  Future<Map<String, bool>> getInstalledStatus(List<String> packageNames) async => {
+        for (final p in packageNames) p: !uninstalledPackages.contains(p),
+      };
+
+  /// Simulated package-change counter and the packages changed since 0.
+  int changeSequence = 0;
+  List<String> changedPackages = [];
+  int iconRequests = 0;
+
+  @override
+  Future<PackageChanges?> getChangedPackages(int sequenceNumber) async =>
+      PackageChanges(
+        sequenceNumber: changeSequence,
+        packageNames: sequenceNumber < changeSequence ? changedPackages : const [],
+      );
 
   @override
   Future<void> syncSchedules({
@@ -77,6 +134,15 @@ Future<void> flushFontsAndSettle(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Steps the clock without settling: a live toast's countdown keeps
+/// animating, so pumpAndSettle would run it to the end.
+Future<void> pumpFor(WidgetTester tester, Duration total) async {
+  const step = Duration(milliseconds: 50);
+  for (var t = Duration.zero; t < total; t += step) {
+    await tester.pump(step);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -88,6 +154,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     mockPlatform = MockPlatformService();
     PlatformFactory.mockPlatformService = mockPlatform;
+    AddAppsScreen.clearInstalledAppsCache();
     repository = ScheduleRepository(platformService: mockPlatform);
     await repository.initialize();
   });
@@ -208,6 +275,7 @@ void main() {
   testWidgets('DashboardScreen displays Focus Shield Online banner when restored', (WidgetTester tester) async {
     await tester.pumpWidget(wrapWithTheme(DashboardScreen(
       repository: repository,
+      view: DashboardView.home,
       initialShowRestorationBanner: true,
     )));
     await flushFontsAndSettle(tester);
@@ -235,11 +303,13 @@ void main() {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: scenario.mode,
-        home: DashboardScreen(repository: repository),
+        home: DashboardScreen(repository: repository, view: DashboardView.home),
       ));
       await flushFontsAndSettle(tester);
 
       expect(find.textContaining('Botanical Calm'), findsNothing);
+      expect(find.text('MANAGED APPS'), findsNothing);
+      expect(find.text('All caught up'), findsOneWidget);
       expect(find.textContaining(RegExp(r'^Good (morning|afternoon|evening|night)$')), findsOneWidget);
       expect(find.text('MUTED'), findsOneWidget);
       expect(find.text('ALERTS'), findsOneWidget);
@@ -253,35 +323,51 @@ void main() {
         expect(find.textContaining(RegExp(r'^(pass|passes)$')), findsOneWidget);
       }
 
-      if (scenario.tablet) {
-        expect(find.text('OVERRIDES'), findsOneWidget);
-        expect(find.text('Mute All (15m)'), findsOneWidget);
-        expect(find.text('QUICK SESSION OVERRIDES'), findsNothing);
-        return;
-      }
-
-      expect(find.text('QUICK SESSION OVERRIDES'), findsOneWidget);
+      expect(find.text('QUICK MUTE · ALL APPS'), findsOneWidget);
+      expect(find.text('QUICK SESSION OVERRIDES'), findsNothing);
       expect(find.text('OVERRIDES'), findsNothing);
-      expect(find.text('Mute (1h)'), findsOneWidget);
+      expect(find.text('Mute All (15m)'), findsNothing);
 
-      await tester.tap(find.text('Mute (30m)'));
+      await tester.tap(find.byKey(const Key('quick_mute_all_30')));
       await flushFontsAndSettle(tester);
       expect(repository.getActiveOverride('global_mute')?.durationMinutes, 30);
-
-      await tester.tap(find.text('Mute (15m)'));
-      await flushFontsAndSettle(tester);
-      expect(repository.getActiveOverride('global_mute')?.durationMinutes, 15);
-
-      await tester.tap(find.text('Mute (15m)'));
-      await flushFontsAndSettle(tester);
-      expect(repository.getActiveOverride('global_mute'), isNull);
-
-      final bypassBefore = repository.vipEmergencyBypass;
-      await tester.tap(find.textContaining('Priority Only'));
-      await flushFontsAndSettle(tester);
-      expect(repository.vipEmergencyBypass, !bypassBefore);
+      expect(find.text('All apps muted'), findsOneWidget);
     });
   }
+
+  testWidgets('QuickMuteAllCard mutes all apps, shows live status, extends and ends', (WidgetTester tester) async {
+    await tester.pumpWidget(wrapWithTheme(Scaffold(
+      body: QuickMuteAllCard(repository: repository),
+    )));
+    await flushFontsAndSettle(tester);
+
+    expect(find.text('QUICK MUTE · ALL APPS'), findsOneWidget);
+    expect(find.text('All apps muted'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('quick_mute_all_30')));
+    await flushFontsAndSettle(tester);
+    expect(repository.getActiveOverride('global_mute')?.durationMinutes, 30);
+    expect(find.text('All apps muted'), findsOneWidget);
+    expect(find.byKey(const Key('quick_mute_all_15')), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('quick_mute_all_remaining'))).data,
+      startsWith('30 min left · until '),
+    );
+
+    await tester.tap(find.byKey(const Key('quick_mute_all_extend')));
+    await flushFontsAndSettle(tester);
+    expect(repository.getActiveOverride('global_mute')?.durationMinutes, 45);
+
+    await tester.tap(find.byKey(const Key('quick_mute_all_end')));
+    await flushFontsAndSettle(tester);
+    expect(repository.getActiveOverride('global_mute'), isNull);
+    expect(find.byKey(const Key('quick_mute_all_15')), findsOneWidget);
+
+    final bypassBefore = repository.vipEmergencyBypass;
+    await tester.tap(find.byKey(const Key('quick_mute_all_repeat_callers')));
+    await flushFontsAndSettle(tester);
+    expect(repository.vipEmergencyBypass, !bypassBefore);
+  });
 
   testWidgets('SettingsScreen displays Engine status, Zero Telemetry card, and Triage preferences', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 2600);
@@ -305,7 +391,7 @@ void main() {
     expect(find.textContaining('Reset All Rules'), findsAtLeastNWidgets(1));
   });
 
-  testWidgets('DashboardScreen renders dynamic time greeting, quote and handles multi-select delete', (WidgetTester tester) async {
+  testWidgets('DashboardScreen rules view lists managed apps and handles multi-select delete', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
@@ -329,10 +415,9 @@ void main() {
     )));
     await flushFontsAndSettle(tester);
 
-    // Verify Greeting is displayed
-    expect(find.textContaining('Good '), findsOneWidget);
-    // Verify an attention quote is displayed
-    expect(find.byType(Text), findsWidgets);
+    // Rules view shows only the managed apps catalog, not the dashboard cards
+    expect(find.textContaining('Good '), findsNothing);
+    expect(find.text('INTERCEPTED'), findsNothing);
     expect(find.text('Test Chat'), findsOneWidget);
 
     // Long press on app card to trigger selection mode
@@ -344,10 +429,16 @@ void main() {
     expect(find.text('Select All'), findsNothing);
     expect(find.text('Deselect All'), findsNothing);
     expect(find.byKey(const Key('select_all_checkbox')), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    final deleteIcon = find.byKey(const ValueKey('rules-delete-selected'));
+    expect(deleteIcon, findsOneWidget);
+    expect(find.text('Delete'), findsNothing);
+    expect(
+      tester.widget<Icon>(find.descendant(of: deleteIcon, matching: find.byType(Icon))).color,
+      anyOf(AppTheme.lightError, AppTheme.darkError),
+    );
 
-    // Tap Delete button
-    await tester.tap(find.text('Delete'));
+    // Tap the red delete icon
+    await tester.tap(deleteIcon);
     await flushFontsAndSettle(tester);
 
     // Dialog confirmation
@@ -378,10 +469,11 @@ void main() {
 
     // Tap Clear Log button when empty
     await tester.tap(find.text('Clear Log'));
-    await flushFontsAndSettle(tester);
+    await pumpFor(tester, const Duration(milliseconds: 500));
 
-    // Verify empty state snackbar
+    // Verify empty state toast
     expect(find.text('Activity log is already empty.'), findsOneWidget);
+    await tester.pumpAndSettle();
   });
 
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
@@ -456,6 +548,67 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Activity log groups messages from one person into one card', (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    const channel = MethodChannel('com.notificationhandler/bridge');
+    final ts = DateTime(2026, 9, 12, 23, 40).millisecondsSinceEpoch;
+    Map<String, dynamic> msg(int minutesAgo, String text) => {
+          'packageName': 'com.whatsapp',
+          'appName': 'WhatsApp',
+          'timestampMs': ts - minutesAgo * 60000,
+          'isBlocked': true,
+          'title': 'Sunil',
+          'message': text,
+          'conversationKey': 'sunil@lid',
+        };
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'getActivityLog') {
+        return jsonEncode([msg(0, 'Third'), msg(5, 'Second'), msg(10, 'First')]);
+      }
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await repository.setUse24HourFormat(true);
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: Scaffold(body: ActivityScreen(repository: repository)),
+    ));
+    await flushFontsAndSettle(tester);
+
+    expect(find.text('12 Sept, 23:40 · 3 messages'), findsOneWidget);
+    expect(find.text('1 Event'), findsOneWidget);
+    // Collapsed: only the latest message.
+    expect(find.text('Third'), findsOneWidget);
+    expect(find.text('First'), findsNothing);
+    expect(find.byIcon(Icons.expand_more_rounded), findsOneWidget);
+
+    // The arrow expands the card in place, oldest message first.
+    await tester.tap(find.byIcon(Icons.expand_more_rounded));
+    await tester.pumpAndSettle();
+    final dy = [for (final t in ['First', 'Second', 'Third']) tester.getTopLeft(find.text(t)).dy];
+    expect(dy[0] < dy[1] && dy[1] < dy[2], isTrue);
+    expect(find.text('23:30'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.expand_less_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('First'), findsNothing);
+
+    // Tapping the card itself opens the details sheet with every message.
+    await tester.tap(find.text('Third'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sunil · 3 messages'), findsOneWidget);
+    expect(find.text('First'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final scenario in [
     (name: 'light phone', size: const Size(390, 900), mode: ThemeMode.light),
@@ -554,11 +707,20 @@ void main() {
       ));
       await flushFontsAndSettle(tester);
 
-      for (final label in ['Rules', 'Apps', 'Activity', 'Settings']) {
+      for (final label in ['Dashboard', 'Rules', 'Activity', 'Settings']) {
         expect(find.text(label), findsWidgets);
       }
+      // Dashboard is the start tab.
+      expect(find.byKey(const Key('digest_overview_card')), findsOneWidget);
+      final labels = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data)
+          .where((d) => const ['Dashboard', 'Rules', 'Apps', 'Activity', 'Settings'].contains(d))
+          .toList();
+      expect(labels, ['Dashboard', 'Rules', 'Activity', 'Settings']);
       if (scenario.tablet) {
         expect(find.byType(SvgPicture), findsNothing);
+        expect(find.byIcon(Icons.dashboard_outlined), findsOneWidget);
         expect(find.byIcon(Icons.tune), findsOneWidget);
         expect(find.byIcon(Icons.notifications_active_outlined), findsOneWidget);
       } else {
@@ -566,11 +728,413 @@ void main() {
         expect(find.byIcon(Icons.tune_rounded), findsNothing);
       }
 
-      await tester.tap(find.text('Apps').last);
+      await tester.tap(find.text('Settings').last);
       await flushFontsAndSettle(tester);
+      expect(find.text('Settings'), findsWidgets);
+
+      await tester.tap(find.text('Rules').last);
+      await flushFontsAndSettle(tester);
+      expect(find.text('MANAGED APPS'), findsOneWidget);
+
+      // Add Apps opens as its own page from Rules.
+      await tester.tap(find.text('Add Apps').first);
+      await flushFontsAndSettle(tester);
+      expect(find.byType(AddAppsScreen), findsOneWidget);
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator).first);
+      navigator.pop();
+      await flushFontsAndSettle(tester);
+      expect(find.byType(AddAppsScreen), findsNothing);
+      expect(find.text('MANAGED APPS'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
+
+  String digestJson(DateTime now, {bool reviewed = false, bool running = false}) => jsonEncode([
+        {
+          'id': 7,
+          'packageName': 'com.whatsapp',
+          'appName': 'WhatsApp',
+          'ruleName': 'Work hours',
+          'startMs': now.subtract(const Duration(hours: 8)).millisecondsSinceEpoch,
+          'endMs': (running ? now.add(const Duration(hours: 1)) : now.subtract(const Duration(minutes: 5)))
+              .millisecondsSinceEpoch,
+          'reviewed': reviewed,
+          'isPriority': true,
+          'count': 3,
+          'events': [
+            for (var i = 1; i <= 3; i++)
+              {
+                'id': '$i',
+                'packageName': 'com.whatsapp',
+                'appName': 'WhatsApp',
+                'title': 'Chat $i',
+                'message': 'Message $i',
+                'timestampMs': now.subtract(Duration(hours: i)).millisecondsSinceEpoch,
+                'isBlocked': true,
+                'reason': 'Scheduled quiet time',
+                'windowId': 7,
+              },
+          ],
+        },
+      ]);
+
+  for (final scenario in [
+    (name: 'light phone', size: const Size(390, 1400), mode: ThemeMode.light),
+    (name: 'dark phone', size: const Size(390, 1400), mode: ThemeMode.dark),
+    (name: 'light tablet', size: const Size(1024, 1300), mode: ThemeMode.light),
+    (name: 'dark tablet', size: const Size(1024, 1300), mode: ThemeMode.dark),
+  ]) {
+    testWidgets('Dashboard digest card opens the Activity Digest and marks it reviewed (${scenario.name})', (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1.0;
+      const channel = MethodChannel('com.notificationhandler/bridge');
+      final now = DateTime.now();
+      var reviewed = false;
+      final markedIds = <List<Object?>>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        switch (call.method) {
+          case 'getDigest':
+            return digestJson(now, reviewed: reviewed);
+          case 'getActivityLog':
+            return '[]';
+          case 'markDigestReviewed':
+            markedIds.add((call.arguments as Map)['ids'] as List<Object?>);
+            reviewed = true;
+            return null;
+        }
+        return null;
+      });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: scenario.mode,
+        home: MainNavigationShell(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      expect(find.text('3 silenced notifications'), findsOneWidget);
+      expect(find.text('Review now'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('digest_overview_card')));
+      await flushFontsAndSettle(tester);
+
+      expect(find.text('Activity Log'), findsOneWidget);
+      expect(find.byKey(const ValueKey('digest_window_7')), findsOneWidget);
+      expect(find.byKey(const ValueKey('digest_unreviewed_7')), findsOneWidget);
+      expect(find.text('3 silenced'), findsOneWidget);
+      expect(find.text('WhatsApp'), findsWidgets);
+
+      await tester.tap(find.byKey(const ValueKey('digest_window_7')));
+      await flushFontsAndSettle(tester);
+
+      expect(markedIds, [
+        [7]
+      ]);
+      expect(find.byKey(const ValueKey('digest_unreviewed_7')), findsNothing);
+      expect(find.textContaining('Chat 1'), findsOneWidget);
+      expect(find.textContaining('Chat 3'), findsOneWidget);
+
+      await tester.tap(find.text('Dashboard').last);
+      await flushFontsAndSettle(tester);
+      expect(find.text('All caught up'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Opening a digest window that is still running does not mark it reviewed', (tester) async {
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    const channel = MethodChannel('com.notificationhandler/bridge');
+    final now = DateTime.now();
+    final markedIds = <Object?>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      switch (call.method) {
+        case 'getDigest':
+          return digestJson(now, running: true);
+        case 'getActivityLog':
+          return '[]';
+        case 'markDigestReviewed':
+          markedIds.add(call.arguments);
+          return null;
+      }
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: MainNavigationShell(repository: repository),
+    ));
+    await flushFontsAndSettle(tester);
+    await tester.tap(find.byKey(const Key('digest_overview_card')));
+    await flushFontsAndSettle(tester);
+
+    await tester.tap(find.byKey(const ValueKey('digest_window_7')));
+    await flushFontsAndSettle(tester);
+
+    expect(find.textContaining('Chat 1'), findsOneWidget);
+    expect(markedIds, isEmpty);
+    expect(find.byKey(const ValueKey('digest_unreviewed_7')), findsOneWidget);
+  });
+
+  testWidgets('AppToast closes on ×, on timeout, and when replaced', (tester) async {
+    late BuildContext ctx;
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: Scaffold(body: Builder(builder: (c) {
+        ctx = c;
+        return const SizedBox();
+      })),
+    ));
+
+    final first = AppToast.show(ctx, message: 'Saved', type: AppToastType.info);
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    expect(find.text('Saved'), findsOneWidget);
+    expect(find.byIcon(Icons.info_rounded), findsOneWidget);
+    await tester.tap(find.byTooltip('Close'));
+    await pumpFor(tester, const Duration(milliseconds: 400));
+    expect(await first, AppToastClosedReason.dismissed);
+    expect(find.text('Saved'), findsNothing);
+
+    final timed = AppToast.show(ctx, message: 'Timed');
+    await pumpFor(tester, AppToast.defaultDuration + const Duration(milliseconds: 400));
+    expect(await timed, AppToastClosedReason.timeout);
+    expect(find.text('Timed'), findsNothing);
+
+    final old = AppToast.show(ctx, message: 'Old', actionLabel: 'Undo');
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    final replacement = AppToast.show(ctx, message: 'New', type: AppToastType.error);
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    expect(await old, AppToastClosedReason.replaced);
+    expect(find.text('Old'), findsNothing);
+    expect(find.text('New'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(await replacement, AppToastClosedReason.timeout);
+  });
+
+  testWidgets('AppToast floats above the phone nav bar', (tester) async {
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    late BuildContext ctx;
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: Scaffold(
+        body: Builder(builder: (c) {
+          ctx = c;
+          return const SizedBox();
+        }),
+        bottomNavigationBar: const AppToastBottomBar(child: SizedBox(height: 80)),
+      ),
+    ));
+    AppToast.show(ctx, message: 'Above nav');
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    final rect = tester.getRect(find.ancestor(of: find.text('Above nav'), matching: find.byType(Material)).first);
+    expect(rect.bottom, lessThanOrEqualTo(800 - 80 - 12));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('AppToast floats above dialogs', (tester) async {
+    late BuildContext ctx;
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      builder: (context, child) => AppToastHost(child: child!),
+      home: Scaffold(body: Builder(builder: (c) {
+        ctx = c;
+        return const SizedBox();
+      })),
+    ));
+    showDialog<void>(context: ctx, builder: (_) => const AlertDialog(title: Text('Open dialog')));
+    await tester.pumpAndSettle();
+    final closed = AppToast.show(ctx, message: 'On top');
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    await tester.tap(find.byTooltip('Close'));
+    await pumpFor(tester, const Duration(milliseconds: 400));
+    expect(await closed, AppToastClosedReason.dismissed);
+    expect(find.text('Open dialog'), findsOneWidget);
+  });
+
+  test('Screens show toasts only through AppToast', () {
+    final offenders = [
+      for (final f in Directory('lib').listSync(recursive: true))
+        if (f is File &&
+            f.path.endsWith('.dart') &&
+            f.readAsStringSync().contains('showSnackBar('))
+          f.path,
+    ];
+    expect(offenders, isEmpty);
+  });
+
+  for (final scenario in [
+    (name: 'phone', size: const Size(390, 1400)),
+    (name: 'tablet', size: const Size(1024, 1300)),
+  ]) {
+    testWidgets('Swiping an Activity log card deletes it with Undo (${scenario.name})', (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1.0;
+      const channel = MethodChannel('com.notificationhandler/bridge');
+      final now = DateTime.now();
+      final deleted = <String>{};
+      final deleteCalls = <List<Object?>>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        switch (call.method) {
+          case 'getActivityLog':
+            return jsonEncode([
+              for (final (id, pkg, title, hours) in [
+                ('10', 'com.slack', 'Slack ping', 1),
+                ('11', 'com.gmail', 'Mail in', 5),
+              ])
+                if (!deleted.contains(id))
+                  {
+                    'id': id,
+                    'packageName': pkg,
+                    'title': title,
+                    'message': 'Body',
+                    'timestampMs': now.subtract(Duration(hours: hours)).millisecondsSinceEpoch,
+                    'isBlocked': true,
+                  },
+            ]);
+          case 'deleteActivityEvents':
+            final ids = (call.arguments as Map)['ids'] as List<Object?>;
+            deleteCalls.add(ids);
+            deleted.addAll(ids.cast<String>());
+            return null;
+        }
+        return null;
+      });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Scaffold(body: ActivityScreen(repository: repository)),
+      ));
+      await flushFontsAndSettle(tester);
+      expect(find.textContaining('Slack ping'), findsOneWidget);
+
+      await tester.fling(find.textContaining('Slack ping'), const Offset(600, 0), 2000);
+      await pumpFor(tester, const Duration(seconds: 1));
+      expect(find.textContaining('Slack ping'), findsNothing);
+      expect(find.text('Message deleted'), findsOneWidget);
+
+      await tester.tap(find.text('Undo'));
+      await pumpFor(tester, const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Slack ping'), findsOneWidget);
+      expect(deleteCalls, isEmpty);
+
+      await tester.fling(find.textContaining('Slack ping'), const Offset(600, 0), 2000);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 5));
+      await flushFontsAndSettle(tester);
+      expect(deleteCalls, [
+        ['10']
+      ]);
+      expect(find.textContaining('Slack ping'), findsNothing);
+      expect(find.textContaining('Mail in'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Swiping a digest card deletes the window and its log messages', (tester) async {
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    const channel = MethodChannel('com.notificationhandler/bridge');
+    final now = DateTime.now();
+    var windowDeleted = false;
+    final deleteCalls = <List<Object?>>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      switch (call.method) {
+        case 'getDigest':
+          return windowDeleted ? '[]' : digestJson(now, reviewed: true);
+        case 'getActivityLog':
+          if (windowDeleted) return '[]';
+          final window = (jsonDecode(digestJson(now)) as List).first as Map;
+          return jsonEncode(window['events']);
+        case 'deleteDigestWindows':
+          deleteCalls.add((call.arguments as Map)['ids'] as List<Object?>);
+          windowDeleted = true;
+          return null;
+      }
+      return null;
+    });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: Scaffold(body: ActivityScreen(repository: repository)),
+    ));
+    await flushFontsAndSettle(tester);
+    expect(find.textContaining('Chat 1'), findsWidgets);
+
+    await tester.tap(find.textContaining('Digest').first);
+    await flushFontsAndSettle(tester);
+    await tester.fling(find.byKey(const ValueKey('digest_window_7')), const Offset(600, 0), 2000);
+    await pumpFor(tester, const Duration(seconds: 1));
+    expect(find.byKey(const ValueKey('digest_window_7')), findsNothing);
+    expect(find.text('Digest deleted · 3 messages'), findsOneWidget);
+
+    // Its messages leave the log too, before the delete is committed.
+    await tester.tap(find.textContaining('All').first);
+    await pumpFor(tester, const Duration(milliseconds: 500));
+    expect(find.textContaining('Chat 1'), findsNothing);
+    expect(deleteCalls, isEmpty);
+
+    await tester.pump(const Duration(seconds: 5));
+    await flushFontsAndSettle(tester);
+    expect(deleteCalls, [
+      [7]
+    ]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Activity Digest filter shows an empty state when nothing was silenced', (tester) async {
+    tester.view.physicalSize = const Size(390, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      home: Scaffold(body: ActivityScreen(repository: repository)),
+    ));
+    await flushFontsAndSettle(tester);
+
+    await tester.tap(find.textContaining('Digest').first);
+    await flushFontsAndSettle(tester);
+    expect(find.textContaining('Nothing to catch up on'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final scenario in [
     (name: 'phone', size: const Size(390, 800), tablet: false),
@@ -635,11 +1199,15 @@ void main() {
     await tester.pumpWidget(wrapWithTheme(DashboardScreen(repository: repository)));
     await flushFontsAndSettle(tester);
 
-    final addAppButton = find.widgetWithText(TextButton, '+ Add App');
-    expect(addAppButton, findsOneWidget);
+    final addAppFab = find.byKey(const ValueKey('rules-add-app-fab'));
+    final applyFab = find.byKey(const ValueKey('rules-apply-fab'));
+    expect(addAppFab, findsOneWidget);
+    expect(find.text('+ Add App'), findsNothing);
     expect(find.text('Add Apps'), findsNothing);
-    // Ensure no redundant Icons.add_rounded is placed inside this TextButton
-    expect(find.descendant(of: addAppButton, matching: find.byIcon(Icons.add_rounded)), findsNothing);
+    expect(tester.getCenter(addAppFab).dy, lessThan(tester.getCenter(applyFab).dy));
+    await tester.tap(addAppFab);
+    await flushFontsAndSettle(tester);
+    expect(find.byType(AddAppsScreen), findsOneWidget);
   });
 
   testWidgets('DashboardScreen shows only the big Add Apps button when no apps are managed', (WidgetTester tester) async {
@@ -655,7 +1223,7 @@ void main() {
 
     expect(find.text('No apps managed yet'), findsOneWidget);
     expect(find.text('Add Apps'), findsOneWidget);
-    expect(find.text('+ Add App'), findsNothing);
+    expect(find.byKey(const ValueKey('rules-add-app-fab')), findsNothing);
   });
 
   for (final scenario in [
@@ -689,6 +1257,7 @@ void main() {
       ));
       await flushFontsAndSettle(tester);
 
+      expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
       expect(find.text('+ Add Schedule'), findsNothing);
       expect(find.text('ACTIVE SCHEDULE RULES (0)'), findsOneWidget);
       expect(find.text('QUICK TEMPORARY BLOCK'), findsOneWidget);
@@ -881,6 +1450,100 @@ void main() {
     expect(find.byType(AppDetailsScreen), findsOneWidget);
   });
 
+  test('InstalledAppsCache fetches icons once and flags uninstalled apps only after loading', () async {
+    final cache = InstalledAppsCache.instance;
+    mockPlatform.installedApps = [
+      DiscoveredAppInfo(
+          packageName: 'com.example.one',
+          displayName: 'One App',
+          iconBytes: Uint8List.fromList([1, 2, 3])),
+    ];
+    mockPlatform.uninstalledPackages = {'com.example.gone'};
+
+    expect(cache.isUninstalled('com.example.gone'), isFalse);
+    await cache.ensureLoaded();
+    expect(cache.iconFor('com.example.one'), isNull);
+
+    await cache.loadIcons(['com.example.one']);
+    await cache.loadIcons(['com.example.one']);
+    expect(cache.iconFor('com.example.one'), [1, 2, 3]);
+    expect(mockPlatform.iconRequests, 1);
+
+    await cache.checkInstalled(['com.example.one', 'com.example.gone']);
+    expect(cache.isUninstalled('com.example.one'), isFalse);
+    expect(cache.isUninstalled('com.example.gone'), isTrue);
+  });
+
+  testWidgets('Rules page greys out uninstalled apps but keeps the rule', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final now = DateTime.now();
+    await repository.addApp(ManagedApp(
+      id: 'com.example.gone',
+      packageName: 'com.example.gone',
+      displayName: 'Gone App',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    mockPlatform.uninstalledPackages = {'com.example.gone'};
+
+    await tester.pumpWidget(wrapWithTheme(DashboardScreen(repository: repository)));
+    await flushFontsAndSettle(tester);
+    expect(find.text('UNINSTALLED'), findsNothing);
+
+    await tester.runAsync(() =>
+        InstalledAppsCache.instance.checkInstalled(['com.example.gone']));
+    await tester.pump();
+    expect(find.text('UNINSTALLED'), findsOneWidget);
+
+    await tester.tap(find.byType(StitchSwitch), warnIfMissed: false);
+    await tester.pump();
+    expect(repository.managedApps.single.enabled, isTrue);
+
+    await tester.tap(find.text('Gone App'));
+    await flushFontsAndSettle(tester);
+    expect(find.byType(AppDetailsScreen), findsOneWidget);
+  });
+
+  testWidgets('AddAppsScreen reuses the shared app list and refreshes only changed packages', (WidgetTester tester) async {
+    mockPlatform.installedApps = [
+      DiscoveredAppInfo(packageName: 'com.example.one', displayName: 'One App'),
+    ];
+    Future<void> open() async {
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: AddAppsScreen(key: UniqueKey(), repository: repository),
+      ));
+    }
+
+    await open();
+    await flushFontsAndSettle(tester);
+    expect(find.byKey(const ValueKey('add-app-com.example.one')), findsOneWidget);
+
+    mockPlatform.installedApps = [
+      ...mockPlatform.installedApps,
+      DiscoveredAppInfo(packageName: 'com.example.two', displayName: 'Two App'),
+    ];
+    mockPlatform.installedAppsGate = Completer<void>();
+    await open();
+    await tester.pump();
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.byKey(const ValueKey('add-app-com.example.one')), findsOneWidget);
+    expect(find.byKey(const ValueKey('add-app-com.example.two')), findsNothing);
+
+    mockPlatform.installedAppsGate!.complete();
+    mockPlatform.changeSequence = 1;
+    mockPlatform.changedPackages = ['com.example.two'];
+    InstalledAppsCache.instance.refreshChanges();
+    await tester.pump();
+    await flushFontsAndSettle(tester);
+    expect(find.byKey(const ValueKey('add-app-com.example.two')), findsOneWidget);
+  });
+
   for (final scenario in [
     (name: 'light phone', size: const Size(390, 844), mode: ThemeMode.light),
     (name: 'dark phone', size: const Size(390, 844), mode: ThemeMode.dark),
@@ -903,6 +1566,7 @@ void main() {
       ));
       await flushFontsAndSettle(tester);
 
+      expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
       final dropdown = find.byKey(const ValueKey('template-dropdown'));
       final dropdownRect = tester.getRect(dropdown);
       await tester.tap(dropdown);
@@ -939,7 +1603,7 @@ void main() {
     (name: 'light tablet', size: const Size(1024, 2600), mode: ThemeMode.light),
     (name: 'dark tablet', size: const Size(1024, 2600), mode: ThemeMode.dark),
   ]) {
-    testWidgets('Settings Saved Rules can rename and delete templates (${scenario.name})', (WidgetTester tester) async {
+    testWidgets('Settings Saved Rules can edit and delete templates (${scenario.name})', (WidgetTester tester) async {
       tester.view.physicalSize = scenario.size;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
@@ -969,15 +1633,30 @@ void main() {
       final defaultTile = find.byKey(const ValueKey('saved-rule-template_work_focus'));
       final wrongTile = find.byKey(const ValueKey('saved-rule-template_wrong'));
       expect(find.descendant(of: defaultTile, matching: find.text('DEFAULT')), findsOneWidget);
+      expect(find.descendant(of: defaultTile, matching: find.text('Focus Hours')), findsOneWidget);
       expect(find.descendant(of: defaultTile, matching: find.byTooltip('Delete')), findsNothing);
+      expect(find.descendant(of: defaultTile, matching: find.byTooltip('Edit')), findsNothing);
 
-      await tester.tap(find.descendant(of: wrongTile, matching: find.byTooltip('Rename')));
+      await tester.tap(find.descendant(of: wrongTile, matching: find.byTooltip('Edit')));
       await flushFontsAndSettle(tester);
-      await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)), 'Late Weekend');
-      await tester.tap(find.text('Save'));
+      expect(find.text('Edit Saved Rule'), findsOneWidget);
+      expect(find.text('QUICK LOAD TEMPLATE / SAVED RULE'), findsNothing);
+      expect(find.text('RULE NAME'), findsOneWidget);
+      expect(find.text('Apps already using this rule keep their current schedule.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'Late Weekend');
+      final everyday = find.text('Everyday');
+      await tester.scrollUntilVisible(everyday, 200, scrollable: find.byType(Scrollable).first);
+      await tester.tap(everyday);
+      await tester.pump();
+      final save = find.text('Save Changes');
+      await tester.scrollUntilVisible(save, 200, scrollable: find.byType(Scrollable).first);
+      await tester.tap(save);
       await flushFontsAndSettle(tester);
+      expect(find.text('Edit Saved Rule'), findsNothing);
       expect(find.text('Late Weekend'), findsOneWidget);
-      expect(repository.ruleTemplates.firstWhere((t) => t.id == 'template_wrong').name, 'Late Weekend');
+      final edited = repository.ruleTemplates.firstWhere((t) => t.id == 'template_wrong');
+      expect(edited.name, 'Late Weekend');
+      expect(edited.daysOfWeek, {1, 2, 3, 4, 5, 6, 7});
 
       await tester.tap(find.descendant(of: wrongTile, matching: find.byTooltip('Delete')));
       await flushFontsAndSettle(tester);
@@ -988,6 +1667,127 @@ void main() {
     });
   }
 
+
+  for (final scenario in [
+    (name: 'light phone', size: const Size(390, 844), mode: ThemeMode.light),
+    (name: 'dark tablet', size: const Size(1024, 1300), mode: ThemeMode.dark),
+  ]) {
+    testWidgets('Import summary removes a waiting app only after confirmation (${scenario.name})', (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final vaulted = ManagedApp(
+        id: 'app_meesho',
+        packageName: 'com.meesho',
+        displayName: 'Meesho',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        isDormantVault: true,
+      );
+      await repository.addApp(vaulted);
+      final report = ImportReport(
+        waiting: [ImportReportApp(app: vaulted, ruleCount: 1)],
+      );
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: scenario.mode,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => showImportSummarySheet(context, report, repository: repository),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await flushFontsAndSettle(tester);
+
+      final remove = find.byKey(const ValueKey('import-summary-remove-app_meesho'));
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      expect(find.text('Remove Meesho?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await flushFontsAndSettle(tester);
+      expect(remove, findsOneWidget);
+      expect(repository.dormantVaultApps.any((a) => a.id == 'app_meesho'), isTrue);
+
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('import-summary-remove-confirm')));
+      await tester.pump();
+      await pumpFor(tester, const Duration(milliseconds: 400));
+      expect(remove, findsNothing);
+      expect(find.byKey(const ValueKey('import-summary-waiting')), findsNothing);
+      expect(repository.dormantVaultApps.any((a) => a.id == 'app_meesho'), isFalse);
+      expect(find.text('Removed Meesho from the vault'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 4));
+    });
+  }
+
+  for (final scenario in [
+    (name: 'light phone', size: const Size(390, 844), mode: ThemeMode.light),
+    (name: 'dark tablet', size: const Size(1024, 1300), mode: ThemeMode.dark),
+  ]) {
+    testWidgets('Settings Dormant Vault card lists vaulted apps and removes after confirmation (${scenario.name})', (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await repository.addApp(ManagedApp(
+        id: 'app_meesho',
+        packageName: 'com.meesho',
+        displayName: 'Meesho',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        isDormantVault: true,
+      ));
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: scenario.mode,
+        home: SettingsScreen(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      final card = find.byKey(const ValueKey('settings-dormant-vault'));
+      await tester.ensureVisible(card);
+      expect(find.descendant(of: card, matching: find.text('1 APP')), findsOneWidget);
+      await tester.tap(card);
+      await flushFontsAndSettle(tester);
+      expect(find.byKey(const ValueKey('dormant-vault-app_meesho')), findsOneWidget);
+
+      final remove = find.byKey(const ValueKey('import-summary-remove-app_meesho'));
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      expect(find.text('Remove Meesho?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await flushFontsAndSettle(tester);
+      expect(repository.dormantVaultApps, hasLength(1));
+
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('import-summary-remove-confirm')));
+      await tester.pump();
+      await pumpFor(tester, const Duration(milliseconds: 400));
+      expect(repository.dormantVaultApps, isEmpty);
+      expect(find.byKey(const ValueKey('dormant-vault-empty')), findsOneWidget);
+      expect(find.text('No uninstalled apps in the vault'), findsOneWidget);
+      expect(find.text('Removed Meesho from the vault'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 4));
+
+      await tester.tap(find.byKey(const ValueKey('dormant-vault-done')));
+      await flushFontsAndSettle(tester);
+      expect(find.descendant(of: card, matching: find.text('0 APPS')), findsOneWidget);
+      expect(find.textContaining('No uninstalled apps.'), findsOneWidget);
+    });
+  }
 
   for (final scenario in [
     (name: 'light phone', size: const Size(390, 844), mode: ThemeMode.light),
@@ -1002,6 +1802,16 @@ void main() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
+      mockPlatform.installedApps = const [
+        DiscoveredAppInfo(packageName: 'com.slack', displayName: 'Slack'),
+      ];
+      await repository.addApp(ManagedApp(
+        id: 'app_import_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
       final backup = repository.exportRulesJson();
       mockPlatform.backupPicker = Completer<String?>();
       await tester.pumpWidget(MaterialApp(
@@ -1026,7 +1836,21 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Importing backup…'), findsNothing);
-      expect(find.text('Backup file restored successfully!'), findsOneWidget);
+      expect(find.text('Import complete'), findsOneWidget);
+      expect(find.byKey(const ValueKey('import-summary-imported')), findsOneWidget);
+      expect(find.text('Backup file restored successfully!'), findsNothing);
+
+      // Sections start expanded; the chevron collapses them.
+      final importedSection = find.byKey(const ValueKey('import-summary-imported'));
+      const firstApp = 'Slack';
+      expect(find.descendant(of: importedSection, matching: find.text(firstApp)), findsOneWidget);
+      await tester.tap(find.descendant(of: importedSection, matching: find.text('Imported')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.descendant(of: importedSection, matching: find.text(firstApp)), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('import-summary-done')));
+      await flushFontsAndSettle(tester);
+      expect(find.text('Import complete'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -1062,7 +1886,6 @@ void main() {
         'Allow Priority Phone Calls',
         '24-Hour Time Format',
         'ON-DEVICE INTEGRITY & STORAGE',
-        'Encrypted Local Storage',
         'Zero Telemetry Guarantee',
         'View Security & Privacy Audit Report',
       ]) {
@@ -1070,6 +1893,9 @@ void main() {
       }
       expect(find.textContaining('Focus Shield'), findsOneWidget);
       expect(find.text('Engine health, security & preferences'), findsNothing);
+      expect(find.text('0.00 B'), findsNothing);
+      expect(find.text(scenario.tablet ? 'Encrypted Local Storage' : 'Encrypted Locally'), findsOneWidget);
+      expect(find.textContaining('No internet needed. Your data stays on this'), findsOneWidget);
 
       final tabletOnly = [
         'ENGINE & BACKGROUND SERVICES',
@@ -1101,6 +1927,264 @@ void main() {
       ));
       await flushFontsAndSettle(tester);
       expect(repository.unmanagedAppsUntouched, !before);
+      expect(find.text('CATCH-UP DIGEST'), findsNothing);
     });
   }
+
+  for (final scenario in [
+    (name: 'light phone', size: const Size(390, 4000), mode: ThemeMode.light),
+    (name: 'dark phone', size: const Size(390, 4000), mode: ThemeMode.dark),
+    (name: 'light tablet', size: const Size(1024, 3000), mode: ThemeMode.light),
+    (name: 'dark tablet', size: const Size(1024, 3000), mode: ThemeMode.dark),
+  ]) {
+    testWidgets('Settings catch-up digest toggle asks for notification permission (${scenario.name})', (WidgetTester tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1.0;
+      const channel = MethodChannel('com.notificationhandler/bridge');
+      var enabled = false;
+      var permission = false;
+      final calls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        calls.add(call.method);
+        switch (call.method) {
+          case 'getDigestSettings':
+            return {'enabled': enabled, 'permissionGranted': permission};
+          case 'setDigestEnabled':
+            enabled = (call.arguments as Map)['enabled'] as bool;
+            return null;
+          case 'requestNotificationPermission':
+            return permission;
+        }
+        return null;
+      });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: scenario.mode,
+        home: SettingsScreen(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      expect(find.text('CATCH-UP DIGEST'), findsOneWidget);
+      expect(find.text('Notify When Quiet Hours End'), findsOneWidget);
+      expect(find.text('NEEDS PERMISSION'), findsNothing);
+
+      final toggle = find.descendant(
+        of: find.byKey(const ValueKey('toggle-digest')),
+        matching: find.byType(StitchSwitch),
+      );
+      await tester.tap(toggle);
+      await flushFontsAndSettle(tester);
+      expect(enabled, isTrue);
+      expect(calls, contains('requestNotificationPermission'));
+      expect(find.text('NEEDS PERMISSION'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-digest-allow')), findsOneWidget);
+
+      permission = true;
+      await tester.tap(find.byKey(const ValueKey('settings-digest-allow')));
+      await flushFontsAndSettle(tester);
+      expect(find.text('ALLOWED'), findsOneWidget);
+      expect(find.byKey(const ValueKey('settings-digest-allow')), findsNothing);
+
+      calls.clear();
+      await tester.tap(toggle);
+      await flushFontsAndSettle(tester);
+      expect(enabled, isFalse);
+      expect(calls, isNot(contains('requestNotificationPermission')));
+      expect(find.text('ALLOWED'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  group('Apply rules wizard', () {
+    Future<void> seed() async {
+      mockPlatform.installedApps = [
+        DiscoveredAppInfo(packageName: 'com.slack', displayName: 'Slack'),
+        DiscoveredAppInfo(packageName: 'com.mail', displayName: 'Mail'),
+      ];
+      await repository.addApp(ManagedApp(
+        id: 'app_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
+    }
+
+    testWidgets('phone: FAB → rules → apps → review → apply, then undo per rule and all',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seed();
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: DashboardScreen(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      final fab = find.byKey(const ValueKey('rules-apply-fab'));
+      expect(fab, findsOneWidget);
+      await tester.longPress(find.text('Slack'));
+      await flushFontsAndSettle(tester);
+      expect(fab, findsNothing, reason: 'hidden during multi-select');
+      await tester.tap(find.byKey(const Key('select_all_checkbox')));
+      await flushFontsAndSettle(tester);
+      expect(fab, findsOneWidget);
+
+      await tester.tap(fab);
+      await flushFontsAndSettle(tester);
+      expect(find.byType(BulkApplyScreen), findsOneWidget);
+
+      final next = find.byKey(const ValueKey('bulk-next'));
+      expect(tester.widget<FilledButton>(next).onPressed, isNull);
+      await tester.tap(find.byKey(const ValueKey('bulk-rule-template_work_focus')));
+      await tester.pumpAndSettle();
+      expect(find.text('Block · 9:00 AM - 5:00 PM · Mon-Fri'), findsOneWidget);
+      await tester.tap(next);
+      await flushFontsAndSettle(tester);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-select-all')));
+      await tester.pumpAndSettle();
+      await tester.tap(next);
+      await flushFontsAndSettle(tester);
+
+      expect(find.text('1 rule → 2 apps'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('bulk-review-line'))).data,
+        '2 new schedules',
+      );
+      expect(find.text('NEW'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-apply')));
+      await flushFontsAndSettle(tester);
+
+      expect(find.text('Rules applied'), findsOneWidget);
+      expect(repository.schedules.length, 2);
+      final mail = repository.managedApps.firstWhere((a) => a.packageName == 'com.mail');
+
+      final slackRule = repository.getRulesForApp('app_slack').single;
+      await tester.tap(find.byKey(ValueKey('bulk-result-remove-rule-${slackRule.id}')));
+      await flushFontsAndSettle(tester);
+      expect(find.text('Remove Focus Hours?'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('bulk-result-confirm')));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      expect(repository.getRulesForApp('app_slack'), isEmpty);
+      expect(repository.managedApps.any((a) => a.id == 'app_slack'), isTrue,
+          reason: 'pre-existing app is kept');
+      expect(find.text('Removed Focus Hours from Slack'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 5));
+
+      await tester.tap(find.byKey(const ValueKey('bulk-result-undo-all')));
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('bulk-result-confirm')));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      expect(repository.schedules, isEmpty);
+      expect(repository.managedApps.any((a) => a.id == mail.id), isFalse,
+          reason: 'app added by the batch is removed when empty');
+      expect(find.text('Rules applied'), findsNothing);
+      await pumpFor(tester, const Duration(seconds: 5));
+    });
+
+    testWidgets('step 1: New rule creates a saved rule and selects it', (tester) async {
+      tester.view.physicalSize = const Size(390, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seed();
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: BulkApplyScreen(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      // Same schedule as Focus Hours: offered to use the existing rule.
+      await tester.tap(find.byKey(const ValueKey('bulk-new-rule')));
+      await flushFontsAndSettle(tester);
+      expect(find.text('New Rule'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).first, 'Copy');
+      await tester.tap(find.text('Save Rule'));
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.text('Use Focus Hours'));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      expect(repository.ruleTemplates.length, 1);
+      expect(find.text('1 rule selected'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-new-rule')));
+      await flushFontsAndSettle(tester);
+      await tester.enterText(find.byType(TextField).first, 'Weekend calm');
+      await tester.ensureVisible(find.text('Weekends'));
+      await tester.tap(find.text('Weekends'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save Rule'));
+      await tester.tap(find.text('Save Rule'));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+
+      final created = repository.ruleTemplates.firstWhere((t) => t.name == 'Weekend calm');
+      expect(created.daysOfWeek, {6, 7});
+      expect(find.byKey(ValueKey('bulk-rule-${created.id}')), findsOneWidget);
+      expect(find.text('2 rules selected'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 5));
+    });
+
+    testWidgets('tablet: panels side by side with review bar Apply', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seed();
+
+      BulkApplyResult? popped;
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                popped = await Navigator.of(context).push<BulkApplyResult>(
+                  MaterialPageRoute(
+                      builder: (_) => BulkApplyScreen(repository: repository)),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await flushFontsAndSettle(tester);
+
+      expect(find.byKey(const ValueKey('bulk-next')), findsNothing);
+      expect(find.text('Choose rules and apps'), findsOneWidget);
+      final rule = find.byKey(const ValueKey('bulk-rule-template_work_focus'));
+      final app = find.byKey(const ValueKey('bulk-app-com.mail'));
+      expect(tester.getCenter(rule).dx, lessThan(tester.getCenter(app).dx));
+
+      await tester.tap(rule);
+      await tester.tap(app);
+      await tester.pumpAndSettle();
+      expect(find.text('1 rule → 1 app'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-apply')));
+      await flushFontsAndSettle(tester);
+      expect(popped?.addedCount, 1);
+      expect(repository.managedApps.any((a) => a.packageName == 'com.mail'), isTrue);
+    });
+  });
 }

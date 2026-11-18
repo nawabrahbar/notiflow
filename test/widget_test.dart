@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,6 +26,18 @@ class MockPlatformService implements NotificationPlatformInterface {
 
   @override
   Future<List<DiscoveredAppInfo>> getInstalledApplications() async => [];
+
+  @override
+  Future<List<DiscoveredAppInfo>> getInstalledAppsLite() async => [];
+
+  @override
+  Future<Map<String, Uint8List>> getAppIcons(List<String> packageNames) async => {};
+
+  @override
+  Future<Map<String, bool>> getInstalledStatus(List<String> packageNames) async => {};
+
+  @override
+  Future<PackageChanges?> getChangedPackages(int sequenceNumber) async => null;
 
   @override
   Future<void> syncSchedules({
