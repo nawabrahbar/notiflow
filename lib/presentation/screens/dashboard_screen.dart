@@ -1,45 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
+import '../../data/services/installed_apps_cache.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
-import '../../domain/models/temporary_override.dart';
+import '../../platform/android_notification_platform.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_switch.dart';
+import '../widgets/app_toast.dart';
+import '../widgets/quick_mute_card.dart';
 import 'add_apps_screen.dart';
 import 'app_details_screen.dart';
 import 'permission_screen.dart';
 
-/// Dashboard Screen (Rules Page) adhering strictly to Botanical Sanctuary / Nocturne design:
+/// Which part of the home experience a [DashboardScreen] renders.
+enum DashboardView {
+  /// Dashboard tab: greeting, metrics, Quick Mute card and the digest overview.
+  home,
+
+  /// Rules tab: the managed apps catalog.
+  rules,
+}
+
+/// Dashboard and Rules screens adhering strictly to Botanical Sanctuary / Nocturne design:
 /// - Responsive layout: Single column on phone (< 600dp), 2-Column Bento Split (5 : 7) on tablet (>= 600dp)
-/// - Editorial Greeting card with Newsreader serif typography and curated quotes
-/// - Bento metrics (Intercepted & Permitted)
-/// - Quick Overrides panel (15m, 1h, and call bypass info pill)
-/// - Managed Apps catalog with real native app icons from PackageManager
+/// - Home: Editorial Greeting card, Bento metrics (Intercepted & Permitted),
+///   Quick Mute · All apps card and the Catch-Up Digest overview card
+/// - Rules: Managed Apps catalog with real native app icons from PackageManager
 class DashboardScreen extends StatefulWidget {
   final ScheduleRepository repository;
+  final DashboardView view;
   final VoidCallback? onAddAppTap;
+  final VoidCallback? onOpenDigest;
   final bool initialShowRestorationBanner;
 
   const DashboardScreen({
     super.key,
     required this.repository,
+    this.view = DashboardView.rules,
     this.onAddAppTap,
+    this.onOpenDigest,
     this.initialShowRestorationBanner = false,
   });
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen>
+class DashboardScreenState extends State<DashboardScreen>
     with WidgetsBindingObserver {
   late final NotificationPlatformInterface _platform;
   bool _isPermissionGranted = true;
   late bool _showRestorationBanner;
   final Set<String> _selectedAppIds = <String>{};
+  int _unreviewedDigestCount = 0;
+
+  bool get _isHome => widget.view == DashboardView.home;
 
   @override
   void initState() {
@@ -48,19 +66,144 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addObserver(this);
     _platform = PlatformFactory.createPlatformService();
     _checkPermission();
+    InstalledAppsCache.instance.addListener(_onInstalledAppsChanged);
+    if (_isHome) {
+      AndroidNotificationPlatform.addActivityUpdatedListener(_loadDigestSummary);
+      _loadDigestSummary();
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    InstalledAppsCache.instance.removeListener(_onInstalledAppsChanged);
+    AndroidNotificationPlatform.removeActivityUpdatedListener(_loadDigestSummary);
     super.dispose();
+  }
+
+  void _onInstalledAppsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkPermission();
+      if (_isHome) _loadDigestSummary();
     }
+  }
+
+  /// Reloads the digest overview, e.g. when the Dashboard tab is reselected.
+  Future<void> refreshDigest() => _loadDigestSummary();
+
+  Future<void> _loadDigestSummary() async {
+    final windows = await AndroidNotificationPlatform.fetchDigest();
+    if (!mounted) return;
+    final count = windows
+        .where((w) => !w.reviewed)
+        .fold<int>(0, (sum, w) => sum + w.count);
+    setState(() => _unreviewedDigestCount = count);
+  }
+
+  Widget _buildDigestOverviewCard({
+    required bool isDark,
+    required Color containerLow,
+    required Color borderCol,
+    required Color textMain,
+    required Color textMuted,
+    required Color primary,
+    required Color secContainer,
+    required Color onSecContainer,
+  }) {
+    final count = _unreviewedDigestCount;
+    final hasNew = count > 0;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const Key('digest_overview_card'),
+        onTap: widget.onOpenDigest,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: containerLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: hasNew ? primary.withValues(alpha: 0.5) : borderCol,
+              width: 1.0,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'CATCH-UP DIGEST',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                  color: textMuted,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: hasNew
+                          ? primary.withValues(alpha: isDark ? 0.2 : 0.12)
+                          : secContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      hasNew
+                          ? Icons.mark_email_unread_outlined
+                          : Icons.done_all_rounded,
+                      size: 20,
+                      color: hasNew ? primary : onSecContainer,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hasNew
+                              ? '$count silenced ${count == 1 ? 'notification' : 'notifications'}'
+                              : 'All caught up',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hasNew
+                              ? 'Review now'
+                              : 'When a rule ends, what it silenced is grouped here by app.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight:
+                                hasNew ? FontWeight.w600 : FontWeight.w400,
+                            color: hasNew ? primary : textMuted,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, size: 22, color: textMuted),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _checkPermission() async {
@@ -211,168 +354,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       await widget.repository.deleteAppsAndRules(ids);
       setState(() => _selectedAppIds.clear());
       if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                'Removed $count apps from Rules page',
-                style: const TextStyle(
-                  color: AppTheme.toastOnSuccess,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              backgroundColor: AppTheme.toastSuccess,
-            ),
-          );
+        AppToast.show(context, message: 'Removed $count apps from Rules page');
       }
     }
-  }
-
-  Widget _buildPhoneQuickOverrides(bool isDark) {
-    final globalMute = widget.repository.overrides
-        .where((o) => o.appId == 'global_mute' && o.isActive)
-        .firstOrNull;
-    final labelColor = isDark
-        ? AppTheme.darkOnSurfaceVariant
-        : AppTheme.lightOnSurfaceVariant;
-
-    void toggleMute(Duration duration) {
-      if (globalMute != null && globalMute.durationMinutes == duration.inMinutes) {
-        widget.repository.clearOverride('global_mute');
-      } else {
-        widget.repository.setTemporaryMute(
-          appId: 'global_mute',
-          duration: duration,
-        );
-      }
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'QUICK SESSION OVERRIDES',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.0,
-            color: labelColor,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _buildOverridePill(
-                isDark: isDark,
-                icon: Icons.hourglass_bottom_rounded,
-                label: 'Mute (15m)',
-                isActive: globalMute?.durationMinutes == 15,
-                onTap: () => toggleMute(const Duration(minutes: 15)),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildOverridePill(
-                isDark: isDark,
-                icon: Icons.timelapse_rounded,
-                label: 'Mute (30m)',
-                isActive: globalMute?.durationMinutes == 30,
-                onTap: () => toggleMute(const Duration(minutes: 30)),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildOverridePill(
-                isDark: isDark,
-                icon: Icons.timer_outlined,
-                label: 'Mute (1h)',
-                isActive: globalMute?.durationMinutes == 60,
-                onTap: () => toggleMute(const Duration(hours: 1)),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        _buildOverridePill(
-          isDark: isDark,
-          icon: Icons.stars_outlined,
-          label: 'Priority Only · Repeat callers ring through',
-          isActive: widget.repository.vipEmergencyBypass,
-          onTap: () => widget.repository.setVipEmergencyBypass(
-            !widget.repository.vipEmergencyBypass,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOverridePill({
-    required bool isDark,
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    final Color background;
-    final Color foreground;
-    final Color iconColor;
-    final Color? borderColor;
-    if (isDark) {
-      background = isActive ? const Color(0xFF2E3B32) : const Color(0xFF1A211D);
-      foreground = isActive ? const Color(0xFFC5D4BA) : const Color(0xFF9AA79B);
-      iconColor = isActive ? AppTheme.darkPrimaryContainer : foreground;
-      borderColor = isActive ? const Color(0xFF3A4B3F) : const Color(0xFF2A362F);
-    } else {
-      background = isActive
-          ? AppTheme.lightSecondaryContainer
-          : AppTheme.lightSurfaceContainer;
-      foreground = isActive
-          ? AppTheme.lightOnSecondaryContainer
-          : AppTheme.lightOnSurfaceVariant;
-      iconColor = foreground;
-      borderColor = null;
-    }
-
-    return Material(
-      color: background,
-      elevation: 1,
-      shadowColor: Colors.black.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-          decoration: borderColor == null
-              ? null
-              : BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: borderColor),
-                ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: iconColor),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: foreground,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildMetricCards({
@@ -710,8 +694,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       builder: (context, _) {
         final apps = widget.repository.managedApps;
         final summary = widget.repository.getSummary();
-        final overrides = widget.repository.overrides;
-        final activeOverride = overrides.isNotEmpty ? overrides.first : null;
         final greeting = _getGreetingData();
 
         return Scaffold(
@@ -721,61 +703,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth >= 600;
 
-                // LEFT PANEL WIDGET (Greeting + Metrics + Overrides)
-                final leftColumnContent = Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Restoration Banner (if access restored)
-                    if (_showRestorationBanner) ...[
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: secContainer.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: secondary.withOpacity(0.4)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.check_circle_rounded,
-                                color: secondary, size: 24),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Focus Shield Online',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: textMain,
-                                    ),
-                                  ),
-                                  Text(
-                                    'ACCESS RESTORED',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: secondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () => setState(
-                                  () => _showRestorationBanner = false),
-                              child: const Text('Audit Health'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    // Permission Recovery Banner (if access lost)
-                    if (!_isPermissionGranted) ...[
-                      Container(
+                // Permission Recovery Banner (if access lost)
+                final Widget? permissionBanner = _isPermissionGranted
+                    ? null
+                    : Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -834,8 +765,61 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                           ],
                         ),
+                      );
+
+                // LEFT PANEL WIDGET (Greeting + Metrics + Overrides)
+                final leftColumnContent = Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Restoration Banner (if access restored)
+                    if (_showRestorationBanner) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: secContainer.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: secondary.withOpacity(0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.check_circle_rounded,
+                                color: secondary, size: 24),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Focus Shield Online',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: textMain,
+                                    ),
+                                  ),
+                                  Text(
+                                    'ACCESS RESTORED',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: secondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(
+                                  () => _showRestorationBanner = false),
+                              child: const Text('Audit Health'),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
+
+                    ?permissionBanner,
 
                     // Sanctuary Editorial Greeting Card
                     Container(
@@ -896,185 +880,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                     const SizedBox(height: 16),
 
-                    // Quick Session Overrides Panel
-                    if (!isTablet)
-                      _buildPhoneQuickOverrides(isDark)
-                    else
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: containerLow,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderCol, width: 1.0),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'OVERRIDES',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.0,
-                                      color: textMuted,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Tap to engage',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: textMain,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Icon(Icons.touch_app_outlined,
-                                  size: 18, color: textMuted),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-
-                          if (activeOverride != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: primary.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: primary),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.hourglass_top_rounded,
-                                      color: primary, size: 18),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      _formatOverrideBannerText(
-                                          activeOverride, apps),
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: textMain,
-                                      ),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => widget.repository
-                                        .clearOverride(activeOverride.appId),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: primary,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                    ),
-                                    child: const Text('Restore'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ] else ...[
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      widget.repository.setTemporaryMute(
-                                        appId: 'global_mute',
-                                        duration: const Duration(minutes: 15),
-                                      );
-                                    },
-                                    icon: Icon(Icons.hourglass_top_rounded,
-                                        size: 16, color: primary),
-                                    label: Text(
-                                      'Mute All (15m)',
-                                      style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: textMain),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      backgroundColor: container,
-                                      side: BorderSide(color: borderCol),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 10),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      widget.repository.setTemporaryMute(
-                                        appId: 'global_mute',
-                                        duration: const Duration(hours: 1),
-                                      );
-                                    },
-                                    icon: Icon(Icons.bedtime_rounded,
-                                        size: 16, color: primary),
-                                    label: Text(
-                                      'Mute All (1h)',
-                                      style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: textMain),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      backgroundColor: container,
-                                      side: BorderSide(color: borderCol),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 10),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 10),
-
-                          // Permitted exception pill
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: secContainer.withOpacity(0.4),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: secondary.withOpacity(0.2)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.call_rounded,
-                                    size: 16, color: onSecContainer),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Phone calls allowed unconditionally',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w500,
-                                      color: onSecContainer,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    QuickMuteAllCard(repository: widget.repository),
                   ],
                 );
 
@@ -1279,6 +1085,42 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ],
                 );
 
+                if (!_isHome) {
+                  if (isTablet) {
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ?permissionBanner,
+                          rightColumnContent,
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    children: [
+                      ?permissionBanner,
+                      rightColumnContent,
+                      const SizedBox(height: 32),
+                    ],
+                  );
+                }
+
+                final digestCard = _buildDigestOverviewCard(
+                  isDark: isDark,
+                  containerLow: containerLow,
+                  borderCol: borderCol,
+                  textMain: textMain,
+                  textMuted: textMuted,
+                  primary: primary,
+                  secContainer: secContainer,
+                  onSecContainer: onSecContainer,
+                );
+
                 if (isTablet) {
                   // Tablet Mode: 2-Column Bento Split Grid (5 : 7)
                   return SingleChildScrollView(
@@ -1296,7 +1138,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         // Right Column (7 cols / ~58%)
                         Expanded(
                           flex: 7,
-                          child: rightColumnContent,
+                          child: digestCard,
                         ),
                       ],
                     ),
@@ -1309,8 +1151,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   children: [
                     leftColumnContent,
-                    const SizedBox(height: 24),
-                    rightColumnContent,
+                    const SizedBox(height: 16),
+                    digestCard,
                     const SizedBox(height: 32),
                   ],
                 );
@@ -1320,26 +1162,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         );
       },
     );
-  }
-
-  String _formatOverrideBannerText(
-    TemporaryOverride override,
-    List<ManagedApp> apps,
-  ) {
-    final mins = override.remainingMinutes;
-    final isBlock = override.mode == OverrideMode.block;
-    if (override.appId == 'global_mute' ||
-        override.appId == 'global_allow' ||
-        override.appId == 'global') {
-      return isBlock
-          ? 'Mute All Active (${mins}m left)'
-          : 'Allow All Active (${mins}m left)';
-    }
-    final matchingApp = apps
-        .where((a) => a.id == override.appId || a.packageName == override.appId)
-        .firstOrNull;
-    final label = matchingApp?.displayName ?? 'App';
-    return '$label ${isBlock ? 'Muted' : 'Allowed'} (${mins}m left)';
   }
 
   Widget _buildManagedAppCard(
@@ -1362,11 +1184,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     final isBlocked = decision.isBlocked;
     final isSelected = _selectedAppIds.contains(app.id);
     final isSelectionMode = _selectedAppIds.isNotEmpty;
+    // Rules stay so the user can delete them; reinstalling restores the card.
+    final isUninstalled =
+        InstalledAppsCache.instance.isUninstalled(app.packageName);
 
     String statusText;
     Color statusBg;
     Color statusFg;
-    if (!app.enabled) {
+    if (isUninstalled) {
+      statusText = 'UNINSTALLED';
+      statusBg = containerHigh;
+      statusFg = textMuted;
+    } else if (!app.enabled) {
       statusText = 'PAUSED';
       statusBg = containerHigh;
       statusFg = textMuted;
@@ -1381,7 +1210,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
 
     String detailText;
-    if (!app.enabled) {
+    if (isUninstalled) {
+      detailText = 'App not installed';
+    } else if (!app.enabled) {
       detailText = 'Monitoring paused';
     } else if (rule != null) {
       final isBlockRule = rule.mode == ScheduleMode.blockDuring ||
@@ -1448,7 +1279,9 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ],
         ),
-        child: Row(
+        child: Opacity(
+          opacity: isUninstalled ? 0.55 : 1,
+          child: Row(
           children: [
             // Native App Icon from PackageManager
             Container(
@@ -1481,7 +1314,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 children: [
                   Row(
                     children: [
-                      Flexible(
+                      // Expanded keeps the status badge aligned at the right edge.
+                      Expanded(
                         child: Text(
                           app.displayName,
                           maxLines: 1,
@@ -1538,11 +1372,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             const SizedBox(width: 10),
 
             // Toggle Master Monitoring Switch
-            StitchSwitch(
-              value: app.enabled,
-              onChanged: (val) {
-                widget.repository.toggleApp(app.id, val);
-              },
+            IgnorePointer(
+              ignoring: isUninstalled,
+              child: StitchSwitch(
+                value: app.enabled,
+                onChanged: (val) {
+                  widget.repository.toggleApp(app.id, val);
+                },
+              ),
             ),
             const SizedBox(width: 4),
 
@@ -1552,6 +1389,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               color: textMuted.withOpacity(0.6),
             ),
           ],
+          ),
         ),
       ),
     );

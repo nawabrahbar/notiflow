@@ -93,3 +93,9 @@ Notification Handler follows a clean, decoupled architecture dividing responsibi
    - Reads the parsed cache in memory (invalidated automatically when preferences change).
    - Evaluates the schedule in `< 1ms`.
    - Executes `cancelNotification` if blocked.
+   - Records the event in the on-device SQLite database `notiflow.db` (`NotiflowDatabase.kt`). Silenced events are linked to a `rule_windows` row describing the continuous silenced period they fall in (overlapping rules and pauses merge; permanent mute has no window). Updates to the same notification or conversation within a window update the existing row, so counts are unique.
+
+### 3.1 Activity history and Catch-Up Digest
+- `notification_events` and `rule_windows` keep 30 days of history; older rows are pruned when the store starts and at most once a day while recording.
+- On first run the legacy `activity_log` `SharedPreferences` key is migrated into the database and removed.
+- Flutter reads history with `getActivityLog`, ended windows with `getDigest`, and marks windows reviewed with `markDigestReviewed`. The Dashboard digest card and the Activity **Digest** filter are built on these calls.

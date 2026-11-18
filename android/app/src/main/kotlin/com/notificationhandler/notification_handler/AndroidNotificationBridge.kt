@@ -29,17 +29,26 @@ class AndroidNotificationBridge(
     companion object {
         private const val REQUEST_CODE_PICK_BACKUP = 9104
         private const val REQUEST_CODE_EXPORT_BACKUP = 9105
+        private const val REQUEST_CODE_POST_NOTIFICATIONS = 9106
+        private const val PERMISSION_PREFS = "notiflow_digest"
+        private const val KEY_PERMISSION_ASKED_VERSION = "notification_permission_asked_version"
         private const val MAX_BACKUP_BYTES = 5 * 1024 * 1024L // 5 MB safety limit
     }
 
     private val scheduleStore = NativeScheduleStore(context)
     private val executor = Executors.newSingleThreadExecutor()
+    // Icons and installed checks run separately so they never queue behind a full app scan.
+    private val iconExecutor = Executors.newSingleThreadExecutor()
+    // Activity log / digest reads stay off the main thread.
+    private val dbExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingPickResult: MethodChannel.Result? = null
     private var pendingExportResult: MethodChannel.Result? = null
     private var pendingExportContent: String? = null
     private var pendingExportFileName: String? = null
     private var permissionWatcherRunnable: Runnable? = null
+    private var pendingPermissionResult: MethodChannel.Result? = null
+    private val methodChannel = channel
 
     init {
         channel.setMethodCallHandler(this)
@@ -195,6 +204,97 @@ class AndroidNotificationBridge(
         }
     }
 
+    /** Tells Flutter a digest notification was tapped; Flutter then consumes the pending open. */
+    fun notifyOpenDigest() {
+        mainHandler.post {
+            try {
+                methodChannel.invokeMethod("openDigest", null)
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun currentVersionCode(): Long = try {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) info.longVersionCode
+        else @Suppress("DEPRECATION") info.versionCode.toLong()
+    } catch (_: Exception) {
+        -1L
+    }
+
+    /**
+     * Startup: asks once per install/update on Android 13+ when not granted.
+     * Settings toggle: asks again while Android still shows the prompt, otherwise opens
+     * the app's notification settings. Resolves with whether notifications can be posted.
+     */
+    private fun requestNotificationPermission(result: MethodChannel.Result, startupOnly: Boolean) {
+        if (DigestNotifier.canPostNotifications(context)) {
+            result.success(true)
+            return
+        }
+        val prefs = context.getSharedPreferences(PERMISSION_PREFS, Context.MODE_PRIVATE)
+        val act = activity
+        val runtimePermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        val runtimeGranted = runtimePermission &&
+            context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (startupOnly) {
+            val version = currentVersionCode()
+            if (!runtimePermission || runtimeGranted || act == null ||
+                prefs.getLong(KEY_PERMISSION_ASKED_VERSION, Long.MIN_VALUE) == version
+            ) {
+                result.success(false)
+                return
+            }
+            prefs.edit().putLong(KEY_PERMISSION_ASKED_VERSION, version).apply()
+            launchPermissionPrompt(act, result)
+            return
+        }
+
+        val canPrompt = runtimePermission && !runtimeGranted && act != null &&
+            (!prefs.contains(KEY_PERMISSION_ASKED_VERSION) ||
+                act.shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS))
+        if (canPrompt && act != null) {
+            prefs.edit().putLong(KEY_PERMISSION_ASKED_VERSION, currentVersionCode()).apply()
+            launchPermissionPrompt(act, result)
+            return
+        }
+        openAppNotificationSettings()
+        result.success(false)
+    }
+
+    private fun launchPermissionPrompt(act: Activity, result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || pendingPermissionResult != null) {
+            result.success(false)
+            return
+        }
+        pendingPermissionResult = result
+        act.requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REQUEST_CODE_POST_NOTIFICATIONS)
+    }
+
+    fun handlePermissionResult(requestCode: Int): Boolean {
+        if (requestCode != REQUEST_CODE_POST_NOTIFICATIONS) return false
+        val pending = pendingPermissionResult
+        pendingPermissionResult = null
+        pending?.success(DigestNotifier.canPostNotifications(context))
+        return true
+    }
+
+    private fun openAppNotificationSettings() {
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            } else {
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(android.net.Uri.fromParts("package", context.packageName, null))
+            }
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: Exception) {
+        }
+    }
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "isPlatformSupported" -> {
@@ -251,6 +351,50 @@ class AndroidNotificationBridge(
                     result.error("SETTINGS_ERROR", "Could not open app details settings", e.message)
                 }
             }
+            "getInstalledAppsLite" -> {
+                executor.execute {
+                    try {
+                        val apps = loadInstalledApplications(withIcons = false)
+                        mainHandler.post { result.success(apps) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("QUERY_ERROR", "Failed to retrieve installed apps", e.message)
+                        }
+                    }
+                }
+            }
+            "getAppIcons" -> {
+                val packages = call.argument<List<String>>("packageNames") ?: emptyList()
+                iconExecutor.execute {
+                    val icons = loadAppIcons(packages)
+                    mainHandler.post { result.success(icons) }
+                }
+            }
+            "getInstalledStatus" -> {
+                val packages = call.argument<List<String>>("packageNames") ?: emptyList()
+                iconExecutor.execute {
+                    val status = packages.distinct().associateWith { isPackageInstalled(it) }
+                    mainHandler.post { result.success(status) }
+                }
+            }
+            "getChangedPackages" -> {
+                val sequence = call.argument<Number>("sequenceNumber")?.toInt() ?: 0
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                    result.success(null)
+                } else {
+                    try {
+                        val changes = context.packageManager.getChangedPackages(sequence)
+                        result.success(
+                            mapOf(
+                                "sequenceNumber" to (changes?.sequenceNumber ?: sequence),
+                                "packageNames" to (changes?.packageNames ?: emptyList<String>())
+                            )
+                        )
+                    } catch (_: Exception) {
+                        result.success(null)
+                    }
+                }
+            }
             "getInstalledApplications" -> {
                 executor.execute {
                     try {
@@ -269,8 +413,36 @@ class AndroidNotificationBridge(
                 val payload = call.argument<String>("payload")
                 if (payload != null) {
                     scheduleStore.savePayload(payload)
+                    executor.execute {
+                        scheduleStore.reconcileHeld(NotificationHandlerListenerService.controller)
+                    }
                 }
                 result.success(null)
+            }
+            "getDigestSettings" -> {
+                result.success(
+                    mapOf(
+                        "enabled" to DigestNotifier.isEnabled(context),
+                        "permissionGranted" to DigestNotifier.canPostNotifications(context)
+                    )
+                )
+            }
+            "setDigestEnabled" -> {
+                DigestNotifier.setEnabled(context, call.argument<Boolean>("enabled") ?: true)
+                result.success(null)
+            }
+            "requestNotificationPermission" -> {
+                requestNotificationPermission(result, startupOnly = false)
+            }
+            "requestNotificationPermissionOnStartup" -> {
+                requestNotificationPermission(result, startupOnly = true)
+            }
+            "setAppThemeMode" -> {
+                AppThemePrefs.setMode(context, activity, call.argument<String>("mode") ?: AppThemePrefs.SYSTEM)
+                result.success(null)
+            }
+            "consumePendingDigestOpen" -> {
+                result.success((activity as? MainActivity)?.consumePendingDigestOpen() ?: false)
             }
             "exportBackupFile" -> {
                 val fileName = call.argument<String>("fileName") ?: "notiflow_backup.notiflow"
@@ -327,7 +499,34 @@ class AndroidNotificationBridge(
                 }
             }
             "getActivityLog" -> {
-                result.success(scheduleStore.getActivityLogJson())
+                dbExecutor.execute {
+                    val json = scheduleStore.getActivityLogJson()
+                    mainHandler.post { result.success(json) }
+                }
+            }
+            "getDigest" -> {
+                dbExecutor.execute {
+                    val json = scheduleStore.getDigestJson()
+                    mainHandler.post { result.success(json) }
+                }
+            }
+            "markDigestReviewed" -> {
+                val ids = call.argument<List<Number>>("ids")?.map { it.toLong() } ?: emptyList()
+                scheduleStore.markDigestReviewed(ids)
+                result.success(null)
+            }
+            "deleteActivityEvents", "deleteDigestWindows" -> {
+                val ids = call.argument<List<Any>>("ids")
+                    ?.mapNotNull { (it as? Number)?.toLong() ?: it.toString().toLongOrNull() }
+                    ?: emptyList()
+                dbExecutor.execute {
+                    if (call.method == "deleteActivityEvents") {
+                        scheduleStore.deleteActivityEvents(ids)
+                    } else {
+                        scheduleStore.deleteDigestWindows(ids)
+                    }
+                    mainHandler.post { result.success(null) }
+                }
             }
             "clearActivityLog" -> {
                 scheduleStore.clearActivityLog()
@@ -358,7 +557,7 @@ class AndroidNotificationBridge(
         }
     }
 
-    private fun loadInstalledApplications(): List<Map<String, Any?>> {
+    private fun loadInstalledApplications(withIcons: Boolean = true): List<Map<String, Any?>> {
         val pm = context.packageManager
         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
@@ -373,8 +572,7 @@ class AndroidNotificationBridge(
             seenPackages.add(pkg)
 
             val appName = info.loadLabel(pm).toString()
-            val iconDrawable = info.loadIcon(pm)
-            val iconBytes = drawableToByteArray(iconDrawable)
+            val iconBytes = if (withIcons) drawableToByteArray(info.loadIcon(pm)) else null
             val isSystem = (info.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
 
             list.add(
@@ -389,6 +587,28 @@ class AndroidNotificationBridge(
 
         // Sort alphabetically by app name
         return list.sortedBy { (it["displayName"] as? String)?.lowercase() ?: "" }
+    }
+
+    /** Launcher icons for just the given packages; packages without an icon are left out. */
+    private fun loadAppIcons(packages: List<String>): Map<String, ByteArray> {
+        val pm = context.packageManager
+        val icons = mutableMapOf<String, ByteArray>()
+        for (pkg in packages.distinct()) {
+            try {
+                val component = pm.getLaunchIntentForPackage(pkg)?.component
+                val drawable = if (component != null) pm.getActivityIcon(component) else pm.getApplicationIcon(pkg)
+                drawableToByteArray(drawable)?.let { icons[pkg] = it }
+            } catch (_: Exception) {
+            }
+        }
+        return icons
+    }
+
+    private fun isPackageInstalled(pkg: String): Boolean = try {
+        context.packageManager.getPackageInfo(pkg, 0)
+        true
+    } catch (_: Exception) {
+        false
     }
 
     private fun drawableToByteArray(drawable: Drawable?): ByteArray? {

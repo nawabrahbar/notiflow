@@ -1,18 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../data/repositories/schedule_repository.dart';
+import '../../data/services/installed_apps_cache.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_toast.dart';
 import '../widgets/stitch_header.dart';
 import 'activity_screen.dart';
 import 'add_apps_screen.dart';
 import 'dashboard_screen.dart';
 import 'settings_screen.dart';
+import '../../platform/android_notification_platform.dart';
 
 /// Main navigation shell housing responsive navigation:
 /// - Tablet (>= 600dp): Left persistent Navigation Rail (w-22 / 88dp)
 /// - Phone (< 600dp): Bottom Navigation Bar
+/// Both show Dashboard, Rules, Activity and Settings. Add Apps opens as its own
+/// page from the Rules tab.
 class MainNavigationShell extends StatefulWidget {
+  static const int dashboardTab = 0;
+  static const int rulesTab = 1;
+  static const int activityTab = 2;
+  static const int settingsTab = 3;
+
   final ScheduleRepository repository;
   final int initialIndex;
   final bool showRestorationBanner;
@@ -20,7 +31,7 @@ class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({
     super.key,
     required this.repository,
-    this.initialIndex = 0,
+    this.initialIndex = dashboardTab,
     this.showRestorationBanner = false,
   });
 
@@ -31,35 +42,106 @@ class MainNavigationShell extends StatefulWidget {
   State<MainNavigationShell> createState() => MainNavigationShellState();
 }
 
-class MainNavigationShellState extends State<MainNavigationShell> {
+class MainNavigationShellState extends State<MainNavigationShell>
+    with WidgetsBindingObserver {
   late int _currentIndex;
   final GlobalKey<ActivityScreenState> _activityKey =
       GlobalKey<ActivityScreenState>();
+  final GlobalKey<DashboardScreenState> _dashboardKey =
+      GlobalKey<DashboardScreenState>();
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    AndroidNotificationPlatform.addOpenDigestListener(_onOpenDigest);
+    WidgetsBinding.instance.addObserver(this);
+    widget.repository.addListener(_checkManagedAppsInstalled);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Load the shared app list in the background once the dashboard is visible.
+      _warmInstalledApps();
+      _startupChecks();
+    });
+  }
+
+  @override
+  void dispose() {
+    AndroidNotificationPlatform.removeOpenDigestListener(_onOpenDigest);
+    WidgetsBinding.instance.removeObserver(this);
+    widget.repository.removeListener(_checkManagedAppsInstalled);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      InstalledAppsCache.instance.refreshChanges().then(
+        (_) => _checkManagedAppsInstalled(force: true),
+      );
+    }
+  }
+
+  Future<void> _warmInstalledApps() async {
+    await InstalledAppsCache.instance.ensureLoaded();
+    await _checkManagedAppsInstalled();
+  }
+
+  Future<void> _checkManagedAppsInstalled({bool force = false}) =>
+      InstalledAppsCache.instance.checkInstalled(
+        widget.repository.managedApps.map((a) => a.packageName),
+        force: force,
+      );
+
+  Future<void> _startupChecks() async {
+    await _onOpenDigest();
+    if (!mounted) return;
+    await AndroidNotificationPlatform.requestNotificationPermissionOnStartup();
+  }
+
+  Future<void> _onOpenDigest() async {
+    final pending =
+        await AndroidNotificationPlatform.consumePendingDigestOpen();
+    if (!pending || !mounted) return;
+    openDigest();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _activityKey.currentState?.showDigest();
+    });
   }
 
   void switchTab(int index) {
-    if (index >= 0 && index < 4) {
+    if (index >= 0 && index <= MainNavigationShell.settingsTab) {
       setState(() => _currentIndex = index);
-      if (index == 2) {
+      if (index == MainNavigationShell.activityTab) {
         _activityKey.currentState?.refreshLogs();
+      } else if (index == MainNavigationShell.dashboardTab) {
+        _dashboardKey.currentState?.refreshDigest();
       }
     }
   }
 
+  void _openAddApps() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddAppsScreen(repository: widget.repository),
+      ),
+    );
+  }
+
+  /// Opens the Activity tab with the Digest filter selected.
+  void openDigest() {
+    switchTab(MainNavigationShell.activityTab);
+    _activityKey.currentState?.showDigest();
+  }
+
   String _getTitle() {
     switch (_currentIndex) {
-      case 0:
+      case MainNavigationShell.dashboardTab:
         return 'Notiflow';
-      case 1:
-        return 'Add Apps';
-      case 2:
+      case MainNavigationShell.rulesTab:
+        return 'Rules';
+      case MainNavigationShell.activityTab:
         return 'Activity Log';
-      case 3:
+      case MainNavigationShell.settingsTab:
         return 'Settings';
       default:
         return 'Notiflow';
@@ -83,11 +165,17 @@ class MainNavigationShellState extends State<MainNavigationShell> {
 
         final screens = [
           DashboardScreen(
+            key: _dashboardKey,
             repository: widget.repository,
-            onAddAppTap: () => switchTab(1),
+            view: DashboardView.home,
+            onOpenDigest: openDigest,
             initialShowRestorationBanner: widget.showRestorationBanner,
           ),
-          AddAppsScreen(repository: widget.repository, isEmbedded: true),
+          DashboardScreen(
+            repository: widget.repository,
+            view: DashboardView.rules,
+            onAddAppTap: _openAddApps,
+          ),
           ActivityScreen(
             key: _activityKey,
             repository: widget.repository,
@@ -123,8 +211,9 @@ class MainNavigationShellState extends State<MainNavigationShell> {
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black
-                                    .withOpacity(isDark ? 0.3 : 0.06),
+                                color: Colors.black.withOpacity(
+                                  isDark ? 0.3 : 0.06,
+                                ),
                                 blurRadius: 8,
                                 offset: const Offset(0, 3),
                               ),
@@ -133,7 +222,9 @@ class MainNavigationShellState extends State<MainNavigationShell> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Image.asset(
-                              isDark ? 'assets/icon/app_icon.png' : 'assets/icon/app_icon_light.png',
+                              isDark
+                                  ? 'assets/icon/app_icon.png'
+                                  : 'assets/icon/app_icon_light.png',
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -142,31 +233,38 @@ class MainNavigationShellState extends State<MainNavigationShell> {
 
                         // Navigation Destinations
                         _TabletNavRailItem(
-                          icon: Icons.tune,
-                          label: 'Rules',
-                          isSelected: _currentIndex == 0,
-                          onTap: () => switchTab(0),
+                          icon: Icons.dashboard_outlined,
+                          label: 'Dashboard',
+                          isSelected:
+                              _currentIndex == MainNavigationShell.dashboardTab,
+                          onTap: () =>
+                              switchTab(MainNavigationShell.dashboardTab),
                         ),
                         const SizedBox(height: 12),
                         _TabletNavRailItem(
-                          icon: Icons.apps,
-                          label: 'Apps',
-                          isSelected: _currentIndex == 1,
-                          onTap: () => switchTab(1),
+                          icon: Icons.tune,
+                          label: 'Rules',
+                          isSelected:
+                              _currentIndex == MainNavigationShell.rulesTab,
+                          onTap: () => switchTab(MainNavigationShell.rulesTab),
                         ),
                         const SizedBox(height: 12),
                         _TabletNavRailItem(
                           icon: Icons.notifications_active_outlined,
                           label: 'Activity',
-                          isSelected: _currentIndex == 2,
-                          onTap: () => switchTab(2),
+                          isSelected:
+                              _currentIndex == MainNavigationShell.activityTab,
+                          onTap: () =>
+                              switchTab(MainNavigationShell.activityTab),
                         ),
                         const SizedBox(height: 12),
                         _TabletNavRailItem(
                           icon: Icons.settings_outlined,
                           label: 'Settings',
-                          isSelected: _currentIndex == 3,
-                          onTap: () => switchTab(3),
+                          isSelected:
+                              _currentIndex == MainNavigationShell.settingsTab,
+                          onTap: () =>
+                              switchTab(MainNavigationShell.settingsTab),
                         ),
                         const Spacer(),
                       ],
@@ -178,11 +276,7 @@ class MainNavigationShellState extends State<MainNavigationShell> {
                 Expanded(
                   child: Column(
                     children: [
-                      StitchHeader(
-                        title: _getTitle(),
-                        showEmblem: false,
-                        onProfileTap: () => switchTab(3),
-                      ),
+                      StitchHeader(title: _getTitle(), showEmblem: false),
                       Expanded(
                         child: IndexedStack(
                           index: _currentIndex,
@@ -198,73 +292,85 @@ class MainNavigationShellState extends State<MainNavigationShell> {
         }
 
         // Phone Layout (< 600dp)
-        return Scaffold(
-          backgroundColor: bg,
-          appBar: StitchHeader(
-            title: _getTitle(),
-            showEmblem: false,
-            onProfileTap: () => switchTab(3),
-          ),
-          body: IndexedStack(
-            index: _currentIndex,
-            children: screens,
-          ),
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF0F1312).withOpacity(0.9)
-                  : AppTheme.lightSurface.withOpacity(0.9),
-              border: isDark
-                  ? Border(
-                      top: BorderSide(
-                        color: const Color(0xFF2A362F).withOpacity(0.7),
-                        width: 1.0,
-                      ),
-                    )
-                  : null,
-              boxShadow: [
-                BoxShadow(
+        return PopScope(
+          canPop: _currentIndex == MainNavigationShell.dashboardTab,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) switchTab(MainNavigationShell.dashboardTab);
+          },
+          child: Scaffold(
+            backgroundColor: bg,
+            appBar: StitchHeader(title: _getTitle(), showEmblem: false),
+            body: IndexedStack(index: _currentIndex, children: screens),
+            bottomNavigationBar: AppToastBottomBar(
+              child: Container(
+                decoration: BoxDecoration(
                   color: isDark
-                      ? Colors.black.withOpacity(0.5)
-                      : const Color(0xFF2C2A29).withOpacity(0.05),
-                  blurRadius: isDark ? 16 : 12,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              top: false,
-              child: SizedBox(
-                height: 64,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                  children: [
-                    _PhoneBottomNavItem(
-                      svg: _NavSvgIcons.rules,
-                      label: 'Rules',
-                      isSelected: _currentIndex == 0,
-                      onTap: () => switchTab(0),
-                    ),
-                    _PhoneBottomNavItem(
-                      svg: _NavSvgIcons.apps,
-                      label: 'Apps',
-                      isSelected: _currentIndex == 1,
-                      onTap: () => switchTab(1),
-                    ),
-                    _PhoneBottomNavItem(
-                      svg: _NavSvgIcons.activity,
-                      label: 'Activity',
-                      isSelected: _currentIndex == 2,
-                      onTap: () => switchTab(2),
-                    ),
-                    _PhoneBottomNavItem(
-                      svg: _NavSvgIcons.settings,
-                      label: 'Settings',
-                      isSelected: _currentIndex == 3,
-                      onTap: () => switchTab(3),
+                      ? const Color(0xFF0F1312).withOpacity(0.9)
+                      : AppTheme.lightSurface.withOpacity(0.9),
+                  border: isDark
+                      ? Border(
+                          top: BorderSide(
+                            color: const Color(0xFF2A362F).withOpacity(0.7),
+                            width: 1.0,
+                          ),
+                        )
+                      : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? Colors.black.withOpacity(0.5)
+                          : const Color(0xFF2C2A29).withOpacity(0.05),
+                      blurRadius: isDark ? 16 : 12,
+                      offset: const Offset(0, -2),
                     ),
                   ],
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: SizedBox(
+                    height: 64,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        children: [
+                          _PhoneBottomNavItem(
+                            svg: _NavSvgIcons.dashboard,
+                            label: 'Dashboard',
+                            isSelected:
+                                _currentIndex ==
+                                MainNavigationShell.dashboardTab,
+                            onTap: () =>
+                                switchTab(MainNavigationShell.dashboardTab),
+                          ),
+                          _PhoneBottomNavItem(
+                            svg: _NavSvgIcons.rules,
+                            label: 'Rules',
+                            isSelected:
+                                _currentIndex == MainNavigationShell.rulesTab,
+                            onTap: () =>
+                                switchTab(MainNavigationShell.rulesTab),
+                          ),
+                          _PhoneBottomNavItem(
+                            svg: _NavSvgIcons.activity,
+                            label: 'Activity',
+                            isSelected:
+                                _currentIndex ==
+                                MainNavigationShell.activityTab,
+                            onTap: () =>
+                                switchTab(MainNavigationShell.activityTab),
+                          ),
+                          _PhoneBottomNavItem(
+                            svg: _NavSvgIcons.settings,
+                            label: 'Settings',
+                            isSelected:
+                                _currentIndex ==
+                                MainNavigationShell.settingsTab,
+                            onTap: () =>
+                                switchTab(MainNavigationShell.settingsTab),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -314,10 +420,11 @@ class _TabletNavRailItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           border: isSelected
               ? Border.all(
-                  color: (isDark
-                          ? AppTheme.darkSecondary
-                          : AppTheme.lightSecondary)
-                      .withOpacity(0.2),
+                  color:
+                      (isDark
+                              ? AppTheme.darkSecondary
+                              : AppTheme.lightSecondary)
+                          .withOpacity(0.2),
                   width: 1.0,
                 )
               : null,
@@ -359,20 +466,23 @@ class _NavSvgIcons {
   static const _open =
       '<svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
 
-  static const rules = '$_open'
+  static const rules =
+      '$_open'
       '<line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/>'
       '<line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/>'
       '<line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/>'
       '<line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/>'
       '<line x1="17" x2="23" y1="16" y2="16"/></svg>';
 
-  static const apps = '$_open'
-      '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/>'
-      '<rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>';
-
   static const activity = '$_open<path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>';
 
-  static const settings = '$_open<circle cx="12" cy="12" r="3"/>'
+  static const dashboard =
+      '$_open'
+      '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/>'
+      '<rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>';
+
+  static const settings =
+      '$_open<circle cx="12" cy="12" r="3"/>'
       '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
 }
 
@@ -395,8 +505,9 @@ class _PhoneBottomNavItem extends StatelessWidget {
     final selectedColor = isDark
         ? AppTheme.darkPrimaryContainer
         : AppTheme.lightPrimaryContainer;
-    final unselectedColor =
-        isDark ? const Color(0xFF9AA79B) : AppTheme.lightOnSurfaceVariant;
+    final unselectedColor = isDark
+        ? const Color(0xFF9AA79B)
+        : AppTheme.lightOnSurfaceVariant;
     final color = isSelected ? selectedColor : unselectedColor;
 
     return Expanded(

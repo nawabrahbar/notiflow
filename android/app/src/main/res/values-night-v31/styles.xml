@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 12+ always shows a system starting window; hide its icon so no splash is visible. -->
+    <!-- Android 12+ system launch screen: the app icon, centred, until the first Flutter frame. -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@color/app_launch_background</item>
         <item name="android:windowSplashScreenBackground">@color/app_launch_background</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
-        <item name="android:windowSplashScreenAnimationDuration">0</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/splash_icon_dark</item>
     </style>
     <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@color/app_launch_background</item>

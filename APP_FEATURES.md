@@ -23,21 +23,21 @@
 
 ## 2. Page Hierarchy & Total Page Count
 
-Notiflow consists of **11 dedicated screens/pages** structured across a startup sequence, an onboarding/recovery layer, a primary 3-tab navigation shell, and contextual sub-screens, supplemented by modal sheets:
+Notiflow consists of **11 dedicated screens/pages** structured across a startup sequence, an onboarding/recovery layer, a primary Dashboard / Rules / Apps / Activity navigation shell (plus Settings), and contextual sub-screens, supplemented by modal sheets:
 
 | # | Page / Screen Name | Type | Primary Role |
 |---|---|---|---|
-| **1** | **Startup Routing** (`resolveStartScreen` in `main.dart`) | No UI | Opens Onboarding, Permission, or the Main Shell directly (no splash screen) |
+| **1** | **Startup Routing** (`resolveStartScreen` in `main.dart`) | No UI | Android shows the app icon while initializing, then opens Onboarding, Permission, or the Main Shell (no Flutter splash) |
 | **2** | **Onboarding Screen** (`OnboardingScreen`) | First-Time Flow | Value pillars explanation and initial notification permission authorization |
 | **3** | **Permission & Health Center** (`PermissionScreen`) | Recovery Screen | Access restoration, OEM battery kill guides, Android 13+ sideload helper |
 | **4** | **Import Rules Screen** (`ImportRulesScreen`) | Onboarding Step 3 | Optional `.notiflow` backup import during onboarding |
-| **5** | **Main Navigation Shell** (`MainNavigationShell`) | Container Screen | Bottom tab bar hosting Rules, Activity, and Settings |
-| **6** | **Dashboard / Rules Screen** (`DashboardScreen`) | Tab 1 (Home) | Dynamic time greetings, Intercepted/Permitted metrics, overrides, managed apps list |
-| **7** | **Add Apps Screen** (`AddAppsScreen`) | Sub-Screen | Device app discovery, search filtering, category chips, batch app addition |
-| **8** | **App Details Screen** (`AppDetailsScreen`) | Sub-Screen | App master toggle, real-time triage simulator, quick mute pills, schedule list |
+| **5** | **Main Navigation Shell** (`MainNavigationShell`) | Container Screen | Phone bottom bar / tablet rail: Dashboard, Rules, Activity, Settings |
+| **6** | **Dashboard / Rules Screen** (`DashboardScreen`) | Tabs 1 & 2 | `DashboardView.home`: greetings, Intercepted/Permitted metrics, quick pauses, digest overview. `DashboardView.rules`: managed apps list |
+| **7** | **Add Apps Screen** (`AddAppsScreen`) | Sub-Screen (from Rules) | Device app discovery, search filtering, category chips, batch app addition |
+| **8** | **App Details Screen** (`AppDetailsScreen`) | Sub-Screen | App master toggle, quick mute pills, schedule list |
 | **9** | **Schedule Rule Editor** (`ScheduleEditorScreen`) | Sub-Screen | BLOCK vs ALLOW modes, time pickers with overnight math, 7-day selector pills |
-| **10** | **Activity / History Screen** (`ActivityScreen`) | Tab 2 | Chronological triage feed with filter tags, focus metrics, and audit log |
-| **11** | **Settings Screen** (`SettingsScreen`) | Tab 3 | Engine health, battery guides, storage badges, export/import backups, reset |
+| **10** | **Activity / History Screen** (`ActivityScreen`) | Tab 3 | Chronological 30-day triage feed with All / Silenced / Allowed / Digest filters |
+| **11** | **Settings Screen** (`SettingsScreen`) | Tab 4 | Engine health, battery guides, storage badges, Saved Rules (fixed *Focus Hours* default; other saved rules can be fully edited in *Edit Saved Rule* or deleted), export/import backups, reset |
 
 ### Key Interactive Modals
 * **Android 13+ Restricted Settings Sheet (`RestrictedSettingsSheet`)**: 2-step guide modal for sideloaded APK unlocking.
@@ -68,9 +68,11 @@ flowchart TD
     SystemPerm -->|Permission Granted| Shell
     
     %% Main Tabs Flow
-    Shell --> Tab1[6. Rules / Dashboard Tab]
+    Shell --> Tab0[6. Dashboard Tab]
+    Shell --> Tab1[6. Rules Tab]
     Shell --> Tab2[10. Activity / History Tab]
-    Shell --> Tab3[11. Settings Tab]
+    Shell --> Tab3[11. Settings]
+    Tab0 -->|Tap digest card| Tab2
     
     %% Dashboard Sub-flows
     Tab1 -->|Tap '+ Add App'| AddApps[7. Add Apps Screen]
@@ -89,7 +91,7 @@ flowchart TD
 
 ### Flow Walkthrough
 1. **Cold Start Flow**:
-   - The user opens Notiflow. There is no splash screen: the app loads preferences and opens the right screen directly.
+   - The user opens Notiflow. Android's launch screen shows the app icon while the app loads preferences, then the right screen opens.
    - If first run: Dispatches to **Onboarding Screen**.
    - If returning user with permissions revoked (or OEM battery killed): Dispatches to **Permission Screen**.
    - If fully configured: Dispatches into the **Main Navigation Shell**.
@@ -117,7 +119,7 @@ flowchart TD
 
 ### Page 1: Startup Routing (no splash screen)
 
-* Notiflow has no splash screen. `main()` loads preferences and `ScheduleRepository`, then opens the first screen directly:
+* Notiflow has no Flutter splash. Android's launch screen shows the app icon while `main()` loads preferences and `ScheduleRepository`, then the first screen opens directly:
   - If `pref_onboarding_completed == false` $\rightarrow$ `OnboardingScreen`.
   - If `isNotificationAccessGranted() == false` $\rightarrow$ `PermissionScreen`.
   - Otherwise $\rightarrow$ `MainNavigationShell`.
@@ -181,17 +183,22 @@ flowchart TD
 
 * **Purpose**: Core application scaffold hosting the bottom navigation bar and preserving tab state across sessions.
 * **Visual & Functional Elements**:
-  * **Bottom Navigation Bar**:
-    - **Tab 1: Rules** (`Icons.tune_rounded`) — Home dashboard with managed apps and schedules.
-    - **Tab 2: Activity** (`Icons.history_rounded`) — Triage history and notification logs.
-    - **Tab 3: Settings** (`Icons.settings_rounded`) — Daemon integrity, preferences, and controls.
+  * **Bottom Navigation Bar (phone)**:
+    - **Dashboard** — start tab: greeting, metrics, quick pauses and the Catch-Up Digest card.
+    - **Rules** — managed apps and their schedules.
+    - **Activity** — 30-day triage history and the Digest filter.
+    - **Settings** — engine health, digest, backups and reset.
+  * **Add Apps**: opened as its own page from the Rules tab ("Add App" / "Add Apps" buttons); system Back returns to Rules.
+  * **Tablet**: the left rail shows the same four tabs.
+  * **Back**: on any tab other than Dashboard, Back returns to Dashboard.
   * **Active Tab Highlighting**: High-contrast amber illumination with smooth indicator pill animation.
 
 ---
 
 ### Page 6: Dashboard / Rules Screen (`DashboardScreen`)
 
-* **Purpose**: Primary home screen displaying dynamic time-based greetings, triage metrics, quick temporary override pills, and managed applications.
+* **Purpose**: One screen with two views. `DashboardView.home` (Dashboard tab) shows greetings, triage metrics, quick temporary override pills and the Catch-Up Digest card; `DashboardView.rules` (Rules tab) shows the managed applications.
+* **Catch-Up Digest card** (Dashboard): *"N silenced notifications — Review now"* counting unique notifications in unreviewed ended windows, or *"All caught up"*. Tapping opens Activity → Digest.
 * **Visual & Functional Elements**:
   * **Dynamic Time-Based Greeting**:
     - Evaluates the device's clock to render contextual greetings paired with matching vector icons:
@@ -205,16 +212,17 @@ flowchart TD
   * **Summary Metrics Grid**:
     - **Silenced Notifications Card**: Counter with `Icons.notifications_paused_rounded`.
     - **Allowed Notifications Card**: Counter with `Icons.notifications_active_rounded`.
-  * **Quick Temporary Override Pills**:
-    - Quick actions to temporarily override schedules without modifying rules:
-      - `Mute All (15m)` / `Mute All (1h)` / `Mute All (2h)`
-      - `Allow All (15m)` / `Allow All (1h)`
-      - Active override pill showing remaining countdown and instant *"Restore Schedules"* button.
+  * **Quick Mute · All apps** (`QuickMuteAllCard`, `lib/presentation/widgets/quick_mute_card.dart`, phone and tablet). Replaced the old Quick Session Overrides (phone) and Overrides / Mute All (tablet) sections.
+    - Header "QUICK MUTE · ALL APPS", subtitle *"Silences every app for a while, on top of your schedules."*
+    - Idle: three presets `15m` / `30m` / `1h`. They set the shared `global_mute` override, which silences every app (Rules apps and apps you haven't added). Only paused apps still ring through.
+    - Active: the presets become a status card *"All apps muted · N min left · until HH:MM"* (refreshed every 15 s) with **+15m** (extends the end time, `ScheduleRepository.extendTemporaryMute`) and **End now** (clears it).
+    - **Let repeat callers ring through** switch (`vipEmergencyBypass`); the row turns soft green while on. During a Quick Mute, a 2nd call from the same caller within 3 minutes rings (native `NativeScheduleEvaluator`, global-mute branch).
   * **Active Monitoring Cards (Managed Apps List)**:
     - Lists all apps currently monitored.
     - App icon, formatted name, package identifier, and current status chip (`SCHEDULED`, `MUTED`, or `ALWAYS ALLOWED`).
     - **Master Switch**: Custom toggle switch to pause/resume monitoring per app.
     - Tap card to open `AppDetailsScreen`.
+    - **Uninstalled apps**: if an app with rules is uninstalled, its card turns grey, shows an `UNINSTALLED` badge instead of the status, and the toggle is disabled. Tapping still opens the details so the rule can be deleted; reinstalling the app restores the card.
   * **Floating Action Button (`+ Add App`)**: Jumps to `AddAppsScreen`.
 
 ---
@@ -223,11 +231,12 @@ flowchart TD
 
 * **Purpose**: Scans installed applications on the device and enables users to add apps to Notiflow in batches.
 * **Visual & Functional Elements**:
-  * **Header**: Search bar with live substring filtering by app label or package name.
+  * **Search bar (bottom, phone and tablet)**: Pill-shaped bar at the bottom of the page with the hint "Search" and a search icon, like the launcher app drawer. Live substring filtering by app label or package name. The bar floats over the list with a frosted blur, the list scrolls underneath it, and the list fades out at its top and bottom edges instead of being cut. Extra space at the end of the list lets the last app scroll fully above the bar.
   * **Category Filter Chips**:
     - `All Apps`, `Messaging`, `Social`, `Productivity`, `System`.
   * **App Discovery List**:
-    - Discovers launchable packages via native `PackageManager`.
+    - Uses the shared installed-apps list (loaded in the background when the dashboard opens), so the list appears instantly.
+    - Icons load in screen-sized batches: about two screens first (computed from the real viewport, so a tablet's 2-column grid loads more), then the next batch when the user scrolls about halfway through what's loaded. Fast flings skip fetching; search or category changes fetch the visible matches first.
     - Displays extracted app icons, app names, package IDs, and selection checkboxes.
     - Already-managed apps are marked with an *"Already Managed"* badge.
   * **Sticky Bottom Action Bar**:
@@ -238,12 +247,11 @@ flowchart TD
 
 ### Page 8: App Details Screen (`AppDetailsScreen`)
 
-* **Purpose**: Dedicated management hub for an individual application, displaying its rules and simulated live status.
+* **Purpose**: Dedicated management hub for an individual application, displaying its rules.
 * **Visual & Functional Elements**:
   * **App Header**:
-    - Large app icon, app label, full package ID, and master monitoring switch.
-  * **Live Triage Simulator Card**:
-    - Real-time indicator stating whether notifications from this app are **SILENCED** or **ALLOWED** right at this minute based on current schedules and overrides.
+    - Large app icon, app label, category, and master monitoring switch.
+  * The live *"Currently Silenced / Currently Permitted"* status card was removed in v1.6.1 (product owner decision). A live-status badge under the app name was tried and also rejected, so the page shows no live status.
   * **Quick Mute Pills**:
     - `15m Mute`, `30m Mute`, `1h Mute`, `Today 24h` buttons with instant override clearing.
   * **Assigned Schedule Rules List**:
@@ -259,7 +267,7 @@ flowchart TD
 
 * **Purpose**: Form interface for creating and modifying time-based schedule rules.
 * **Visual & Functional Elements**:
-  * **Rule Name Input**: Text field to assign custom labels (e.g., *"Work Focus Hours"*, *"Sleep Shield"*).
+  * **Rule Name Input**: Text field to assign custom labels (e.g., *"Focus Hours"*, *"Sleep Shield"*).
   * **Interception Behavior (Mode Toggle)**:
     - **BLOCK Mode (Silence alerts)**: Notifications arriving in this interval are silenced.
     - **ALLOW Mode (Pass through)**: Notifications arriving in this interval pass through; silenced outside.
@@ -287,6 +295,12 @@ flowchart TD
   * **Notification Event Stream**:
     - App icon, notification title, timestamp, and action badge (`SILENCED` in amber/coral, `ALLOWED` in green).
     - Triage reasoning tag: e.g. *"Blocked by 'Work Focus' rule"*, *"Allowed: Outside schedule"*, *"Muted by quick override"*.
+    - **Conversation grouping**: back-to-back messages from the same app and person/chat with the same status, each within 30 minutes of the previous one, share one card showing *"time · N messages"* and the latest message. The arrow next to the sender expands the card in place to show every message; tapping the card opens the details sheet. Filter chips count messages; *"N Events"* counts cards.
+    - Group-summary copies of a message and the user's own replies are not logged.
+    - The log shows immediately; app names and icons come from the shared installed-apps list, and only icons of apps in the log are fetched.
+    - Entries from apps that are no longer installed are greyed out and labelled *"Uninstalled"*.
+    - **Swipe right to delete** (left to right) (phone and tablet): a soft light-red *"Delete"* background appears on the left and the card goes at once, with an *"Undo"* toast for 4 seconds; the database delete only happens when the toast closes without Undo. A grouped card deletes all of its messages. The details sheet also has a *"Delete"* button. Deleted messages also leave their Catch-Up Digest card; a digest card with nothing left disappears.
+    - **Digest cards** can be swiped right too, which deletes every message that rule window silenced (from the digest and the log), with the same Undo.
   * **Header Action**: *"Clear Log"* button to wipe stored triage history.
 
 ---
@@ -309,6 +323,8 @@ flowchart TD
     - **Silence ongoing notifications**: Toggle to filter persistent background notifications.
     - **Silence summary notifications**: Toggle to handle grouped notification bundles.
     - **Allow priority calls**: Toggle to let incoming phone calls through regardless of rules.
+  * **CATCH-UP DIGEST** (Android only):
+    - **Notify When Quiet Hours End**: Toggle (default on) for the single "quiet hours ended" notification. Shows `ALLOWED` or `NEEDS PERMISSION`; **Allow Notiflow Notifications** re-asks or opens Android's notification settings.
   * **DANGER ZONE**:
     - **Reset All Rules & Logs**: Red warning button opening a confirmation dialog. Clearing all rules resets the local database and empties the native daemon cache.
     - **Version Information**: Displays `Notiflow v1.4.0 (Build 4)`.
@@ -324,6 +340,20 @@ flowchart TD
   * **Step 1 Button (`Open App Info`)**: Directly launches Notiflow's system App Info page via `ACTION_APPLICATION_DETAILS_SETTINGS`. Instructs the user to tap `⋮` (top-right menu) $\rightarrow$ select *"Allow restricted settings"* $\rightarrow$ authenticate with PIN/fingerprint.
   * **Step 2 Button (`Open Notification Access`)**: Directly opens Notification Access via `ACTION_NOTIFICATION_LISTENER_SETTINGS` where the toggle switch is now enabled.
 
+### Toasts (`AppToast`, `lib/presentation/widgets/app_toast.dart`)
+* **One place**: every screen calls `AppToast.show(context, message:, type:, actionLabel:)`. Look, motion and timing live only in this file, so a change there applies app-wide. A test fails if any screen calls `showSnackBar` directly.
+* **Look**: rounded card (16 radius) with a type icon, message, × close button (or an action such as *"Undo"*), and a thin countdown bar along the bottom edge.
+* **Types and colours** (from `AppTheme`):
+  * Success: sage `#CCD5AE`, text `#3A4128`, check icon.
+  * Info: soft blue `#D3E3EE`, text `#2C4A5E`, info icon. Used for neutral notices, cleared overrides and Undo deletes.
+  * Warning: `#F59E0B`, white text.
+  * Error: `#EF4444`, white text.
+* **Motion**: slides in from the left, waits, then slides out to the right. Tapping × slides it out at once.
+* **Timing**: 3 seconds; 4 seconds when it has an action, so there is time to tap Undo.
+* **One at a time**: a new toast replaces the one on screen. The replaced one reports "replaced", so a pending delete is committed.
+* **Position**: floats above everything (pages, dialogs, bottom sheets) through `AppToastHost` in `MaterialApp.builder`. It sits 12 px above the phone nav bar while that bar is on screen (`AppToastBottomBar`), otherwise above the system inset or keyboard.
+* **Phone vs tablet**: full width with 12 px side margins on phone; at most 420 px wide and centred on tablet.
+
 ---
 
 ## 6. Summary of Key App Capabilities
@@ -338,3 +368,11 @@ flowchart TD
 * [x] **Temporary Overrides**: Quick 15m/30m/1h/2h/24h mute or allow overrides with countdown and one-tap restore.
 * [x] **Android 13+ Sideloading Helper**: Built-in 2-step navigation flow to unlock restricted system settings.
 * [x] **Zero Network Footprint**: Completely isolated, 100% on-device operation.
+
+---
+
+## 7. Planned Features
+
+* [x] **Catch-Up Digest Phase 1**: Dashboard tab (greeting, Intercepted/Permitted cards, quick pauses, digest overview), Digest view in Activity, and on-device SQLite storage with 30-day retention.
+* [x] **Catch-Up Digest Phase 2**: When a rule window ends, silenced notifications come back (Android snooze) and one short Notiflow notification says how many are back (device checks pending). Full spec and every agreed decision: [`docs/catch-up-digest.md`](docs/catch-up-digest.md).
+* [x] **Shared installed-apps list & uninstalled apps** (v1.6.1): One app-wide installed-apps list loaded in the background from the dashboard; icons fetched on demand (Activity log shows instantly, Add Apps loads icons in screen-sized batches on phone and tablet); apps with rules that get uninstalled are shown greyed with an "Uninstalled" badge on Rules and Activity. Full spec: [`docs/installed-apps-cache.md`](docs/installed-apps-cache.md).

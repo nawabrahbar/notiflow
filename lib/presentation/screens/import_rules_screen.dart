@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_toast.dart';
 import 'main_navigation_shell.dart';
 
 /// Onboarding step three: optional .notiflow backup import.
@@ -28,14 +29,11 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     final rawContent = await widget.repository.pickBackupRawContent();
     if (!mounted || rawContent == null) return;
     if (rawContent.trim().isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Selected backup file is empty.'),
-            backgroundColor: AppTheme.toastError,
-          ),
-        );
+      AppToast.show(
+        context,
+        message: 'Selected backup file is empty.',
+        type: AppToastType.error,
+      );
       return;
     }
     await _processBackupContent(rawContent);
@@ -82,24 +80,14 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     });
 
     if (success) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Backup file restored successfully!', style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600)),
-            backgroundColor: AppTheme.toastSuccess,
-          ),
-        );
+      AppToast.show(context, message: 'Backup file restored successfully!');
       await _finishFlow();
     } else {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Invalid .notiflow backup file.'),
-            backgroundColor: AppTheme.toastError,
-          ),
-        );
+      AppToast.show(
+        context,
+        message: 'Invalid .notiflow backup file.',
+        type: AppToastType.error,
+      );
     }
   }
 
@@ -534,22 +522,13 @@ Future<bool> restoreBackupFromFile(
   BuildContext context,
   ScheduleRepository repository,
 ) async {
-  final messenger = ScaffoldMessenger.of(context);
+  final overlay = Overlay.of(context, rootOverlay: true);
   void toast(String message, {required bool success}) {
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            style: TextStyle(
-              color: success ? AppTheme.toastOnSuccess : Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          backgroundColor: success ? AppTheme.toastSuccess : AppTheme.toastError,
-        ),
-      );
+    AppToast.showOn(
+      overlay,
+      message: message,
+      type: success ? AppToastType.success : AppToastType.error,
+    );
   }
 
   final navigator = Navigator.of(context, rootNavigator: true);

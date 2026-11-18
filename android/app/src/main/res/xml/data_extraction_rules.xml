@@ -7,5 +7,6 @@
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="notification_handler_schedules.xml" />
+        <exclude domain="database" path="notiflow.db" />
     </device-transfer>
 </data-extraction-rules>

@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
 import 'package:notification_handler/domain/models/managed_app.dart';
+import 'package:notification_handler/domain/models/rule_template.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
 import 'package:notification_handler/domain/models/temporary_override.dart';
 import 'package:notification_handler/platform/notification_platform_interface.dart';
@@ -25,6 +29,18 @@ class MockPlatformService implements NotificationPlatformInterface {
 
   @override
   Future<List<DiscoveredAppInfo>> getInstalledApplications() async => [];
+
+  @override
+  Future<List<DiscoveredAppInfo>> getInstalledAppsLite() async => [];
+
+  @override
+  Future<Map<String, Uint8List>> getAppIcons(List<String> packageNames) async => {};
+
+  @override
+  Future<Map<String, bool>> getInstalledStatus(List<String> packageNames) async => {};
+
+  @override
+  Future<PackageChanges?> getChangedPackages(int sequenceNumber) async => null;
 
   bool lastUnmanagedAppsUntouched = true;
   bool lastVipEmergencyBypass = true;
@@ -315,5 +331,71 @@ void main() {
     }
     ''';
     expect(await repository.importRulesJson(badDaysJson), false);
+  });
+
+  test('Legacy "Work Focus Hours" default is renamed; a custom default name is kept', () async {
+    final legacy = RuleTemplate.defaultWorkFocus.copyWith(name: 'Work Focus Hours');
+    SharedPreferences.setMockInitialValues({
+      'pref_rule_templates': jsonEncode([legacy.toJson()]),
+    });
+    final migrated = ScheduleRepository(platformService: mockPlatform);
+    await migrated.initialize();
+    expect(migrated.ruleTemplates.single.name, 'Focus Hours');
+
+    final custom = RuleTemplate.defaultWorkFocus.copyWith(name: 'Office');
+    SharedPreferences.setMockInitialValues({
+      'pref_rule_templates': jsonEncode([custom.toJson()]),
+    });
+    final kept = ScheduleRepository(platformService: mockPlatform);
+    await kept.initialize();
+    expect(kept.ruleTemplates.single.name, 'Office');
+  });
+
+  test('updateRuleTemplate edits a saved rule but never the default', () async {
+    final now = DateTime.now();
+    final template = RuleTemplate(
+      id: 'template_custom',
+      name: 'Night',
+      mode: ScheduleMode.blockDuring,
+      startTime: const TimeOfDayValue(hour: 22, minute: 0),
+      endTime: const TimeOfDayValue(hour: 6, minute: 0),
+      daysOfWeek: const {1, 2, 3},
+      createdAt: now,
+    );
+    await repository.saveRuleTemplate(template);
+
+    final edited = template.copyWith(
+      name: '  Late Night  ',
+      mode: ScheduleMode.allowDuring,
+      startTime: const TimeOfDayValue(hour: 23, minute: 30),
+      daysOfWeek: const {6, 7},
+      allowVipContacts: false,
+    );
+    expect(await repository.updateRuleTemplate(edited), isTrue);
+    final saved = repository.ruleTemplates.firstWhere((t) => t.id == template.id);
+    expect(saved.name, 'Late Night');
+    expect(saved.mode, ScheduleMode.allowDuring);
+    expect(saved.startTime.hour, 23);
+    expect(saved.startTime.minute, 30);
+    expect(saved.daysOfWeek, {6, 7});
+    expect(saved.allowVipContacts, isFalse);
+
+    expect(await repository.updateRuleTemplate(edited.copyWith(name: '  ')), isFalse);
+    expect(
+      await repository.updateRuleTemplate(
+        RuleTemplate.defaultWorkFocus.copyWith(daysOfWeek: const {7}),
+      ),
+      isFalse,
+    );
+    expect(repository.ruleTemplates.first.daysOfWeek, {1, 2, 3, 4, 5});
+
+    final asDefault = edited.copyWith(
+      mode: RuleTemplate.defaultWorkFocus.mode,
+      startTime: RuleTemplate.defaultWorkFocus.startTime,
+      endTime: RuleTemplate.defaultWorkFocus.endTime,
+      daysOfWeek: RuleTemplate.defaultWorkFocus.daysOfWeek,
+    );
+    expect(repository.findDuplicateTemplate(asDefault)?.id, RuleTemplate.defaultWorkFocus.id);
+    expect(repository.findDuplicateTemplate(saved), isNull);
   });
 }

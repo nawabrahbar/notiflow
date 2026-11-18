@@ -4,6 +4,7 @@ import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
+import '../widgets/app_toast.dart';
 import 'main_navigation_shell.dart';
 
 /// Permission Paused / Action Required screen faithfully implemented from Stitch UX.
@@ -61,17 +62,7 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
     });
 
     if (granted && mounted) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Access Restored · Focus Shield Online',
-              style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600),
-            ),
-            backgroundColor: AppTheme.toastSuccess,
-          ),
-        );
+      AppToast.show(context, message: 'Access Restored · Focus Shield Online');
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => MainNavigationShell(

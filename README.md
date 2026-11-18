@@ -41,11 +41,14 @@ Every push to `main` is automatically built and published by GitHub Actions. You
   - **Full Message Body** (supports multi-line `EXTRA_BIG_TEXT` and inbox-style lines)
   - **Channel / Subtext** (e.g., conversation or account name)
   - **Exact Timestamp** and **Triage Rule Reason** (e.g., `Blocked by ‘Work Focus’ rule (09:00 - 17:00)` or `Silenced by Global Mute override`)
-- **Real-Time Feed & Filters**: Live-updating stream with **All**, **Silenced**, and **Allowed** filter chips, pull-to-refresh, and focus metrics (*Intercepted*, *Focus Gain*, *0% Leak Rate*).
+- **Conversation Cards**: Back-to-back messages from the same app and person (same status, within 30 minutes of each other) are grouped into one expandable card. Duplicate group summaries and your own replies are not logged.
+- **Real-Time Feed & Filters**: Live-updating stream with **All**, **Silenced**, **Allowed** and **Digest** filter chips, pull-to-refresh, and focus metrics (*Intercepted*, *Focus Gain*, *0% Leak Rate*).
+- **30-Day On-Device History**: Events live in a private SQLite database (`notiflow.db`) and are pruned automatically after 30 days.
+- **Catch-Up Digest (in-app)**: When a rule window ends, the **Digest** filter shows one card per app and window with the number of unique notifications it silenced. Messaging apps come first, new windows are marked until opened, and the **Dashboard** shows "N silenced notifications — Review now".
 - **Interactive Notification Inspector**: Tap any recorded notification card to open a bottom sheet with full selectable message text (`SelectableText` for copying OTPs/messages) and a one-tap **Open App** button.
 
-### 3. Quick Session Overrides (Global & Per-App)
-- **Global Session Overrides**: Engage **Mute All (15m)**, **Mute All (1h)**, or **Pass Calls** directly from the Dashboard with a live countdown banner and one-tap **Restore**.
+### 3. Quick Mute · All apps & Per-App Overrides
+- **Quick Mute · All apps**: mute every app for **15m**, **30m** or **1h** from the Dashboard. A live "All apps muted · N min left" card offers **+15m** and **End now**, and **Let repeat callers ring through** lets a 2nd call within 3 min ring.
 - **Per-App Instant Mute Pills**: Temporarily mute any individual app for **15m**, **30m**, **1h**, or **Today 24h** from the App Details screen without altering recurring schedules.
 
 ### 4. Rules Backup & Portability (`.notiflow`)
@@ -56,7 +59,12 @@ Every push to `main` is automatically built and published by GitHub Actions. You
 - **Zero Network Access**: `android.permission.INTERNET` is completely omitted from [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml). It is physically impossible for the app to transmit data off your device.
 - **Privacy Policy**: View the official Play Store Privacy Policy at **[nawabrahbar.github.io/notiflow/privacy-policy.html](https://nawabrahbar.github.io/notiflow/privacy-policy.html)** (or [`PRIVACY_POLICY.md`](PRIVACY_POLICY.md)).
 - **Unmanaged Apps Untouched**: Apps you haven't added to Notiflow pass through the OS untouched.
-- **Semantic State Toasts & Obsidian Signal Design**: High-contrast Dark (`#09090B`) and Crisp Light (`#F9F9FB`) themes with Signal Amber (`#F59E0B`) accents, semantic toast notifications (**Success Green** `#22C55E`, **Error Red** `#EF4444`, **Warning Orange** `#F59E0B`), custom 60/120fps animated vector emblems, and dynamic time-of-day greetings.
+- **Semantic State Toasts & Obsidian Signal Design**: High-contrast Dark (`#09090B`) and Crisp Light (`#F9F9FB`) themes with Signal Amber (`#F59E0B`) accents, semantic toast notifications (**Success Sage** `#CCD5AE`, **Info Soft Blue** `#D3E3EE`, **Warning Orange** `#F59E0B`, **Error Red** `#EF4444`), custom 60/120fps animated vector emblems, and dynamic time-of-day greetings.
+
+### 🔔 Catch-Up Digest Phase 2
+- During a rule window or pause, silenced notifications are snoozed instead of cancelled. When the rule ends they come back by themselves and Notiflow posts one short "quiet hours ended" notification (app names and counts only). Tapping it opens Activity → Digest.
+- Rule edits re-snooze or release held notifications; permanent mute and ongoing notifications are still cancelled.
+- Asks for `POST_NOTIFICATIONS` once on Android 13+, with a **Catch-up Digest** toggle in Settings. See [`docs/catch-up-digest.md`](docs/catch-up-digest.md) for the full spec.
 
 ---
 
@@ -66,35 +74,44 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 | # | Screen | File | Description |
 | :--- | :--- | :--- | :--- |
-| 1 | **Startup Routing** | [`lib/main.dart`](lib/main.dart) | No splash screen; opens Onboarding, Permission, or the main shell directly |
+| 1 | **Startup Routing** | [`lib/main.dart`](lib/main.dart) | Android shows the app icon while initializing, then opens Onboarding, Permission, or the main shell (no Flutter splash) |
 | 2 | **Onboarding Screen** | [`lib/presentation/screens/onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) | 3-step onboarding with direct 1-tap notification access setup |
 | 3 | **Permission Center** | [`lib/presentation/screens/permission_screen.dart`](lib/presentation/screens/permission_screen.dart) | Quick 2-step permission recovery with auto-return & OEM battery tips |
 | 4 | **Import Rules** | [`lib/presentation/screens/import_rules_screen.dart`](lib/presentation/screens/import_rules_screen.dart) | Onboarding step 3 backup import; Settings → Import opens the system file picker directly |
-| 5 | **Navigation Shell** | [`lib/presentation/screens/main_navigation_shell.dart`](lib/presentation/screens/main_navigation_shell.dart) | 4-tab bottom navigation (*Rules*, *Apps*, *Activity*, *Settings*) |
+| 5 | **Navigation Shell** | [`lib/presentation/screens/main_navigation_shell.dart`](lib/presentation/screens/main_navigation_shell.dart) | Phone bottom navigation and tablet rail with *Dashboard*, *Rules*, *Activity* and *Settings*; Add Apps opens from the Rules tab |
 | 6 | **Dashboard (Rules)** | [`lib/presentation/screens/dashboard_screen.dart`](lib/presentation/screens/dashboard_screen.dart) | Time-based greeting, triage counters, global overrides, managed apps |
 | 7 | **Add Apps Screen** | [`lib/presentation/screens/add_apps_screen.dart`](lib/presentation/screens/add_apps_screen.dart) | Installed app discovery, search, and category filters (*Messaging*, *Social*, etc.) |
-| 8 | **App Details Screen** | [`lib/presentation/screens/app_details_screen.dart`](lib/presentation/screens/app_details_screen.dart) | Real-time triage status card, quick mute pills, multiple schedule rules list, and + Add Schedule button |
+| 8 | **App Details Screen** | [`lib/presentation/screens/app_details_screen.dart`](lib/presentation/screens/app_details_screen.dart) | Quick mute pills, multiple schedule rules list, and + Add Schedule button |
 | 9 | **Schedule Editor** | [`lib/presentation/screens/schedule_editor_screen.dart`](lib/presentation/screens/schedule_editor_screen.dart) | Quick Load Template dropdown with deduplication, BLOCK/ALLOW mode, time pickers, overnight badge, and day pills |
 | 10 | **Activity Log** | [`lib/presentation/screens/activity_screen.dart`](lib/presentation/screens/activity_screen.dart) | Silenced and allowed notifications from managed apps, including paused apps, with full details and app launcher sheet |
 | 11 | **Settings Screen** | [`lib/presentation/screens/settings_screen.dart`](lib/presentation/screens/settings_screen.dart) | Service health, on-device privacy audit, `.notiflow` backup/restore, reset |
 
 ### Native Android Engine (`android/app/src/main/kotlin/...`)
 - **[`NotificationHandlerListenerService.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/NotificationHandlerListenerService.kt)**: System-bound `NotificationListenerService` that intercepts posted notifications, extracts notification title/message/channel extras, records triage events, and cancels muted notifications in `< 5ms`.
-- **[`NativeScheduleStore.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/NativeScheduleStore.kt)**: Pure Kotlin schedule evaluator (`NativeScheduleEvaluator`) and persistent store (`SharedPreferences`) that runs independently even when the Flutter UI is closed.
+- **[`NativeScheduleStore.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/NativeScheduleStore.kt)**: Pure Kotlin schedule evaluator (`NativeScheduleEvaluator`) and persistent store (`SharedPreferences` for schedules, SQLite `notiflow.db` via `NotiflowDatabase.kt` for 30-day activity history and digest windows) that runs independently even when the Flutter UI is closed.
 - **[`AndroidNotificationBridge.kt`](android/app/src/main/kotlin/com/notificationhandler/notification_handler/AndroidNotificationBridge.kt)**: MethodChannel bridge (`com.notificationhandler/bridge`) connecting Flutter with Android package discovery, direct Notification Access deep-linking (`ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS`) with automatic foreground return, `.notiflow` file import/export, app launching, and real-time activity updates.
 
 ---
 
 ## 📋 Changelog & Recent Updates
 
+- **v1.6.1 (`+11`) — Shared Installed-Apps Cache, Faster Activity Log & Uninstalled-App Handling**:
+  - **Shared installed-apps cache**: one app-wide list loads in the background after the dashboard appears; icons are fetched on demand and only changed packages refresh on resume.
+  - **Faster Activity log**: entries show immediately; log and digest load in parallel off the Android main thread.
+  - **Add Apps**: icons load in screen-sized batches (phone and tablet); frosted bottom search bar with edge fade.
+  - **Uninstalled apps**: Rules cards and Activity entries grey out with an "Uninstalled" label; the rule stays until deleted.
+  - **Swipe to delete**: swipe an Activity log or Digest card from left to right to delete it, with Undo; deleted messages leave both the log and the digest.
+  - **New toasts**: one shared `AppToast` (`lib/presentation/widgets/app_toast.dart`) replaces every SnackBar. It is a rounded card with a type icon, message, × (or Undo) and a countdown bar. It slides in from the left, slides out to the right after 3 s (4 s with Undo, at once on ×), and floats above everything, including the phone nav bar, dialogs and sheets.
+  - **Quick Mute · All apps**: replaces the old Quick Session Overrides on the Dashboard (phone and tablet). It mutes every app for 15m, 30m or 1h, then shows a live "All apps muted · N min left" card with +15m and End now. Repeat callers (a 2nd call within 3 min) now ring through during these mutes when "Let repeat callers ring through" is on.
 - **v1.6.0 (`+10`) — Botanical Sanctuary Redesign, Rule Templates, Tablet Expansion & Native Hardening**:
   - **Botanical Sanctuary & Nocturne Redesign**: Warm Canvas (`#FEF8F6`) / Deep Forest (`#101412`), Terracotta (`#7D562D` / `#FCBC76`), and Sage Green (`#5A6242` / `#BECCA3`) with elegant Newsreader display serifs and Plus Jakarta Sans body typography.
   - **Seamless Canvas Flow**: Completely eliminated header bottom borders and dividers across all screens for a unified, tranquil surface.
   - **Urgent Repeated Call Bypass (< 3 Minutes) Native Fix**: Fixed incoming call interception in native Kotlin (`NotificationHandlerListenerService.kt` & `NativeScheduleStore.kt`). Ringing calls are no longer skipped as ongoing foreground events; a 1st call during quiet hours is silenced while arming a 3-minute window, and a 2nd call from the same caller within 180 seconds immediately rings through.
   - **Material You Dynamic Themed App Icon**: Added monochrome adaptive launcher icon layer (`<monochrome>`), enabling Android 13+ device home screens and app drawers to dynamically theme Notiflow in light or dark mode following system appearance.
+  - **Light / Dark App Icon**: The launcher icon and launch screen use the light design (`assets/icon/app_icon_light.png`) in light mode and the dark design (`assets/icon/app_icon.png`) in dark mode, via `-night` resource folders.
   - **First-Launch Theme Sync & Explicit User Preference**: Opens strictly following device system appearance on initial launch, then retains explicit user preference across subsequent sessions once toggled.
   - **Responsive Phone & Tablet Architecture**:
-    - **Adaptive Navigation**: Bottom navigation bar on phones (<600dp), 88dp left Navigation Rail with emblem and 4 tabs on tablets (≥600dp).
+    - **Adaptive Navigation**: Bottom navigation bar on phones (<600dp) and an 88dp left Navigation Rail with emblem on tablets (≥600dp), both with 4 tabs (Dashboard, Rules, Activity, Settings). Add Apps opens as its own page from Rules.
     - **Dashboard Bento**: 5:7 two-column responsive bento on tablet.
     - **Add Apps Screen**: 2-column responsive grid on tablet with 5 category filter chips.
     - **App Details Screen**: 5:7 two-column split on tablet.
@@ -102,7 +119,7 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
     - **Settings Screen**: 6:6 two-column bento on tablet with storage audit and diagnostic cards.
     - **Onboarding & Permission Centers**: Centered editorial cards (max 680dp) on tablet.
   - **Smart Backup Import & Dormant Vault**: Detects uninstalled apps in `.notiflow` backups and offers to *"Keep in Vault & Auto-Apply on Install"* (safely parked in local DB and auto-applied when installed) or *"Exclude These Apps"*.
-  - **Quick Load Rule Templates**: Reusable schedule rule dropdown with deduplication, pre-seeded with `"Work Focus Hours"` (09:00 AM – 05:00 PM, Mon–Fri).
+  - **Quick Load Rule Templates**: Reusable schedule rule dropdown with deduplication, pre-seeded with `"Focus Hours"` (09:00 AM – 05:00 PM, Mon–Fri); the default is fixed, while other saved rules can be fully edited (name, behaviour, times, days, VIP) from Settings → Saved Rules without changing apps already using them.
   - **Multiple Schedules per App**: Full support for attaching multiple active schedules to a single app with independent monitoring switches.
   - **Unified `.notiflow` Backup**: Single backup file format bundling rule templates alongside managed apps and schedules with 100% backward compatibility.
   - **Google Play In-App Updates**: Added zero-network In-App Update checker via Play Core IPC (`in_app_update`), maintaining strict 100% on-device privacy with **zero `INTERNET` permission** in [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml).

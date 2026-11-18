@@ -8,6 +8,7 @@ import '../../domain/models/temporary_override.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
+import '../widgets/app_toast.dart';
 import 'main_navigation_shell.dart';
 import 'schedule_editor_screen.dart';
 
@@ -97,8 +98,6 @@ class AppDetailsScreen extends StatelessWidget {
 
         final rules = repository.getRulesForApp(currentApp.id);
         final override = repository.getOverrideForApp(currentApp.id);
-        final decision = repository.evaluateApp(currentApp);
-        final isSilenced = decision.isBlocked;
 
         return PopScope(
           canPop: false,
@@ -109,7 +108,10 @@ class AppDetailsScreen extends StatelessWidget {
             } else {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (_) => MainNavigationShell(repository: repository),
+                  builder: (_) => MainNavigationShell(
+                    repository: repository,
+                    initialIndex: MainNavigationShell.rulesTab,
+                  ),
                 ),
               );
             }
@@ -122,27 +124,11 @@ class AppDetailsScreen extends StatelessWidget {
                 color: bg,
                 padding: EdgeInsets.only(
                   top: MediaQuery.of(context).padding.top,
-                  left: 8,
+                  left: 20,
                   right: 16,
                 ),
                 child: Row(
                   children: [
-                    IconButton(
-                      onPressed: () {
-                        if (Navigator.of(context).canPop()) {
-                          Navigator.of(context).pop();
-                        } else {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  MainNavigationShell(repository: repository),
-                            ),
-                          );
-                        }
-                      },
-                      icon: Icon(Icons.arrow_back_rounded, color: textMain),
-                      tooltip: 'Back',
-                    ),
                     Expanded(
                       child: Text(
                         'App Details',
@@ -245,123 +231,6 @@ class AppDetailsScreen extends StatelessWidget {
                       ),
                     ),
 
-                    const SizedBox(height: 18),
-
-                    // Real-Time Triage Status Card
-                    Builder(
-                      builder: (context) {
-                        final permittedInk = isDark
-                            ? AppTheme.permittedAccent
-                            : AppTheme.toastOnSuccess;
-                        return Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: isSilenced
-                                ? (isDark
-                                      ? AppTheme.signalHeld.withValues(
-                                          alpha: 0.12,
-                                        )
-                                      : const Color(0xFFFEE2E2))
-                                : (isDark
-                                      ? AppTheme.permittedAccent.withValues(
-                                          alpha: 0.12,
-                                        )
-                                      : AppTheme.permittedSurface),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: isSilenced
-                                  ? AppTheme.signalHeld.withValues(alpha: 0.4)
-                                  : (isDark
-                                        ? AppTheme.permittedAccent.withValues(
-                                            alpha: 0.4,
-                                          )
-                                        : AppTheme.permittedAccent),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isSilenced
-                                    ? Icons.do_not_disturb_on_rounded
-                                    : Icons.check_circle_rounded,
-                                color: isSilenced
-                                    ? AppTheme.signalHeld
-                                    : permittedInk,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            isSilenced
-                                                ? 'Currently Silenced'
-                                                : 'Currently Permitted',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 14.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: textMain,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isSilenced
-                                                ? AppTheme.signalHeld
-                                                      .withValues(alpha: 0.2)
-                                                : (isDark
-                                                      ? AppTheme.permittedAccent
-                                                            .withValues(
-                                                              alpha: 0.25,
-                                                            )
-                                                      : AppTheme
-                                                            .permittedAccent),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            isSilenced ? 'MUTED' : 'ALERTS',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.5,
-                                              color: isSilenced
-                                                  ? AppTheme.signalHeld
-                                                  : permittedInk,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      decision.reason,
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 12.5,
-                                        color: textMuted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-
                     const SizedBox(height: 22),
 
                     // Quick Temporary Block
@@ -443,29 +312,18 @@ class AppDetailsScreen extends StatelessWidget {
                                 if (override?.mode == OverrideMode.block &&
                                     override?.durationMinutes == 15) {
                                   repository.clearOverride(currentApp.id);
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Cleared temporary override for "${currentApp.displayName}"',
-                                        ),
-                                        backgroundColor: AppTheme.signalNeutral,
-                                      ),
-                                    );
+                                  AppToast.show(
+                                    context,
+                                    message:
+                                        'Cleared temporary override for "${currentApp.displayName}"',
+                                    type: AppToastType.info,
+                                  );
                                 } else {
                                   repository.setTemporaryMute(
                                     appId: currentApp.id,
                                     duration: const Duration(minutes: 15),
                                   );
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      _muteSnackBar(
-                                        'Muted "${currentApp.displayName}" for 15 minutes',
-                                        isDark,
-                                      ),
-                                    );
+                                  AppToast.show(context, message: 'Muted "${currentApp.displayName}" for 15 minutes');
                                 }
                               },
                               isDark: isDark,
@@ -484,29 +342,18 @@ class AppDetailsScreen extends StatelessWidget {
                                 if (override?.mode == OverrideMode.block &&
                                     override?.durationMinutes == 30) {
                                   repository.clearOverride(currentApp.id);
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Cleared temporary override for "${currentApp.displayName}"',
-                                        ),
-                                        backgroundColor: AppTheme.signalNeutral,
-                                      ),
-                                    );
+                                  AppToast.show(
+                                    context,
+                                    message:
+                                        'Cleared temporary override for "${currentApp.displayName}"',
+                                    type: AppToastType.info,
+                                  );
                                 } else {
                                   repository.setTemporaryMute(
                                     appId: currentApp.id,
                                     duration: const Duration(minutes: 30),
                                   );
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      _muteSnackBar(
-                                        'Muted "${currentApp.displayName}" for 30 minutes',
-                                        isDark,
-                                      ),
-                                    );
+                                  AppToast.show(context, message: 'Muted "${currentApp.displayName}" for 30 minutes');
                                 }
                               },
                               isDark: isDark,
@@ -525,29 +372,18 @@ class AppDetailsScreen extends StatelessWidget {
                                 if (override?.mode == OverrideMode.block &&
                                     override?.durationMinutes == 60) {
                                   repository.clearOverride(currentApp.id);
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Cleared temporary override for "${currentApp.displayName}"',
-                                        ),
-                                        backgroundColor: AppTheme.signalNeutral,
-                                      ),
-                                    );
+                                  AppToast.show(
+                                    context,
+                                    message:
+                                        'Cleared temporary override for "${currentApp.displayName}"',
+                                    type: AppToastType.info,
+                                  );
                                 } else {
                                   repository.setTemporaryMute(
                                     appId: currentApp.id,
                                     duration: const Duration(hours: 1),
                                   );
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      _muteSnackBar(
-                                        'Muted "${currentApp.displayName}" for 1 hour',
-                                        isDark,
-                                      ),
-                                    );
+                                  AppToast.show(context, message: 'Muted "${currentApp.displayName}" for 1 hour');
                                 }
                               },
                               isDark: isDark,
@@ -563,16 +399,12 @@ class AppDetailsScreen extends StatelessWidget {
                               onTap: () {
                                 if (isCustomActive) {
                                   repository.clearOverride(currentApp.id);
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Cleared temporary override for "${currentApp.displayName}"',
-                                        ),
-                                        backgroundColor: AppTheme.signalNeutral,
-                                      ),
-                                    );
+                                  AppToast.show(
+                                    context,
+                                    message:
+                                        'Cleared temporary override for "${currentApp.displayName}"',
+                                    type: AppToastType.info,
+                                  );
                                 } else {
                                   _showCustomMuteDialog(
                                     context,
@@ -602,16 +434,12 @@ class AppDetailsScreen extends StatelessWidget {
                       TextButton.icon(
                         onPressed: () {
                           repository.clearOverride(currentApp.id);
-                          ScaffoldMessenger.of(context)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Cleared temporary override for "${currentApp.displayName}"',
-                                ),
-                                backgroundColor: AppTheme.signalNeutral,
-                              ),
-                            );
+                          AppToast.show(
+                            context,
+                            message:
+                                'Cleared temporary override for "${currentApp.displayName}"',
+                            type: AppToastType.info,
+                          );
                         },
                         icon: const Icon(Icons.refresh_rounded, size: 16),
                         label: const Text('Clear Temporary Override'),
@@ -965,22 +793,10 @@ class AppDetailsScreen extends StatelessWidget {
                                         onPressed: () async {
                                           await repository.deleteRule(rule.id);
                                           if (!context.mounted) return;
-                                          ScaffoldMessenger.of(context)
-                                            ..hideCurrentSnackBar()
-                                            ..showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Schedule rule removed.',
-                                                  style: TextStyle(
-                                                    color:
-                                                        AppTheme.toastOnSuccess,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                                backgroundColor:
-                                                    AppTheme.toastSuccess,
-                                              ),
-                                            );
+                                          AppToast.show(
+                                            context,
+                                            message: 'Schedule rule removed.',
+                                          );
                                         },
                                         constraints: const BoxConstraints(
                                           minWidth: 32,
@@ -1099,27 +915,20 @@ class AppDetailsScreen extends StatelessWidget {
                   onPressed: () async {
                     await repository.deleteAppsAndRules([currentApp.id]);
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Removed "${currentApp.displayName}" from Rules page!',
-                            style: const TextStyle(
-                              color: AppTheme.toastOnSuccess,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          backgroundColor: AppTheme.toastSuccess,
-                        ),
-                      );
+                    AppToast.show(
+                      context,
+                      message:
+                          'Removed "${currentApp.displayName}" from Rules page!',
+                    );
                     if (Navigator.of(context).canPop()) {
                       Navigator.of(context).pop();
                     } else {
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (_) =>
-                              MainNavigationShell(repository: repository),
+                          builder: (_) => MainNavigationShell(
+                            repository: repository,
+                            initialIndex: MainNavigationShell.rulesTab,
+                          ),
                         ),
                       );
                     }
@@ -1155,8 +964,10 @@ class AppDetailsScreen extends StatelessWidget {
                       } else {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (_) =>
-                                MainNavigationShell(repository: repository),
+                            builder: (_) => MainNavigationShell(
+                              repository: repository,
+                              initialIndex: MainNavigationShell.rulesTab,
+                            ),
                           ),
                         );
                       }
@@ -1473,14 +1284,7 @@ class AppDetailsScreen extends StatelessWidget {
                       duration: Duration(hours: selectedHours),
                     );
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(
-                        _muteSnackBar(
-                          'Muted "${app.displayName}" for $selectedHours hours',
-                          isDark,
-                        ),
-                      );
+                    AppToast.show(context, message: 'Muted "${app.displayName}" for $selectedHours hours');
                   },
                   icon: const Icon(Icons.do_not_disturb_on_rounded, size: 16),
                   label: Text(
@@ -1569,28 +1373,4 @@ class AppDetailsScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Mute confirmations use the shared success toast colour.
-SnackBar _muteSnackBar(String message, bool isDark) {
-  const foreground = AppTheme.toastOnSuccess;
-  return SnackBar(
-    content: Row(
-      children: [
-        Icon(Icons.stars_outlined, size: 18, color: foreground),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            message,
-            style: GoogleFonts.plusJakartaSans(
-              color: foreground,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    ),
-    backgroundColor: AppTheme.toastSuccess,
-  );
 }

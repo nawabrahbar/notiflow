@@ -69,11 +69,12 @@ The service checks if `packageName` is actively managed. If the app is not in th
 
 ### Step 4: Action Execution
 - **Decision == ALLOW**: Do nothing. The notification appears normally in the status bar with sound/vibration as configured by the user.
-- **Decision == BLOCK**: Call `cancelNotification(key)`. The system immediately dismisses the notification from the notification tray.
+- **Decision == BLOCK during a rule window or pause** (Android 8.0+): Call `snoozeNotification(key, duration)` until one minute after the window ends, and record it in `held_notifications`. When Android returns it, the listener sees the window is over, lets it through without logging it again, and posts one "quiet hours ended" Catch-up digest notification about 15 seconds later.
+- **Decision == BLOCK otherwise** (permanent mute, ongoing/foreground notifications, calls, or if snoozing fails): Call `cancelNotification(key)`. The system immediately dismisses the notification from the notification tray.
 
 ---
 
 ## 4. Key Performance and Reliability Characteristics
 - **Zero Flutter Engine dependency**: The evaluation runs 100% in native Kotlin using locally cached preferences. No Flutter isolates or Dart runtimes are booted during notification arrival.
 - **Latency**: Evaluation completes in under 1-2 milliseconds, preventing notification sound/heads-up banner from lingering.
-- **Targeted Cancellation**: Only `cancelNotification(key)` is invoked for the specific matching notification. System notifications, unmanaged apps, and allowed apps are strictly unaffected.
+- **Targeted Cancellation**: Only `snoozeNotification(key, …)` or `cancelNotification(key)` is invoked for the specific matching notification. System notifications, unmanaged apps, and allowed apps are strictly unaffected.

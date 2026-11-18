@@ -2,16 +2,19 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
+import '../../data/services/installed_apps_cache.dart';
+import '../../domain/engine/activity_grouping.dart';
+import '../../domain/models/digest_window.dart';
 import '../../domain/models/managed_app.dart';
 import '../../platform/android_notification_platform.dart';
-import '../../platform/notification_platform_interface.dart';
-import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
+import '../widgets/app_toast.dart';
 
 /// Activity Screen (Audit Trail) adhering strictly to Botanical Sanctuary / Nocturne design:
 /// - Responsive: Multi-column tablet layout (>= 600dp) with top 3-metric bento spread and wide audit cards
-/// - Filter bar (All, Silenced, Allowed) with count badges & Clear Log action
+/// - Filter bar (All, Silenced, Allowed, Digest) with count badges & Clear Log action
+/// - Digest: one card per finished rule window with the unique notifications it silenced
 /// - Real native app icons from PackageManager
 /// - Notification details inspector bottom sheet
 class ActivityScreen extends StatefulWidget {
@@ -30,16 +33,28 @@ class ActivityScreen extends StatefulWidget {
 
 class ActivityScreenState extends State<ActivityScreen>
     with WidgetsBindingObserver {
-  String _selectedFilter = 'all'; // 'all', 'silenced', 'allowed'
+  String _selectedFilter = 'all'; // 'all', 'silenced', 'allowed', 'digest'
   final List<Map<String, dynamic>> _events = [];
-  Future<List<DiscoveredAppInfo>>? _installedApplications;
+  final List<DigestWindow> _digest = [];
+  final Map<int, List<Map<String, dynamic>>> _digestEvents = {};
+  final Set<int> _expandedDigest = {};
+  final Set<String> _expandedGroups = {};
+  static const double _uninstalledOpacity = 0.55;
+  List<Map<String, dynamic>> _rawLogs = const [];
+  List<DigestWindow> _rawDigest = const [];
+  // Swiped away but not yet deleted natively (Undo is still possible), or
+  // deleted natively and waiting for the reload that no longer has them.
+  final Set<String> _hiddenEventIds = {};
+  final Set<int> _hiddenWindowIds = {};
+  final InstalledAppsCache _appsCache = InstalledAppsCache.instance;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.repository.addListener(_onRepositoryChanged);
-    AndroidNotificationPlatform.setActivityUpdatedListener(_loadNativeEvents);
+    _appsCache.addListener(_onAppsCacheChanged);
+    AndroidNotificationPlatform.addActivityUpdatedListener(_loadNativeEvents);
     _loadNativeEvents();
   }
 
@@ -47,7 +62,8 @@ class ActivityScreenState extends State<ActivityScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.repository.removeListener(_onRepositoryChanged);
-    AndroidNotificationPlatform.setActivityUpdatedListener(null);
+    _appsCache.removeListener(_onAppsCacheChanged);
+    AndroidNotificationPlatform.removeActivityUpdatedListener(_loadNativeEvents);
     super.dispose();
   }
 
@@ -55,15 +71,25 @@ class ActivityScreenState extends State<ActivityScreen>
     _loadNativeEvents();
   }
 
+  void _onAppsCacheChanged() {
+    if (mounted) setState(_rebuildDisplay);
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _installedApplications = null;
       _loadNativeEvents();
     }
   }
 
   Future<void> refreshLogs() => _loadNativeEvents();
+
+  /// Switches to the Digest filter (used by the Dashboard "review now" card).
+  void showDigest() {
+    if (!mounted) return;
+    setState(() => _selectedFilter = 'digest');
+    _loadNativeEvents();
+  }
 
   IconData _getDefaultIconForApp(String name) {
     final lower = name.toLowerCase();
@@ -104,15 +130,26 @@ class ActivityScreenState extends State<ActivityScreen>
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'
     ];
+    return '${dt.day} ${months[dt.month - 1]}, ${_formatClock(dt)}';
+  }
+
+  String _formatClock(DateTime dt) {
     final mm = dt.minute.toString().padLeft(2, '0');
-    final String hm;
     if (widget.repository.use24HourFormat) {
-      hm = '${dt.hour.toString().padLeft(2, '0')}:$mm';
-    } else {
-      final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-      hm = '$hour12:$mm ${dt.hour >= 12 ? 'PM' : 'AM'}';
+      return '${dt.hour.toString().padLeft(2, '0')}:$mm';
     }
-    return '${dt.day} ${months[dt.month - 1]}, $hm';
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    return '$hour12:$mm ${dt.hour >= 12 ? 'PM' : 'AM'}';
+  }
+
+  /// "12 Sept, 9:00 AM – 5:00 PM", or both dates when the window crosses midnight.
+  String _formatWindowRange(DateTime start, DateTime end) {
+    final sameDay = start.year == end.year &&
+        start.month == end.month &&
+        start.day == end.day;
+    return sameDay
+        ? '${_formatShortTime(start)} – ${_formatClock(end)}'
+        : '${_formatShortTime(start)} – ${_formatShortTime(end)}';
   }
 
   String _formatFullDateTime(DateTime dt) {
@@ -138,63 +175,100 @@ class ActivityScreenState extends State<ActivityScreen>
   }
 
   Future<void> _loadNativeEvents() async {
-    final nativeLogs =
-        await AndroidNotificationPlatform.fetchNativeActivityLog();
+    // Log and digest load together; app names and icons come from the shared
+    // cache so the list shows without waiting for the installed-apps scan.
+    final results = await Future.wait<Object>([
+      AndroidNotificationPlatform.fetchNativeActivityLog(),
+      AndroidNotificationPlatform.fetchDigest(),
+    ]);
     if (!mounted) return;
+    _rawLogs = results[0] as List<Map<String, dynamic>>;
+    _rawDigest = results[1] as List<DigestWindow>;
+    setState(_rebuildDisplay);
+    _loadAppDetails();
+  }
 
-    final installedApps = await (_installedApplications ??=
-        PlatformFactory.createPlatformService().getInstalledApplications());
-    if (!mounted) return;
-    final installedByPkg = {
-      for (final app in installedApps) app.packageName: app,
+  Future<void> _loadAppDetails() async {
+    final packages = <String>{
+      for (final e in _rawLogs)
+        if (e['packageName'] is String) e['packageName'] as String,
+      for (final w in _rawDigest)
+        for (final e in w.events)
+          if (e['packageName'] is String) e['packageName'] as String,
     };
+    if (packages.isEmpty) return;
+    await _appsCache.ensureLoaded();
+    await Future.wait([
+      _appsCache.loadIcons(packages),
+      _appsCache.checkInstalled(packages),
+    ]);
+  }
+
+  void _rebuildDisplay() {
     final Map<String, ManagedApp> appsByPkg = {
-      for (final a in widget.repository.managedApps) a.packageName: a,
+      for (final a in widget.repository.allManagedApps) a.packageName: a,
     };
 
-    setState(() {
-      _events
-        ..clear()
-        ..addAll(nativeLogs.map((raw) {
-          final pkg = raw['packageName'] as String? ?? 'Unknown App';
-          final managedApp = appsByPkg[pkg];
-          final installedApp = installedByPkg[pkg];
-          final rawAppName = (raw['appName'] as String?)?.trim() ?? '';
-          final displayName = managedApp?.displayName ??
-              installedApp?.displayName ??
-              (rawAppName.isNotEmpty ? rawAppName : pkg);
-          final iconBytes = installedApp?.iconBytes ?? managedApp?.iconBytes;
+    Map<String, dynamic> toDisplay(Map<String, dynamic> raw) {
+      final pkg = raw['packageName'] as String? ?? 'Unknown App';
+      final managedApp = appsByPkg[pkg];
+      final installedApp = _appsCache.appFor(pkg);
+      final rawAppName = (raw['appName'] as String?)?.trim() ?? '';
+      final displayName = managedApp?.displayName ??
+          installedApp?.displayName ??
+          (rawAppName.isNotEmpty ? rawAppName : pkg);
+      final iconBytes = _appsCache.iconFor(pkg) ?? managedApp?.iconBytes;
 
-          final tsMs = (raw['timestampMs'] as num?)?.toInt() ?? 0;
-          final dt = DateTime.fromMillisecondsSinceEpoch(tsMs);
-          final timeStr = _formatShortTime(dt);
-          final fullDateTimeStr = _formatFullDateTime(dt);
+      final tsMs = (raw['timestampMs'] as num?)?.toInt() ?? 0;
+      final dt = DateTime.fromMillisecondsSinceEpoch(tsMs);
 
-          final isBlocked = raw['isBlocked'] as bool? ?? false;
-          final notifTitle = (raw['title'] as String?)?.trim() ?? '';
-          final notifMessage = (raw['message'] as String?)?.trim() ?? '';
-          final subText = (raw['subText'] as String?)?.trim() ?? '';
-          final reason = (raw['reason'] as String?)?.trim() ??
-              (isBlocked
-                  ? 'Silenced while app was muted'
-                  : 'Allowed by schedule');
+      final isBlocked = raw['isBlocked'] as bool? ?? false;
+      final reason = (raw['reason'] as String?)?.trim() ??
+          (isBlocked ? 'Silenced while app was muted' : 'Allowed by schedule');
 
-          return <String, dynamic>{
-            'packageName': pkg,
-            'icon': _getDefaultIconForApp(displayName),
-            'iconBytes': iconBytes,
-            'appName': displayName,
-            'notifTitle': notifTitle,
-            'notifMessage': notifMessage,
-            'subText': subText,
-            'time': timeStr,
-            'fullDateTime': fullDateTimeStr,
-            'timestampMs': tsMs,
-            'isBlocked': isBlocked,
-            'reason': reason,
-          };
-        }));
-    });
+      return <String, dynamic>{
+        'id': raw['id']?.toString() ?? '',
+        'packageName': pkg,
+        'icon': _getDefaultIconForApp(displayName),
+        'iconBytes': iconBytes,
+        'appName': displayName,
+        'isUninstalled': _appsCache.isUninstalled(pkg),
+        'notifTitle': (raw['title'] as String?)?.trim() ?? '',
+        'notifMessage': (raw['message'] as String?)?.trim() ?? '',
+        'subText': (raw['subText'] as String?)?.trim() ?? '',
+        'conversationKey': (raw['conversationKey'] as String?)?.trim() ?? '',
+        'time': _formatShortTime(dt),
+        'fullDateTime': _formatFullDateTime(dt),
+        'timestampMs': tsMs,
+        'isBlocked': isBlocked,
+        'reason': reason,
+      };
+    }
+
+    bool visible(Map<String, dynamic> raw) =>
+        !_hiddenEventIds.contains(raw['id']?.toString());
+
+    _events
+      ..clear()
+      ..addAll(_rawLogs.where(visible).map(toDisplay));
+    _digestEvents
+      ..clear()
+      ..addAll({
+        for (final w in _rawDigest)
+          if (!_hiddenWindowIds.contains(w.id))
+            w.id: [
+              for (final e in w.events)
+                if (visible(e))
+                  toDisplay({...e, 'appName': e['appName'] ?? w.appName}),
+            ],
+      });
+    // A window whose messages were all deleted leaves the digest.
+    _digestEvents.removeWhere((_, events) => events.isEmpty);
+    _digest
+      ..clear()
+      ..addAll(DigestWindow.sorted(
+          _rawDigest.where((w) => _digestEvents.containsKey(w.id)).toList()));
+    _expandedDigest.retainWhere(_digestEvents.containsKey);
   }
 
   int get _silencedCount => _events.where((e) => e['isBlocked'] == true).length;
@@ -211,14 +285,11 @@ class ActivityScreenState extends State<ActivityScreen>
 
   void _confirmClearActivity() {
     if (_events.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: const Text('Activity log is already empty.'),
-            backgroundColor: AppTheme.toastWarning,
-          ),
-        );
+      AppToast.show(
+        context,
+        message: 'Activity log is already empty.',
+        type: AppToastType.info,
+      );
       return;
     }
 
@@ -264,20 +335,118 @@ class ActivityScreenState extends State<ActivityScreen>
               await AndroidNotificationPlatform.clearNativeActivityLog();
               if (!mounted) return;
               setState(() => _events.clear());
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(
-                    content: const Text('Triage activity log cleared.', style: TextStyle(color: AppTheme.toastOnSuccess, fontWeight: FontWeight.w600)),
-                    backgroundColor: AppTheme.toastSuccess,
-                  ),
-                );
+              AppToast.show(context, message: 'Triage activity log cleared.');
             },
             child: const Text('Clear All'),
           ),
         ],
       ),
     );
+  }
+
+  /// Ids of every message a (possibly grouped) log card stands for.
+  List<String> _eventIds(Map<String, dynamic> evt) {
+    final group = (evt['groupEvents'] as List?)?.cast<Map<String, dynamic>>();
+    return [
+      for (final e in group ?? [evt])
+        if ((e['id'] as String? ?? '').isNotEmpty) e['id'] as String,
+    ];
+  }
+
+  void _deleteLogCard(Map<String, dynamic> evt) {
+    final ids = _eventIds(evt);
+    if (ids.isEmpty) return;
+    final count = ids.length;
+    _deleteWithUndo(
+      eventIds: ids,
+      message: count > 1 ? '$count messages deleted' : 'Message deleted',
+    );
+  }
+
+  void _deleteDigestWindow(DigestWindow window) {
+    final events = _digestEvents[window.id] ?? const [];
+    final count = events.length;
+    _deleteWithUndo(
+      eventIds: [for (final e in events) e['id'] as String? ?? ''],
+      windowIds: [window.id],
+      message: 'Digest deleted · $count message${count == 1 ? '' : 's'}',
+    );
+  }
+
+  /// Hides the items at once and deletes them natively when the toast
+  /// closes without Undo. Showing another toast closes (and commits) the
+  /// previous one.
+  void _deleteWithUndo({
+    required List<String> eventIds,
+    List<int> windowIds = const [],
+    required String message,
+  }) {
+    final ids = eventIds.where((id) => id.isNotEmpty).toList();
+    setState(() {
+      _hiddenEventIds.addAll(ids);
+      _hiddenWindowIds.addAll(windowIds);
+      _rebuildDisplay();
+    });
+
+    AppToast.show(
+      context,
+      message: message,
+      type: AppToastType.info,
+      actionLabel: 'Undo',
+    ).then((reason) async {
+      if (reason == AppToastClosedReason.action) {
+        if (!mounted) return;
+        setState(() {
+          _hiddenEventIds.removeAll(ids);
+          _hiddenWindowIds.removeAll(windowIds);
+          _rebuildDisplay();
+        });
+        return;
+      }
+      await Future.wait([
+        AndroidNotificationPlatform.deleteActivityEvents(ids),
+        AndroidNotificationPlatform.deleteDigestWindows(windowIds),
+      ]);
+      if (!mounted) return;
+      await _loadNativeEvents();
+      // Reloaded data no longer has them, so they can leave the hidden sets.
+      _hiddenEventIds.removeAll(ids);
+      _hiddenWindowIds.removeAll(windowIds);
+    });
+  }
+
+  /// Swipe-right-to-delete wrapper shared by log and digest cards.
+  Widget _swipeToDelete({
+    required Key key,
+    required VoidCallback onDelete,
+    required BorderRadius radius,
+    required Widget child,
+    double bottomGap = 0,
+  }) =>
+      Padding(
+        key: key,
+        padding: EdgeInsets.only(bottom: bottomGap),
+        child: _SwipeToDelete(
+          dismissKey: key,
+          radius: radius,
+          onDelete: onDelete,
+          child: child,
+        ),
+      );
+
+  /// Card time, plus the message count when the card groups several messages.
+  String _timeWithCount(Map<String, dynamic> evt) {
+    final time = evt['time'] as String? ?? '';
+    final count = evt['groupCount'] as int? ?? 1;
+    return count > 1 ? '$time · $count messages' : time;
+  }
+
+  /// Stable id of a grouped card: its app and oldest message, which stay the
+  /// same while newer messages join the card.
+  String _groupId(Map<String, dynamic> evt) {
+    final group = (evt['groupEvents'] as List?)?.cast<Map<String, dynamic>>();
+    final oldest = group?.last ?? evt;
+    return '${evt['packageName']}|${oldest['timestampMs']}';
   }
 
   void _showNotificationDetailsSheet(
@@ -312,6 +481,9 @@ class ActivityScreenState extends State<ActivityScreen>
         evt['fullDateTime'] as String? ?? (evt['time'] as String? ?? '');
     final bool isBlocked = evt['isBlocked'] as bool? ?? false;
     final String reason = evt['reason'] as String? ?? '';
+    final List<Map<String, dynamic>> groupEvents =
+        (evt['groupEvents'] as List?)?.cast<Map<String, dynamic>>() ??
+            [evt];
 
     showModalBottomSheet(
       context: context,
@@ -401,40 +573,101 @@ class ActivityScreenState extends State<ActivityScreen>
                 ],
               ),
               const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: containerHigh.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(14),
+              if (groupEvents.length > 1) ...[
+                Text(
+                  notifTitle.isNotEmpty
+                      ? '$notifTitle · ${groupEvents.length} messages'
+                      : '${groupEvents.length} messages',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: textMain,
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (notifTitle.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(ctx).size.height * 0.45,
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: containerHigh.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.all(14),
+                      // Oldest first so the conversation reads top to bottom.
+                      itemCount: groupEvents.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) {
+                        final e = groupEvents[groupEvents.length - 1 - i];
+                        final msg = (e['notifMessage'] as String? ?? '').trim();
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                msg.isNotEmpty
+                                    ? msg
+                                    : 'No preview content available.',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: textMain,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              e['time'] as String? ?? '',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                color: textMuted,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ] else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: containerHigh.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (notifTitle.isNotEmpty) ...[
+                        Text(
+                          notifTitle,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: textMain,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                      ],
                       Text(
-                        notifTitle,
+                        notifMessage.isNotEmpty
+                            ? notifMessage
+                            : 'No preview content available.',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: textMain,
+                          fontSize: 13,
+                          color: textMuted,
+                          height: 1.4,
                         ),
                       ),
-                      const SizedBox(height: 4),
                     ],
-                    Text(
-                      notifMessage.isNotEmpty
-                          ? notifMessage
-                          : 'No preview content available.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        color: textMuted,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -466,6 +699,33 @@ class ActivityScreenState extends State<ActivityScreen>
                   ),
                 ],
               ),
+              if (_eventIds(evt).isNotEmpty) ...[
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor:
+                          isDark ? AppTheme.darkError : AppTheme.lightError,
+                      side: BorderSide(
+                          color: (isDark
+                                  ? AppTheme.darkError
+                                  : AppTheme.lightError)
+                              .withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _deleteLogCard(evt);
+                    },
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    label: Text(groupEvents.length > 1
+                        ? 'Delete ${groupEvents.length} messages'
+                        : 'Delete'),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -502,7 +762,7 @@ class ActivityScreenState extends State<ActivityScreen>
         ? AppTheme.darkOnSecondaryContainer
         : AppTheme.lightOnSecondaryContainer;
 
-    final events = _filteredEvents;
+    final events = groupActivityEvents(_filteredEvents);
 
     return Scaffold(
       backgroundColor: bg,
@@ -590,6 +850,9 @@ class ActivityScreenState extends State<ActivityScreen>
                                     const SizedBox(width: 6),
                                     _buildFilterPill('allowed', 'Allowed',
                                         _allowedCount, isDark),
+                                    const SizedBox(width: 6),
+                                    _buildFilterPill('digest', 'Digest',
+                                        _digest.length, isDark),
                                   ],
                                 ),
                               ),
@@ -630,7 +893,9 @@ class ActivityScreenState extends State<ActivityScreen>
 
                       // Recorded Events List
                       Expanded(
-                        child: events.isEmpty
+                        child: _selectedFilter == 'digest'
+                            ? _buildDigestList(isDark, textMain, textMuted)
+                            : events.isEmpty
                             ? Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -669,12 +934,23 @@ class ActivityScreenState extends State<ActivityScreen>
                                   final Uint8List? iconBytes =
                                       evt['iconBytes'] as Uint8List?;
 
-                                  return InkWell(
+                                  final uninstalled =
+                                      evt['isUninstalled'] == true;
+
+                                  return _swipeToDelete(
+                                    key: ValueKey('log-${_groupId(evt)}'),
+                                    radius: BorderRadius.circular(14),
+                                    bottomGap: 10,
+                                    onDelete: () => _deleteLogCard(evt),
+                                    child: InkWell(
                                     onTap: () => _showNotificationDetailsSheet(
                                         evt, isDark),
                                     borderRadius: BorderRadius.circular(14),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(bottom: 10),
+                                    child: Opacity(
+                                      opacity: uninstalled
+                                          ? _uninstalledOpacity
+                                          : 1,
+                                      child: Container(
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
                                         color: containerLow,
@@ -771,7 +1047,9 @@ class ActivityScreenState extends State<ActivityScreen>
                                                     ],
                                                     const Spacer(),
                                                     Text(
-                                                      evt['time'] as String? ?? '',
+                                                      uninstalled
+                                                          ? 'Uninstalled · ${_timeWithCount(evt)}'
+                                                          : _timeWithCount(evt),
                                                       style: GoogleFonts
                                                           .plusJakartaSans(
                                                         fontSize: 11,
@@ -806,6 +1084,8 @@ class ActivityScreenState extends State<ActivityScreen>
                                         ],
                                       ),
                                     ),
+                                    ),
+                                    ),
                                   );
                                 },
                               ),
@@ -830,6 +1110,7 @@ class ActivityScreenState extends State<ActivityScreen>
     final chipBg =
         isDark ? const Color(0xFF1E2621) : AppTheme.lightSurfaceContainer;
     final chipBorder = isDark ? const Color(0xFF2A362F) : Colors.transparent;
+    final isDigest = _selectedFilter == 'digest';
 
     Widget filterPill(String key, String label, int count) {
       final selected = _selectedFilter == key;
@@ -871,6 +1152,8 @@ class ActivityScreenState extends State<ActivityScreen>
         const SizedBox(height: 8),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
+          // Let chips scroll under the page padding up to the screen edges.
+          clipBehavior: Clip.none,
           child: Row(
             children: [
               filterPill('all', 'All', _events.length),
@@ -878,6 +1161,8 @@ class ActivityScreenState extends State<ActivityScreen>
               filterPill('silenced', 'Silenced', _silencedCount),
               const SizedBox(width: 8),
               filterPill('allowed', 'Allowed', _allowedCount),
+              const SizedBox(width: 8),
+              filterPill('digest', 'Digest', _digest.length),
             ],
           ),
         ),
@@ -885,7 +1170,7 @@ class ActivityScreenState extends State<ActivityScreen>
         Row(
           children: [
             Text(
-              'Recorded',
+              isDigest ? 'Catch-up' : 'Recorded',
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -904,7 +1189,9 @@ class ActivityScreenState extends State<ActivityScreen>
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                '${events.length} ${events.length == 1 ? 'Event' : 'Events'}',
+                isDigest
+                    ? '${_digest.length} ${_digest.length == 1 ? 'Window' : 'Windows'}'
+                    : '${events.length} ${events.length == 1 ? 'Event' : 'Events'}',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 13,
                   color: textMuted,
@@ -948,22 +1235,293 @@ class ActivityScreenState extends State<ActivityScreen>
         ),
         const SizedBox(height: 16),
         Expanded(
-          child: events.isEmpty
+          child: isDigest
+              ? _buildDigestList(isDark, textMain, textMuted)
+              : events.isEmpty
               ? _buildPhoneEmptyState(isDark, textMain, textMuted)
               : ListView.separated(
                   padding: const EdgeInsets.only(bottom: 24),
                   itemCount: events.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 14),
-                  itemBuilder: (context, index) =>
-                      _buildPhoneEventCard(events[index], isDark, textMain,
-                          textMuted),
+                  itemBuilder: (context, index) => _swipeToDelete(
+                    key: ValueKey('log-${_groupId(events[index])}'),
+                    radius: BorderRadius.circular(12),
+                    onDelete: () => _deleteLogCard(events[index]),
+                    child: _buildPhoneEventCard(
+                        events[index], isDark, textMain, textMuted),
+                  ),
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildPhoneEmptyState(bool isDark, Color textMain, Color textMuted) {
+  int get unreviewedDigestCount =>
+      _digest.where((w) => !w.reviewed).fold(0, (sum, w) => sum + _windowCount(w));
+
+  int _windowCount(DigestWindow w) => _digestEvents[w.id]?.length ?? 0;
+
+  void _toggleDigestWindow(DigestWindow window) {
+    final wasExpanded = _expandedDigest.contains(window.id);
+    // A window still running can't be reviewed yet, so its end-of-rule
+    // notification still covers everything silenced in it.
+    final markReviewed = !window.reviewed && !window.end.isAfter(DateTime.now());
+    setState(() {
+      if (wasExpanded) {
+        _expandedDigest.remove(window.id);
+      } else {
+        _expandedDigest.add(window.id);
+      }
+      if (markReviewed) {
+        final index = _digest.indexWhere((w) => w.id == window.id);
+        if (index >= 0) _digest[index] = window.copyWith(reviewed: true);
+        _rawDigest = [
+          for (final w in _rawDigest)
+            w.id == window.id ? w.copyWith(reviewed: true) : w,
+        ];
+      }
+    });
+    if (markReviewed) {
+      AndroidNotificationPlatform.markDigestReviewed([window.id]);
+    }
+  }
+
+  Widget _buildDigestList(bool isDark, Color textMain, Color textMuted) {
+    if (_digest.isEmpty) {
+      return _buildPhoneEmptyState(
+        isDark,
+        textMain,
+        textMuted,
+        message:
+            'Nothing to catch up on. When a rule ends, the notifications it silenced are grouped here by app.',
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.only(top: 4, bottom: 24),
+      itemCount: _digest.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) => _swipeToDelete(
+        key: ValueKey('digest-${_digest[index].id}'),
+        radius: BorderRadius.circular(12),
+        onDelete: () => _deleteDigestWindow(_digest[index]),
+        child: _buildDigestCard(_digest[index], isDark, textMain, textMuted),
+      ),
+    );
+  }
+
+  Widget _buildDigestCard(DigestWindow window, bool isDark, Color textMain,
+      Color textMuted) {
+    final events = _digestEvents[window.id] ?? const [];
+    final header = events.isNotEmpty ? events.first : null;
+    final iconBytes = header?['iconBytes'] as Uint8List?;
+    final appName = header?['appName'] as String? ?? window.displayName;
+    final expanded = _expandedDigest.contains(window.id);
+    final unreviewed = !window.reviewed;
+    final accent = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final cardBg =
+        isDark ? const Color(0xFF1A211D) : AppTheme.lightSurfaceContainerLow;
+    final cardBorder = unreviewed
+        ? accent.withValues(alpha: isDark ? 0.5 : 0.35)
+        : (isDark ? const Color(0xFF2A362F) : Colors.transparent);
+    final countBg = isDark
+        ? AppTheme.darkSecondaryContainer.withValues(alpha: 0.6)
+        : AppTheme.lightSecondaryContainer;
+    final countFg = isDark
+        ? AppTheme.darkOnSecondaryContainer
+        : AppTheme.lightOnSecondaryContainer;
+
+    return Container(
+      key: ValueKey('digest_window_${window.id}'),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => _toggleDigestWindow(window),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppTheme.darkSurfaceContainerHigh
+                          : AppTheme.lightSurfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: iconBytes != null
+                        ? Image.memory(iconBytes,
+                            width: 34, height: 34, fit: BoxFit.cover)
+                        : Icon(_getDefaultIconForApp(appName),
+                            size: 18, color: textMain),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                appName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: textMain,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                            if (unreviewed) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                key: ValueKey('digest_unreviewed_${window.id}'),
+                                width: 7,
+                                height: 7,
+                                decoration: BoxDecoration(
+                                  color: accent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        Text(
+                          _formatWindowRange(window.start, window.end),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            color: textMuted,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: countBg,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '${_windowCount(window)} silenced',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: countFg,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 20,
+                    color: textMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (expanded) ...[
+            Divider(
+              height: 1,
+              color: isDark
+                  ? const Color(0xFF2A362F)
+                  : AppTheme.lightOutlineVariant.withValues(alpha: 0.5),
+            ),
+            for (final evt in events)
+              _buildDigestEventRow(window, evt, textMain, textMuted),
+            const SizedBox(height: 6),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDigestEventRow(DigestWindow window, Map<String, dynamic> evt,
+      Color textMain, Color textMuted) {
+    final title = (evt['notifTitle'] as String? ?? '').trim();
+    final message = (evt['notifMessage'] as String? ?? '').trim();
+    return InkWell(
+      onTap: () => AndroidNotificationPlatform.openApp(window.packageName),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(60, 10, 16, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (title.isNotEmpty)
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: textMain,
+                        height: 1.4,
+                      ),
+                    ),
+                  if (message.isNotEmpty)
+                    Text(
+                      message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: textMain,
+                        height: 1.4,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _formatClock(DateTime.fromMillisecondsSinceEpoch(
+                  evt['timestampMs'] as int? ?? 0)),
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: textMuted,
+                height: 1.6,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhoneEmptyState(bool isDark, Color textMain, Color textMuted,
+      {String message =
+          'No notifications matching this filter or the log was recently refreshed.'}) {
     return Align(
       alignment: Alignment.topCenter,
       child: Container(
@@ -1006,7 +1564,7 @@ class ActivityScreenState extends State<ActivityScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              'No notifications matching this filter or the log was recently refreshed.',
+              message,
               textAlign: TextAlign.center,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
@@ -1027,6 +1585,11 @@ class ActivityScreenState extends State<ActivityScreen>
     final title = (evt['notifTitle'] as String? ?? '').trim();
     final message = (evt['notifMessage'] as String? ?? '').trim();
     final reason = (evt['reason'] as String? ?? '').trim();
+    final group = (evt['groupEvents'] as List?)?.cast<Map<String, dynamic>>() ??
+        [evt];
+    final isGroup = group.length > 1;
+    final groupId = _groupId(evt);
+    final expanded = isGroup && _expandedGroups.contains(groupId);
 
     final Color badgeBg;
     final Color badgeFg;
@@ -1056,10 +1619,14 @@ class ActivityScreenState extends State<ActivityScreen>
       badgeDot = isDark ? const Color(0xFFA7D4A3) : AppTheme.lightSecondary;
     }
 
+    final uninstalled = evt['isUninstalled'] == true;
+
     return InkWell(
       onTap: () => _showNotificationDetailsSheet(evt, isDark),
       borderRadius: BorderRadius.circular(12),
-      child: Container(
+      child: Opacity(
+        opacity: uninstalled ? _uninstalledOpacity : 1,
+        child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isDark
@@ -1115,7 +1682,9 @@ class ActivityScreenState extends State<ActivityScreen>
                         ),
                       ),
                       Text(
-                        evt['time'] as String? ?? '',
+                        uninstalled
+                            ? 'Uninstalled · ${_timeWithCount(evt)}'
+                            : _timeWithCount(evt),
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 13,
                           color: textMuted,
@@ -1175,18 +1744,55 @@ class ActivityScreenState extends State<ActivityScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (title.isNotEmpty)
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: textMain,
-                        ),
+                    if (title.isNotEmpty || isGroup)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: textMain,
+                              ),
+                            ),
+                          ),
+                          if (isGroup)
+                            InkResponse(
+                              radius: 20,
+                              onTap: () => setState(() => expanded
+                                  ? _expandedGroups.remove(groupId)
+                                  : _expandedGroups.add(groupId)),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  expanded
+                                      ? Icons.expand_less_rounded
+                                      : Icons.expand_more_rounded,
+                                  size: 22,
+                                  color: textMuted,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    if (message.isNotEmpty || title.isEmpty) ...[
+                    if (expanded) ...[
+                      // Oldest first so the conversation reads top to bottom.
+                      for (final e in group.reversed) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          (e['notifMessage'] as String? ?? '').trim(),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                            color: textMuted,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ] else if (message.isNotEmpty || title.isEmpty) ...[
                       if (title.isNotEmpty) const SizedBox(height: 2),
                       Text(
                         message.isNotEmpty ? message : reason,
@@ -1206,6 +1812,7 @@ class ActivityScreenState extends State<ActivityScreen>
             ],
           ],
         ),
+      ),
       ),
     );
   }
@@ -1341,6 +1948,75 @@ class ActivityScreenState extends State<ActivityScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Dismissible clips its own background to a straight-edged strip, which
+/// shows the page behind the card's rounded corners. This paints the soft red
+/// under the whole card instead, only while it is being swiped, and clips
+/// both to the card's rounded shape.
+class _SwipeToDelete extends StatefulWidget {
+  const _SwipeToDelete({
+    required this.dismissKey,
+    required this.radius,
+    required this.onDelete,
+    required this.child,
+  });
+
+  final Key dismissKey;
+  final BorderRadius radius;
+  final VoidCallback onDelete;
+  final Widget child;
+
+  @override
+  State<_SwipeToDelete> createState() => _SwipeToDeleteState();
+}
+
+class _SwipeToDeleteState extends State<_SwipeToDelete> {
+  bool _swiping = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final onColor =
+        isDark ? AppTheme.darkOnErrorContainer : AppTheme.lightOnErrorContainer;
+    return ClipRRect(
+      borderRadius: widget.radius,
+      child: Stack(
+        children: [
+          if (_swiping)
+            Positioned.fill(
+              child: Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.only(left: 24),
+                color: isDark
+                    ? AppTheme.darkErrorContainer
+                    : AppTheme.lightErrorContainer,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.delete_outline_rounded, color: onColor),
+                    const SizedBox(width: 6),
+                    Text('Delete',
+                        style: GoogleFonts.plusJakartaSans(
+                            color: onColor, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          Dismissible(
+            key: widget.dismissKey,
+            direction: DismissDirection.startToEnd,
+            onUpdate: (details) {
+              final swiping = details.progress > 0;
+              if (swiping != _swiping) setState(() => _swiping = swiping);
+            },
+            onDismissed: (_) => widget.onDelete(),
+            child: widget.child,
+          ),
+        ],
       ),
     );
   }

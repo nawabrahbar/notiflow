@@ -47,8 +47,18 @@ data class NativeEvaluationDecision(
     val isManagedOrOverridden: Boolean,
     val reason: String,
     val ruleName: String? = null,
-    val timeWindow: String? = null
+    val timeWindow: String? = null,
+    /** Set when the notification should be snoozed (not cancelled) for this long. */
+    val snoozeDurationMs: Long? = null,
+    /** True when this post is a notification Notiflow had snoozed coming back. */
+    val isReturningOriginal: Boolean = false
 )
+
+/** Lets the store re-snooze or cancel held notifications through the connected listener. */
+interface HeldNotificationController {
+    fun snooze(key: String, durationMs: Long): Boolean
+    fun cancel(key: String): Boolean
+}
 
 /**
  * Pure Kotlin evaluator for background schedule decisions.
@@ -213,6 +223,27 @@ class NativeScheduleEvaluator {
     // Key is "$packageName:$callerIdentity", Value is timestampMs of the last call
     private val callerHistory = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
+    /**
+     * Urgent repeated-call check (3-minute window). Returns true when this is the
+     * 2nd call from the same caller within 3 minutes; otherwise records the call.
+     */
+    private fun isRepeatCallBypass(packageName: String, title: String, postTimeMs: Long): Boolean {
+        val callerKey = "$packageName:${if (title.isNotBlank()) title.trim() else "unknown"}"
+        val lastCallMs = callerHistory[callerKey]
+        val threeMinutesMs = 3 * 60 * 1000L
+
+        if (callerHistory.size > 200) {
+            callerHistory.entries.removeIf { postTimeMs - it.value > threeMinutesMs * 3 }
+        }
+
+        if (lastCallMs != null && (postTimeMs - lastCallMs) in 1..threeMinutesMs) {
+            callerHistory.remove(callerKey)
+            return true
+        }
+        callerHistory[callerKey] = postTimeMs
+        return false
+    }
+
     private fun findManagedApp(packageName: String): NativeManagedApp? {
         return cachedApps[packageName]
             ?: cachedApps.entries.firstOrNull { it.key.equals(packageName, ignoreCase = true) }?.value
@@ -248,6 +279,9 @@ class NativeScheduleEvaluator {
             )
         }
 
+        val isCall = category.equals("call", ignoreCase = true) ||
+                     category.equals("android.category.call", ignoreCase = true)
+
         // 2. Check active global override (applies to enabled managed apps, and global_mute applies if active)
         val globalOverride = cachedOverrides["global_mute"]
             ?: cachedOverrides["global_allow"]
@@ -255,6 +289,15 @@ class NativeScheduleEvaluator {
         if (globalOverride != null && postTimeMs >= globalOverride.startMs && postTimeMs < globalOverride.endMs) {
             val blocked = globalOverride.mode == "block"
             if (blocked && (app == null || app.enabled)) {
+                // Repeat callers ring through during Quick Mute when the toggle is on
+                if (vipEmergencyBypass && isCall && isRepeatCallBypass(packageName, title, postTimeMs)) {
+                    return NativeEvaluationDecision(
+                        shouldBlock = false,
+                        isManagedOrOverridden = true,
+                        reason = "Allowed by urgent repeated call bypass (< 3 mins)",
+                        ruleName = "Urgent Call Bypass"
+                    )
+                }
                 return NativeEvaluationDecision(
                     shouldBlock = true,
                     isManagedOrOverridden = true,
@@ -296,9 +339,6 @@ class NativeScheduleEvaluator {
             )
         }
 
-        val isCall = category.equals("call", ignoreCase = true) ||
-                     category.equals("android.category.call", ignoreCase = true)
-
         val cal = Calendar.getInstance().apply { timeInMillis = postTimeMs }
         val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
         val todayIso = if (dayOfWeek == Calendar.SUNDAY) 7 else dayOfWeek - 1
@@ -316,17 +356,7 @@ class NativeScheduleEvaluator {
 
                 // Urgent repeated call escalation check (3-minute window)
                 if (vipEmergencyBypass && isCall && rule.allowVipContacts) {
-                    val callerKey = "$packageName:${if (title.isNotBlank()) title.trim() else "unknown"}"
-                    val lastCallMs = callerHistory[callerKey]
-                    val threeMinutesMs = 3 * 60 * 1000L
-
-                    if (callerHistory.size > 200) {
-                        callerHistory.entries.removeIf { postTimeMs - it.value > threeMinutesMs * 3 }
-                    }
-
-                    if (lastCallMs != null && (postTimeMs - lastCallMs) in 1..threeMinutesMs) {
-                        // 2nd call within 3 minutes bypasses suppression and rings through!
-                        callerHistory.remove(callerKey)
+                    if (isRepeatCallBypass(packageName, title, postTimeMs)) {
                         return NativeEvaluationDecision(
                             shouldBlock = false,
                             isManagedOrOverridden = true,
@@ -334,9 +364,6 @@ class NativeScheduleEvaluator {
                             ruleName = "Urgent Call Bypass",
                             timeWindow = window
                         )
-                    } else {
-                        // 1st call attempt: record timestamp and suppress
-                        callerHistory[callerKey] = postTimeMs
                     }
                 }
 
@@ -371,16 +398,7 @@ class NativeScheduleEvaluator {
 
             // Urgent repeated call escalation check outside allow window
             if (vipEmergencyBypass && isCall && firstAllow.allowVipContacts) {
-                val callerKey = "$packageName:${if (title.isNotBlank()) title.trim() else "unknown"}"
-                val lastCallMs = callerHistory[callerKey]
-                val threeMinutesMs = 3 * 60 * 1000L
-
-                if (callerHistory.size > 200) {
-                    callerHistory.entries.removeIf { postTimeMs - it.value > threeMinutesMs * 3 }
-                }
-
-                if (lastCallMs != null && (postTimeMs - lastCallMs) in 1..threeMinutesMs) {
-                    callerHistory.remove(callerKey)
+                if (isRepeatCallBypass(packageName, title, postTimeMs)) {
                     return NativeEvaluationDecision(
                         shouldBlock = false,
                         isManagedOrOverridden = true,
@@ -388,8 +406,6 @@ class NativeScheduleEvaluator {
                         ruleName = "Urgent Call Bypass",
                         timeWindow = window
                     )
-                } else {
-                    callerHistory[callerKey] = postTimeMs
                 }
             }
 
@@ -421,6 +437,51 @@ class NativeScheduleEvaluator {
             category = category,
             title = title
         ).shouldBlock
+    }
+
+    /**
+     * Finds the continuous silenced period around [timeMs] for [packageName] with the
+     * current rules and overrides, so overlapping rules, overnight rules and temporary
+     * mutes merge into one window. Scans minute by minute without side effects.
+     *
+     * Returns `startMs` (first silenced minute) and `endMs` (last silenced minute), or
+     * null when the app is not silenced at [timeMs] or stays silenced beyond
+     * [maxScanDays] in either direction (treated as a permanent mute: no digest).
+     */
+    fun findSilencedWindow(
+        packageName: String,
+        timeMs: Long,
+        maxScanDays: Int = 8
+    ): Pair<Long, Long>? {
+        if (!evaluateNotification(packageName, timeMs).shouldBlock) return null
+        val minuteMs = 60_000L
+        val maxSteps = maxScanDays * 24 * 60
+        val baseMinute = timeMs - Math.floorMod(timeMs, minuteMs)
+
+        var end: Long? = null
+        var probe = baseMinute
+        for (i in 0 until maxSteps) {
+            val next = probe + minuteMs
+            if (!evaluateNotification(packageName, next).shouldBlock) {
+                end = probe
+                break
+            }
+            probe = next
+        }
+        if (end == null) return null
+
+        var start: Long? = null
+        probe = baseMinute
+        for (i in 0 until maxSteps) {
+            val prev = probe - minuteMs
+            if (!evaluateNotification(packageName, prev).shouldBlock) {
+                start = probe
+                break
+            }
+            probe = prev
+        }
+        if (start == null) return null
+        return Pair(start, end)
     }
 
     fun isManagedPackage(packageName: String): Boolean {
@@ -471,29 +532,40 @@ class NativeScheduleStore(context: Context) {
         const val PREF_NAME = "notification_handler_schedules"
         const val KEY_PAYLOAD = "payload"
         const val KEY_ACTIVITY_LOG = "activity_log"
-        private const val MAX_ACTIVITY_EVENTS = 150
+        private const val KEY_LAST_PRUNE_MS = "activity_last_prune_ms"
         private const val DEDUP_WINDOW_MS = 2000L
+        private const val PRUNE_INTERVAL_MS = 24L * 60 * 60 * 1000
 
         @Volatile
         var onActivityUpdatedListener: (() -> Unit)? = null
     }
 
+    private val appContext: Context = context.applicationContext
+
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+
+    private val database = NotiflowDatabase.getInstance(context)
 
     private val evaluator = NativeScheduleEvaluator()
 
     @Volatile
     private var lastLoadedPayload: String? = null
 
+    // Last computed silenced window per package, valid while the payload is unchanged.
+    private val windowCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Long>>()
+
     init {
         loadFromPreferences()
+        migrateLegacyActivityLog()
+        pruneIfDue(force = true)
     }
 
     fun savePayload(jsonPayload: String) {
         prefs.edit().putString(KEY_PAYLOAD, jsonPayload).apply()
         evaluator.parsePayload(jsonPayload)
         lastLoadedPayload = jsonPayload
+        windowCache.clear()
     }
 
     fun reloadIfChanged() {
@@ -501,6 +573,7 @@ class NativeScheduleStore(context: Context) {
         if (currentPayload != lastLoadedPayload) {
             evaluator.parsePayload(currentPayload)
             lastLoadedPayload = currentPayload
+            windowCache.clear()
         }
     }
 
@@ -508,6 +581,28 @@ class NativeScheduleStore(context: Context) {
         val payload = prefs.getString(KEY_PAYLOAD, null)
         evaluator.parsePayload(payload)
         lastLoadedPayload = payload
+    }
+
+    @Synchronized
+    private fun migrateLegacyActivityLog() {
+        try {
+            val raw = prefs.getString(KEY_ACTIVITY_LOG, null) ?: return
+            if (raw.isNotBlank()) database.importLegacyEvents(raw)
+            prefs.edit().remove(KEY_ACTIVITY_LOG).apply()
+        } catch (e: Exception) {
+            android.util.Log.e("NativeScheduleStore", "Activity history migration failed; legacy history was retained", e)
+        }
+    }
+
+    private fun pruneIfDue(force: Boolean = false) {
+        try {
+            val now = System.currentTimeMillis()
+            val last = prefs.getLong(KEY_LAST_PRUNE_MS, 0L)
+            if (!force && now - last < PRUNE_INTERVAL_MS) return
+            database.pruneOlderThan(now - NotiflowDatabase.RETENTION_MS)
+            prefs.edit().putLong(KEY_LAST_PRUNE_MS, now).apply()
+        } catch (_: Exception) {
+        }
     }
 
     fun shouldBlockNotification(packageName: String, postTimeMs: Long): Boolean {
@@ -525,24 +620,34 @@ class NativeScheduleStore(context: Context) {
         message: String = "",
         subText: String = "",
         category: String = "",
-        isGroupSummary: Boolean = false
+        isGroupSummary: Boolean = false,
+        notificationKey: String = "",
+        conversationKey: String = "",
+        evaluationTimeMs: Long = postTimeMs,
+        canSnooze: Boolean = false,
+        isSelfMessage: Boolean = false
     ): NativeEvaluationDecision {
         reloadIfChanged()
         val decision = evaluator.evaluateNotification(
             packageName = packageName,
-            postTimeMs = postTimeMs,
+            postTimeMs = evaluationTimeMs,
             category = category,
             title = title
         )
 
+        val held = if (notificationKey.isNotBlank()) heldOrNull(notificationKey, evaluationTimeMs) else null
+        if (held != null) return handleHeldRepost(held, decision, canSnooze, evaluationTimeMs)
+
         // Record blocked notifications and all managed apps, including paused apps.
         // Skip empty group summary container notifications so we don't duplicate real messages.
         val hasContent = title.isNotBlank() || message.isNotBlank()
+        // The user's own replies are re-posted by chat apps; keep blocking them but don't log them.
         val shouldRecord = (decision.shouldBlock || decision.isManagedOrOverridden) &&
-            (!isGroupSummary || hasContent)
+            (!isGroupSummary || hasContent) && !isSelfMessage
 
+        var windowId: Long? = null
         if (shouldRecord) {
-            recordTriageEvent(
+            windowId = recordTriageEvent(
                 packageName = packageName,
                 appName = appName,
                 title = title,
@@ -554,10 +659,158 @@ class NativeScheduleStore(context: Context) {
                 reason = decision.reason,
                 ruleName = decision.ruleName,
                 timeWindow = decision.timeWindow,
-                isGroupSummary = isGroupSummary
+                isGroupSummary = isGroupSummary,
+                notificationKey = notificationKey,
+                conversationKey = conversationKey
             )
         }
+
+        if (!decision.shouldBlock) return decision
+        val window = silencedWindowFor(packageName, evaluationTimeMs)
+        val action = DigestPlanner.holdAction(
+            shouldBlock = true,
+            canSnooze = canSnooze && notificationKey.isNotBlank(),
+            window = window,
+            nowMs = evaluationTimeMs
+        )
+        if (action is DigestPlanner.HoldAction.Snooze) {
+            try {
+                database.holdNotification(notificationKey, packageName, windowId, action.releaseAtMs)
+                DigestNotifier.reschedule(appContext)
+                return decision.copy(snoozeDurationMs = action.durationMs)
+            } catch (_: Exception) {
+                // Fall back to cancelling when the hold cannot be stored.
+            }
+        }
         return decision
+    }
+
+    /** The held row for [key], dropping it when it is long past its release (it never came back). */
+    private fun heldOrNull(key: String, nowMs: Long): NotiflowDatabase.HeldNotification? {
+        return try {
+            val held = database.getHeld(key) ?: return null
+            if (held.releaseAtMs + 2 * DigestPlanner.MINUTE_MS < nowMs) {
+                database.finishHeld(key, NotiflowDatabase.DELIVERY_REMOVED)
+                null
+            } else held
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * A snoozed notification came back. If its app is no longer silenced it is let
+     * through and not logged again; otherwise it is snoozed to the current window end.
+     */
+    private fun handleHeldRepost(
+        held: NotiflowDatabase.HeldNotification,
+        decision: NativeEvaluationDecision,
+        canSnooze: Boolean,
+        nowMs: Long
+    ): NativeEvaluationDecision {
+        try {
+            if (!decision.shouldBlock) {
+                database.finishHeld(held.key, NotiflowDatabase.DELIVERY_RELEASED)
+                onActivityUpdatedListener?.invoke()
+                return decision.copy(isReturningOriginal = true)
+            }
+            val window = silencedWindowFor(held.packageName, nowMs)
+            val action = DigestPlanner.holdAction(true, canSnooze, window, nowMs)
+            if (action is DigestPlanner.HoldAction.Snooze) {
+                database.updateHeldRelease(held.key, action.releaseAtMs)
+                return decision.copy(snoozeDurationMs = action.durationMs, isReturningOriginal = true)
+            }
+            database.finishHeld(held.key, NotiflowDatabase.DELIVERY_REMOVED)
+        } catch (_: Exception) {
+        }
+        return decision.copy(isReturningOriginal = true)
+    }
+
+    /** Marks a held notification removed by its source app during the window. */
+    fun onHeldNotificationRemoved(key: String) {
+        try {
+            if (database.getHeld(key) != null) {
+                database.finishHeld(key, NotiflowDatabase.DELIVERY_REMOVED)
+                onActivityUpdatedListener?.invoke()
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * After a restart or listener reconnect: held notifications that Android no longer has
+     * (neither snoozed nor showing) are marked removed.
+     */
+    fun dropLostHeld(presentKeys: Set<String>) {
+        try {
+            for (held in database.getAllHeld()) {
+                if (held.key !in presentKeys) database.finishHeld(held.key, NotiflowDatabase.DELIVERY_REMOVED)
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * Applies the saved rules to running windows and snoozed notifications (spec 3.4):
+     * a changed end time re-snoozes, a finished/deleted/disabled rule releases now, and a
+     * switch to permanent mute cancels. Uses its own evaluator so it can run off the main thread.
+     */
+    fun reconcileHeld(controller: HeldNotificationController?) {
+        try {
+            val now = System.currentTimeMillis()
+            val eval = NativeScheduleEvaluator().apply { parsePayload(prefs.getString(KEY_PAYLOAD, null)) }
+            val windows = HashMap<String, Pair<Long, Long>?>()
+            val blocked = HashMap<String, Boolean>()
+            fun windowFor(pkg: String) = windows.getOrPut(pkg) { eval.findSilencedWindow(pkg, now) }
+            fun blockedFor(pkg: String) = blocked.getOrPut(pkg) { eval.evaluateNotification(pkg, now).shouldBlock }
+
+            var changed = false
+            val currentMinute = now - Math.floorMod(now, DigestPlanner.MINUTE_MS)
+            for (w in database.getOpenWindows(now)) {
+                val current = windowFor(w.packageName)
+                if (current == null) {
+                    database.updateWindowEnd(w.id, maxOf(w.startMs, currentMinute - DigestPlanner.MINUTE_MS))
+                    changed = true
+                } else if (current.second != w.endMs && current.first <= w.endMs + DigestPlanner.MINUTE_MS) {
+                    database.updateWindowEnd(w.id, current.second)
+                    changed = true
+                }
+            }
+
+            for (held in database.getAllHeld()) {
+                val action = DigestPlanner.reconcileHeld(
+                    held.releaseAtMs, blockedFor(held.packageName), windowFor(held.packageName), now
+                )
+                when (action) {
+                    is DigestPlanner.HeldAction.Resnooze ->
+                        if (controller?.snooze(held.key, action.durationMs) == true) {
+                            database.updateHeldRelease(held.key, action.releaseAtMs)
+                        }
+                    DigestPlanner.HeldAction.Release ->
+                        // Comes back in a moment; the listener then marks it released.
+                        controller?.snooze(held.key, DigestPlanner.RELEASE_NOW_MS)
+                    DigestPlanner.HeldAction.Cancel ->
+                        if (controller?.cancel(held.key) == true) {
+                            database.finishHeld(held.key, NotiflowDatabase.DELIVERY_REMOVED)
+                        }
+                    DigestPlanner.HeldAction.Keep -> Unit
+                }
+            }
+            windowCache.clear()
+            DigestNotifier.reschedule(appContext)
+            if (changed) onActivityUpdatedListener?.invoke()
+        } catch (e: Exception) {
+            android.util.Log.w("NativeScheduleStore", "Could not apply rule changes to held notifications", e)
+        }
+    }
+
+    private fun silencedWindowFor(packageName: String, timeMs: Long): Pair<Long, Long>? {
+        windowCache[packageName]?.let { cached ->
+            if (timeMs >= cached.first && timeMs < cached.second + 60_000L) return cached
+        }
+        val window = evaluator.findSilencedWindow(packageName, timeMs) ?: return null
+        windowCache[packageName] = window
+        return window
     }
 
     @Synchronized
@@ -573,66 +826,93 @@ class NativeScheduleStore(context: Context) {
         reason: String? = null,
         ruleName: String? = null,
         timeWindow: String? = null,
-        isGroupSummary: Boolean = false
-    ) {
-        try {
-            val raw = prefs.getString(KEY_ACTIVITY_LOG, null)
-            val currentArray = if (!raw.isNullOrBlank()) org.json.JSONArray(raw) else org.json.JSONArray()
-
-            // Deduplicate rapid consecutive updates of the exact same notification or group summary
-            if (currentArray.length() > 0) {
-                val latest = currentArray.optJSONObject(0)
-                if (latest != null) {
-                    val samePkg = latest.optString("packageName") == packageName
-                    val sameBlock = latest.optBoolean("isBlocked") == isBlocked
-                    val prevTs = latest.optLong("timestampMs", 0L)
-                    val withinWindow = kotlin.math.abs(postTimeMs - prevTs) <= DEDUP_WINDOW_MS
-                    val sameTitle = latest.optString("title") == title
-                    val sameMessage = latest.optString("message") == message
-
-                    if (samePkg && sameBlock && withinWindow) {
-                        if ((sameTitle && sameMessage) || isGroupSummary) {
-                            return
-                        }
-                    }
-                }
-            }
-
+        isGroupSummary: Boolean = false,
+        notificationKey: String = "",
+        conversationKey: String = ""
+    ): Long? {
+        return try {
             val effectiveReason = reason ?: if (isBlocked) "Silenced by schedule rule" else "Allowed by schedule window"
+            val windowId = if (isBlocked) {
+                silencedWindowFor(packageName, postTimeMs)?.let { (start, end) ->
+                    database.upsertWindow(packageName, appName, ruleName, start, end)
+                }
+            } else null
 
-            val eventObj = JSONObject().apply {
-                put("id", "${postTimeMs}_${packageName.hashCode()}")
-                put("packageName", packageName)
-                if (appName.isNotBlank()) put("appName", appName)
-                put("title", title)
-                put("message", message)
-                if (subText.isNotBlank()) put("subText", subText)
-                if (category.isNotBlank()) put("category", category)
-                put("timestampMs", postTimeMs)
-                put("isBlocked", isBlocked)
-                put("reason", effectiveReason)
-                if (!ruleName.isNullOrBlank()) put("ruleName", ruleName)
-                if (!timeWindow.isNullOrBlank()) put("timeWindow", timeWindow)
-            }
-            val nextArray = org.json.JSONArray()
-            nextArray.put(eventObj)
-            val limit = minOf(currentArray.length(), MAX_ACTIVITY_EVENTS - 1)
-            for (i in 0 until limit) {
-                nextArray.put(currentArray.getJSONObject(i))
-            }
-            prefs.edit().putString(KEY_ACTIVITY_LOG, nextArray.toString()).apply()
-            onActivityUpdatedListener?.invoke()
+            val recorded = database.recordEvent(
+                NotiflowDatabase.EventInput(
+                    packageName = packageName,
+                    appName = appName,
+                    title = title,
+                    message = message,
+                    subText = subText,
+                    category = category,
+                    postTimeMs = postTimeMs,
+                    notificationKey = notificationKey,
+                    conversationKey = conversationKey,
+                    isBlocked = isBlocked,
+                    reason = effectiveReason,
+                    ruleName = ruleName,
+                    timeWindow = timeWindow,
+                    isGroupSummary = isGroupSummary
+                ),
+                windowId,
+                DEDUP_WINDOW_MS
+            )
+            pruneIfDue()
+            if (recorded) onActivityUpdatedListener?.invoke()
+            windowId
         } catch (_: Exception) {
             // Ignore logging failures in background
+            null
         }
     }
 
     fun getActivityLogJson(): String {
-        return prefs.getString(KEY_ACTIVITY_LOG, "[]") ?: "[]"
+        return try {
+            database.getEventsJson(System.currentTimeMillis() - NotiflowDatabase.RETENTION_MS)
+        } catch (_: Exception) {
+            "[]"
+        }
+    }
+
+    fun getDigestJson(): String {
+        return try {
+            database.getDigestJson(System.currentTimeMillis())
+        } catch (_: Exception) {
+            "[]"
+        }
+    }
+
+    fun markDigestReviewed(ids: List<Long>) {
+        try {
+            database.markWindowsReviewed(ids)
+            DigestNotifier.onReviewed(appContext)
+            onActivityUpdatedListener?.invoke()
+        } catch (_: Exception) {
+        }
+    }
+
+    fun deleteActivityEvents(ids: List<Long>) = afterDelete { database.deleteEvents(ids) }
+
+    fun deleteDigestWindows(ids: List<Long>) = afterDelete { database.deleteWindowEvents(ids) }
+
+    private fun afterDelete(delete: () -> Unit) {
+        try {
+            delete()
+            // Drops the end-of-rule notification if nothing it listed is left.
+            DigestNotifier.onReviewed(appContext)
+        } catch (_: Exception) {
+        }
+        onActivityUpdatedListener?.invoke()
     }
 
     fun clearActivityLog() {
+        try {
+            database.clearAll()
+        } catch (_: Exception) {
+        }
         prefs.edit().remove(KEY_ACTIVITY_LOG).apply()
+        windowCache.clear()
         onActivityUpdatedListener?.invoke()
     }
 }

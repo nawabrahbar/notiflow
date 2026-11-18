@@ -32,7 +32,11 @@ class AppTheme {
   static const Color permittedSurface = Color(0xFFE9EDC9);
   static const Color permittedAccent = Color(0xFFCCD5AE);
   static const Color toastWarning = signalWarning;
+  static const Color toastOnWarning = Colors.white;
   static const Color toastError = signalError;
+  static const Color toastOnError = Colors.white;
+  static const Color toastInfo = Color(0xFFD3E3EE);
+  static const Color toastOnInfo = Color(0xFF2C4A5E);
 
   // Botanical Sanctuary (Light Mode) Tokens
   static const Color lightBackground = Color(0xFFFEF8F6);
@@ -59,6 +63,8 @@ class AppTheme {
   static const Color lightTertiary = Color(0xFF5C6145);
   static const Color lightTertiaryContainer = Color(0xFFABAF8E);
   static const Color lightError = Color(0xFFBA1A1A);
+  static const Color lightErrorContainer = Color(0xFFFFDAD6);
+  static const Color lightOnErrorContainer = Color(0xFF93000A);
 
   // Botanical Nocturne (Dark Mode) Tokens
   static const Color darkBackground = Color(0xFF101412);
@@ -85,6 +91,8 @@ class AppTheme {
   static const Color darkTertiary = Color(0xFFA7D4A3);
   static const Color darkTertiaryContainer = Color(0xFF8CB889);
   static const Color darkError = Color(0xFFFFB4AB);
+  static const Color darkErrorContainer = Color(0xFF5C2A26);
+  static const Color darkOnErrorContainer = Color(0xFFFFDAD6);
 
   // Backward-compatible design token aliases (defaults to Dark/Botanical tokens)
   static const Color amberPrimary = darkPrimary;
@@ -299,15 +307,6 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: signalSuccess,
-        contentTextStyle: GoogleFonts.plusJakartaSans(
-          color: Colors.white,
-          fontSize: 13.5,
-          fontWeight: FontWeight.w600,
-        ),
-        behavior: SnackBarBehavior.fixed,
-      ),
     );
   }
 
@@ -497,15 +496,6 @@ class AppTheme {
         unselectedItemColor: darkOnSurfaceVariant,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-      ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: signalSuccess,
-        contentTextStyle: GoogleFonts.plusJakartaSans(
-          color: Colors.white,
-          fontSize: 13.5,
-          fontWeight: FontWeight.w600,
-        ),
-        behavior: SnackBarBehavior.fixed,
       ),
     );
   }

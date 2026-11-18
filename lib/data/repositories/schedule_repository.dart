@@ -102,11 +102,7 @@ class ScheduleRepository extends ChangeNotifier {
       }
     }
 
-    // Ensure the pre-seeded default template (Work Focus Hours 9am-5pm Mon-Fri) is always present
-    if (_ruleTemplates.isEmpty ||
-        !_ruleTemplates.any((t) => t.id == RuleTemplate.defaultWorkFocus.id)) {
-      _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
-    }
+    _ensureDefaultTemplate();
 
     final overridesJson = prefs.getString(_keyOverrides);
     if (overridesJson != null) {
@@ -312,14 +308,55 @@ class ScheduleRepository extends ChangeNotifier {
     return true;
   }
 
-  /// Renames a saved rule template. Blank names are ignored.
-  Future<void> renameRuleTemplate(String templateId, String newName) async {
-    final trimmed = newName.trim();
-    if (trimmed.isEmpty) return;
-    final index = _ruleTemplates.indexWhere((t) => t.id == templateId);
-    if (index == -1) return;
-    _ruleTemplates[index] = _ruleTemplates[index].copyWith(name: trimmed);
+  /// Keeps the pre-seeded default template present and renames the legacy
+  /// "Work Focus Hours" name to "Focus Hours" (custom names are kept).
+  void _ensureDefaultTemplate() {
+    final index =
+        _ruleTemplates.indexWhere((t) => t.id == RuleTemplate.defaultWorkFocus.id);
+    if (index == -1) {
+      _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
+    } else if (_ruleTemplates[index].name == _legacyDefaultTemplateName) {
+      _ruleTemplates[index] =
+          _ruleTemplates[index].copyWith(name: RuleTemplate.defaultWorkFocus.name);
+    }
+  }
+
+  static const String _legacyDefaultTemplateName = 'Work Focus Hours';
+
+  /// Returns another saved rule with the same mode, times and days as
+  /// [template], or null.
+  RuleTemplate? findDuplicateTemplate(RuleTemplate template) {
+    for (final t in _ruleTemplates) {
+      if (t.id == template.id) continue;
+      if (t.matchesConfiguration(
+        targetMode: template.mode,
+        targetStartTime: template.startTime,
+        targetEndTime: template.endTime,
+        targetDaysOfWeek: template.daysOfWeek,
+      )) {
+        return t;
+      }
+    }
+    return null;
+  }
+
+  /// Replaces a saved rule's name, mode, times, days and VIP setting.
+  /// The pre-seeded default cannot be edited; blank names and empty days are ignored.
+  /// Schedules already applied to apps are not changed.
+  Future<bool> updateRuleTemplate(RuleTemplate template) async {
+    if (template.id == RuleTemplate.defaultWorkFocus.id) return false;
+    final name = template.name.trim();
+    if (name.isEmpty || template.daysOfWeek.isEmpty) return false;
+    final index = _ruleTemplates.indexWhere((t) => t.id == template.id);
+    if (index == -1) return false;
+    final existing = _ruleTemplates[index];
+    _ruleTemplates[index] = template.copyWith(
+      name: name,
+      isPreSeeded: existing.isPreSeeded,
+      createdAt: existing.createdAt,
+    );
     await _persist();
+    return true;
   }
 
   /// Deletes a custom rule template by [templateId] (cannot delete pre-seeded default).
@@ -400,6 +437,25 @@ class ScheduleRepository extends ChangeNotifier {
       createdAt: now,
     );
     await setOverride(override);
+  }
+
+  /// Pushes the end of the active override for [appId] out by [extra].
+  /// Starts a fresh mute if nothing is active.
+  Future<void> extendTemporaryMute({required String appId, required Duration extra}) async {
+    final current = _overrides[appId];
+    if (current == null || !current.isActive) {
+      await setTemporaryMute(appId: appId, duration: extra);
+      return;
+    }
+    _overrides[appId] = TemporaryOverride(
+      id: current.id,
+      appId: current.appId,
+      mode: current.mode,
+      startDateTime: current.startDateTime,
+      endDateTime: current.endDateTime.add(extra),
+      createdAt: current.createdAt,
+    );
+    await _persist();
   }
 
   /// Sets a temporary allow override for [appId] lasting [duration].
@@ -542,7 +598,7 @@ class ScheduleRepository extends ChangeNotifier {
   String exportRulesJson() {
     final payload = {
       'app': 'Notiflow',
-      'version': '1.6.0',
+      'version': '1.6.1',
       'format': 'notiflow-backup-v1',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'managedApps': _managedApps.map((a) => a.toJson()).toList(),
@@ -751,10 +807,7 @@ class ScheduleRepository extends ChangeNotifier {
       }
 
       // Always ensure the default pre-seeded template exists
-      if (_ruleTemplates.isEmpty ||
-          !_ruleTemplates.any((t) => t.id == RuleTemplate.defaultWorkFocus.id)) {
-        _ruleTemplates.insert(0, RuleTemplate.defaultWorkFocus);
-      }
+      _ensureDefaultTemplate();
 
       if (decoded.containsKey('unmanagedAppsUntouched')) {
         _unmanagedAppsUntouched = decoded['unmanagedAppsUntouched'] as bool? ?? true;
