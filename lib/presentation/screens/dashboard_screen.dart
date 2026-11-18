@@ -923,22 +923,16 @@ class DashboardScreenState extends State<DashboardScreen>
                               ),
                             ),
                             const Spacer(),
-                            ElevatedButton.icon(
+                            IconButton(
+                              key: const ValueKey('rules-delete-selected'),
                               onPressed: _deleteSelectedApps,
-                              icon: const Icon(Icons.delete_outline_rounded,
-                                  size: 16),
-                              label: const Text('Delete'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isDark
+                              tooltip: 'Delete selected',
+                              icon: Icon(
+                                Icons.delete_outline_rounded,
+                                size: 24,
+                                color: isDark
                                     ? AppTheme.darkError
                                     : AppTheme.lightError,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
                               ),
                             ),
                           ],

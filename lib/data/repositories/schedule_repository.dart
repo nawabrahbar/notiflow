@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/engine/schedule_evaluator.dart';
+import '../../domain/models/import_report.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_decision.dart';
 import '../../domain/models/schedule_rule.dart';
@@ -724,11 +725,28 @@ class ScheduleRepository extends ChangeNotifier {
     bool vaultUninstalled = true,
     bool excludeUninstalled = false,
   }) async {
+    final report = await importRulesWithReport(
+      rawJson,
+      replaceAll: replaceAll,
+      vaultUninstalled: vaultUninstalled,
+      excludeUninstalled: excludeUninstalled,
+    );
+    return report != null;
+  }
+
+  /// Same as [importRulesJson], but returns what was imported, kept for later
+  /// (uninstalled, vaulted) or skipped. Returns null when the backup is invalid.
+  Future<ImportReport?> importRulesWithReport(
+    String rawJson, {
+    bool replaceAll = true,
+    bool vaultUninstalled = true,
+    bool excludeUninstalled = false,
+  }) async {
     try {
       final sanitized = rawJson.trim().replaceFirst(RegExp(r'^\uFEFF'), '');
       final decoded = jsonDecode(sanitized);
       if (decoded is! Map<String, dynamic>) {
-        return false;
+        return null;
       }
 
       final List<dynamic>? appsList = decoded['managedApps'] as List<dynamic>?;
@@ -736,7 +754,7 @@ class ScheduleRepository extends ChangeNotifier {
       final List<dynamic>? templatesList = decoded['ruleTemplates'] as List<dynamic>?;
 
       if (appsList == null && schedulesList == null && templatesList == null) {
-        return false;
+        return null;
       }
 
       final importedApps = appsList != null
@@ -754,6 +772,32 @@ class ScheduleRepository extends ChangeNotifier {
       // Handle uninstalled apps:
       final installed = await _platformService.getInstalledApplications();
       final installedPkgs = installed.map((a) => a.packageName.toLowerCase()).toSet();
+
+      bool isMissing(ManagedApp a) =>
+          installed.isNotEmpty &&
+          !installedPkgs.contains(a.packageName.toLowerCase());
+      ImportReportApp summarize(ManagedApp a) => ImportReportApp(
+            app: a,
+            ruleCount: importedSchedules.where((r) => r.appId == a.id).length,
+          );
+      final report = ImportReport(
+        imported: [
+          for (final a in importedApps)
+            if (!isMissing(a) || (!excludeUninstalled && !vaultUninstalled))
+              summarize(a),
+        ],
+        waiting: [
+          if (!excludeUninstalled && vaultUninstalled)
+            for (final a in importedApps)
+              if (isMissing(a)) summarize(a),
+        ],
+        skipped: [
+          if (excludeUninstalled)
+            for (final a in importedApps)
+              if (isMissing(a)) summarize(a),
+        ],
+        savedRules: [for (final t in importedTemplates) t.name],
+      );
 
       if (installed.isNotEmpty) {
         if (excludeUninstalled) {
@@ -826,10 +870,10 @@ class ScheduleRepository extends ChangeNotifier {
       }
 
       await _persist();
-      return true;
+      return report;
     } catch (e) {
       debugPrint('Failed to parse and import .notiflow JSON: $e');
-      return false;
+      return null;
     }
   }
 

@@ -573,14 +573,21 @@ class AndroidNotificationBridge(
 
             val appName = info.loadLabel(pm).toString()
             val iconBytes = if (withIcons) drawableToByteArray(info.loadIcon(pm)) else null
-            val isSystem = (info.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            val appInfo = info.activityInfo.applicationInfo
+            val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            val category = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                appInfo.category
+            } else {
+                -1
+            }
 
             list.add(
                 mapOf(
                     "packageName" to pkg,
                     "displayName" to appName,
                     "iconBytes" to iconBytes,
-                    "isSystemApp" to isSystem
+                    "isSystemApp" to isSystem,
+                    "category" to category
                 )
             )
         }

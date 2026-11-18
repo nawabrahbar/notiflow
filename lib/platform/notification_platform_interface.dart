@@ -62,11 +62,15 @@ class DiscoveredAppInfo {
   final Uint8List? iconBytes;
   final bool isSystemApp;
 
+  /// Android's `ApplicationInfo.category` (API 26+); -1 when the app doesn't set one.
+  final int androidCategory;
+
   const DiscoveredAppInfo({
     required this.packageName,
     required this.displayName,
     this.iconBytes,
     this.isSystemApp = false,
+    this.androidCategory = -1,
   });
 }
 

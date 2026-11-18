@@ -109,7 +109,7 @@ flowchart TD
 4. **Backup & Portability Flow**:
    - User opens **Settings**, scrolls to **Rules Backup & Portability**, and taps **Export .notiflow File**.
    - The app generates a structured backup file containing all app configs and rules, opening the Android share sheet to save to Downloads, Google Drive, or messaging apps.
-   - On a new device or fresh install, the user taps **Import** in Settings, picks a `.notiflow` file in the system file picker, and the configuration is restored in place.
+   - On a new device or fresh install, the user taps **Import** in Settings, picks a `.notiflow` file in the system file picker, and the configuration is restored in place. An **Import complete** bottom sheet then shows what was imported, what is waiting for install, what was skipped and which saved rules came with it.
 
 ---
 
@@ -177,6 +177,13 @@ flowchart TD
   * `STEP 3 OF 3` pill, *"Import Rules"* headline, and a dashed `.notiflow` upload card that opens the system file picker (tablet also offers *"Or Paste Backup JSON"*).
   * *"Done"* completes onboarding and opens the Main Navigation Shell.
 * **Settings import**: Settings → Import does not open this screen; it launches the system file picker directly and restores the selected `.notiflow` file in place.
+* **Uninstalled apps choice (before import)**: if the backup has apps that aren't installed, a bottom sheet asks to *Keep in Vault* (rules kept and applied when the app is installed) or *Exclude These Apps*.
+* **Import summary sheet (after import)**: a successful import (here or from Settings) opens an **Import complete** modal bottom sheet (`lib/presentation/widgets/import_summary_sheet.dart`) instead of a toast. It shows a summary line ("N apps · N rules · N saved rules") and collapsible sections, all expanded at first, each with a count and a down-arrow:
+  * **Imported**: installed apps with their icon and active rule count.
+  * **Waiting for install**: vaulted apps; their rules turn on when the app is installed. Each app has a **×** button that asks *"Remove <app>?"* and, on **Remove**, deletes the app and its saved rules from the vault (toast confirms; **Cancel** keeps it).
+  * **Skipped**: excluded apps; nothing was imported for them.
+  * **Saved rules**: names of the saved rules in the backup.
+  * Buttons: **View Rules** (opens the Rules tab) and **Done**. Empty sections are hidden. Max 85% of screen height, scrolls when long; 560 px wide and centred on tablet. Invalid or empty files still show an error toast.
 ---
 
 ### Page 5: Main Navigation Shell (`MainNavigationShell`)
@@ -222,6 +229,7 @@ flowchart TD
     - App icon, formatted name, package identifier, and current status chip (`SCHEDULED`, `MUTED`, or `ALWAYS ALLOWED`).
     - **Master Switch**: Custom toggle switch to pause/resume monitoring per app.
     - Tap card to open `AppDetailsScreen`.
+    - **Multi-select delete**: long-pressing a card shows a selection bar with a select-all checkbox, *"N Selected"* and a red delete icon (icon only, no label or background) that asks *"Delete N Rules?"* before deleting.
     - **Uninstalled apps**: if an app with rules is uninstalled, its card turns grey, shows an `UNINSTALLED` badge instead of the status, and the toggle is disabled. Tapping still opens the details so the rule can be deleted; reinstalling the app restores the card.
   * **Floating Action Button (`+ Add App`)**: Jumps to `AddAppsScreen`.
 
@@ -233,7 +241,8 @@ flowchart TD
 * **Visual & Functional Elements**:
   * **Search bar (bottom, phone and tablet)**: Pill-shaped bar at the bottom of the page with the hint "Search" and a search icon, like the launcher app drawer. Live substring filtering by app label or package name. The bar floats over the list with a frosted blur, the list scrolls underneath it, and the list fades out at its top and bottom edges instead of being cut. Extra space at the end of the list lets the last app scroll fully above the bar.
   * **Category Filter Chips**:
-    - `All Apps`, `Messaging`, `Social`, `Productivity`, `System`.
+    - `All Apps`, `Messaging`, `Social`, `Productivity`, `Other`, `System`. The label under each app name shows the same category.
+    - Category is picked in `lib/domain/engine/app_category.dart` (`appCategoryFor`), in this order: messaging keywords (WhatsApp, Telegram, chat, SMS…) → Android's own app category (`ApplicationInfo.category`, Social or Productivity, sent by the native app list) → social/productivity keywords → **System** only if Android flags the app as a system (preinstalled) app → everything else is **Other**. Preinstalled apps with a known category (e.g. Gmail, Messages) stay in their category rather than System.
   * **App Discovery List**:
     - Uses the shared installed-apps list (loaded in the background when the dashboard opens), so the list appears instantly.
     - Icons load in screen-sized batches: about two screens first (computed from the real viewport, so a tablet's 2-column grid loads more), then the next batch when the user scrolls about halfway through what's loaded. Fast flings skip fetching; search or category changes fetch the visible matches first.
@@ -274,7 +283,7 @@ flowchart TD
   * **Time Range Selector**:
     - Interactive Start Time and End Time pickers supporting 12h AM/PM and 24h formats.
     - **Overnight Interval Support**: Full support for windows crossing midnight (e.g., `20:00` to `08:00` next morning).
-    - Live span calculator showing total duration (e.g., `8 hrs span`).
+    - Live duration pill (`Duration: 8 hrs`), plus a `+1 DAY OVERNIGHT` badge for windows past midnight, shown right below the *TIME WINDOW · DAILY SCHEDULE* heading and above the Starts / Ends At cards (phone and tablet).
   * **Recurrence Days Selector**:
     - Quick preset selector chips: `Everyday`, `Weekdays`, `Weekends`.
     - 7 individual day toggle pills (`M`, `T`, `W`, `T`, `F`, `S`, `S`).
@@ -310,15 +319,16 @@ flowchart TD
 * **Purpose**: Central controls for engine health, privacy metrics, rule backup/restore, triage preferences, and data reset.
 * **Visual & Functional Elements**:
   * **ENGINE & BACKGROUND SERVICES**:
-    - **Focus Shield Card**: Live permission status with a direct `"Manage Access"` button.
+    - **Focus Shield Card**: Live permission status with a direct `"Manage Access"` button. When active it reads *"Filtering your notifications. You can turn this off anytime from Manage Access."*; when paused, *"Notification access is off. Grant access to start filtering."*
     - **Battery Optimization Card**: Battery status indicator with a guide for whitelisting Notiflow against OS killers.
   * **ON-DEVICE INTEGRITY & STORAGE**:
-    - **Encrypted Local Storage Card**: Explains that all rules are stored strictly on-device, with a `24 KB` database badge aligned within card boundaries.
-    - **Zero Telemetry Guarantee Card**: Highlights complete network isolation, zero analytics SDKs, and zero external tracking.
+    - **Encrypted Local Storage Card**: Explains that all rules are stored strictly on-device, with a `24 KB` database badge aligned within card boundaries. Titled *"Encrypted Locally"* on phone (so it fits beside the AES-256 badge) and *"Encrypted Local Storage"* on tablet.
+    - **Zero Telemetry Guarantee Card**: Highlights complete network isolation, zero analytics SDKs, and zero external tracking. No badge; the line reads *"No internet needed. Your data stays on this phone."* ("this device" on tablet).
     - **Privacy Audit Action**: Top app bar button opening the complete privacy audit sheet.
   * **RULES BACKUP & PORTABILITY (.notiflow file)**:
     - **Export Rules Backup**: One-tap action to serialize all rules into a `.notiflow` JSON file and launch the Android share sheet.
-    - **Import Rules Backup**: Opens the system file picker directly and restores the selected `.notiflow` backup.
+    - **Import Rules Backup**: Opens the system file picker directly and restores the selected `.notiflow` backup, then shows the **Import complete** summary sheet (see Page 4).
+    - **Dormant Vault**: Full-width card below Export/Import (phone and tablet), always shown with an *"N APPS"* count. Tapping it opens a **Dormant Vault** bottom sheet listing every app whose rules are parked because it isn't installed (name, icon or initial, *"N rules saved"*). Each app has a **×** that asks *"Remove <app>?"*; **Remove** deletes the app and its saved rules (toast confirms) and the count updates live. With zero apps the card reads *"0 APPS · No uninstalled apps…"* and the sheet shows *"0 apps · no uninstalled apps"* and *"No uninstalled apps in the vault"*.
   * **TRIAGE & AUTOMATION PREFERENCES**:
     - **Silence ongoing notifications**: Toggle to filter persistent background notifications.
     - **Silence summary notifications**: Toggle to handle grouped notification bundles.

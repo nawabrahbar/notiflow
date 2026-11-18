@@ -24,7 +24,9 @@ import 'package:notification_handler/presentation/screens/permission_screen.dart
 import 'package:notification_handler/presentation/screens/settings_screen.dart';
 import 'package:notification_handler/presentation/screens/app_details_screen.dart';
 import 'package:notification_handler/presentation/screens/schedule_editor_screen.dart';
+import 'package:notification_handler/domain/models/import_report.dart';
 import 'package:notification_handler/presentation/widgets/app_toast.dart';
+import 'package:notification_handler/presentation/widgets/import_summary_sheet.dart';
 import 'package:notification_handler/presentation/widgets/quick_mute_card.dart';
 import 'package:notification_handler/presentation/widgets/stitch_header.dart';
 import 'package:notification_handler/presentation/widgets/stitch_switch.dart';
@@ -68,6 +70,7 @@ class MockPlatformService implements NotificationPlatformInterface {
           packageName: a.packageName,
           displayName: a.displayName,
           isSystemApp: a.isSystemApp,
+          androidCategory: a.androidCategory,
         ),
     ];
   }
@@ -424,10 +427,16 @@ void main() {
     expect(find.text('Select All'), findsNothing);
     expect(find.text('Deselect All'), findsNothing);
     expect(find.byKey(const Key('select_all_checkbox')), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    final deleteIcon = find.byKey(const ValueKey('rules-delete-selected'));
+    expect(deleteIcon, findsOneWidget);
+    expect(find.text('Delete'), findsNothing);
+    expect(
+      tester.widget<Icon>(find.descendant(of: deleteIcon, matching: find.byType(Icon))).color,
+      anyOf(AppTheme.lightError, AppTheme.darkError),
+    );
 
-    // Tap Delete button
-    await tester.tap(find.text('Delete'));
+    // Tap the red delete icon
+    await tester.tap(deleteIcon);
     await flushFontsAndSettle(tester);
 
     // Dialog confirmation
@@ -1655,6 +1664,127 @@ void main() {
 
   for (final scenario in [
     (name: 'light phone', size: const Size(390, 844), mode: ThemeMode.light),
+    (name: 'dark tablet', size: const Size(1024, 1300), mode: ThemeMode.dark),
+  ]) {
+    testWidgets('Import summary removes a waiting app only after confirmation (${scenario.name})', (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      final vaulted = ManagedApp(
+        id: 'app_meesho',
+        packageName: 'com.meesho',
+        displayName: 'Meesho',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        isDormantVault: true,
+      );
+      await repository.addApp(vaulted);
+      final report = ImportReport(
+        waiting: [ImportReportApp(app: vaulted, ruleCount: 1)],
+      );
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: scenario.mode,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => showImportSummarySheet(context, report, repository: repository),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await flushFontsAndSettle(tester);
+
+      final remove = find.byKey(const ValueKey('import-summary-remove-app_meesho'));
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      expect(find.text('Remove Meesho?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await flushFontsAndSettle(tester);
+      expect(remove, findsOneWidget);
+      expect(repository.dormantVaultApps.any((a) => a.id == 'app_meesho'), isTrue);
+
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('import-summary-remove-confirm')));
+      await tester.pump();
+      await pumpFor(tester, const Duration(milliseconds: 400));
+      expect(remove, findsNothing);
+      expect(find.byKey(const ValueKey('import-summary-waiting')), findsNothing);
+      expect(repository.dormantVaultApps.any((a) => a.id == 'app_meesho'), isFalse);
+      expect(find.text('Removed Meesho from the vault'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 4));
+    });
+  }
+
+  for (final scenario in [
+    (name: 'light phone', size: const Size(390, 844), mode: ThemeMode.light),
+    (name: 'dark tablet', size: const Size(1024, 1300), mode: ThemeMode.dark),
+  ]) {
+    testWidgets('Settings Dormant Vault card lists vaulted apps and removes after confirmation (${scenario.name})', (tester) async {
+      tester.view.physicalSize = scenario.size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await repository.addApp(ManagedApp(
+        id: 'app_meesho',
+        packageName: 'com.meesho',
+        displayName: 'Meesho',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+        isDormantVault: true,
+      ));
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: scenario.mode,
+        home: SettingsScreen(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      final card = find.byKey(const ValueKey('settings-dormant-vault'));
+      await tester.ensureVisible(card);
+      expect(find.descendant(of: card, matching: find.text('1 APP')), findsOneWidget);
+      await tester.tap(card);
+      await flushFontsAndSettle(tester);
+      expect(find.byKey(const ValueKey('dormant-vault-app_meesho')), findsOneWidget);
+
+      final remove = find.byKey(const ValueKey('import-summary-remove-app_meesho'));
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      expect(find.text('Remove Meesho?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await flushFontsAndSettle(tester);
+      expect(repository.dormantVaultApps, hasLength(1));
+
+      await tester.tap(remove);
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('import-summary-remove-confirm')));
+      await tester.pump();
+      await pumpFor(tester, const Duration(milliseconds: 400));
+      expect(repository.dormantVaultApps, isEmpty);
+      expect(find.byKey(const ValueKey('dormant-vault-empty')), findsOneWidget);
+      expect(find.text('No uninstalled apps in the vault'), findsOneWidget);
+      expect(find.text('Removed Meesho from the vault'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 4));
+
+      await tester.tap(find.byKey(const ValueKey('dormant-vault-done')));
+      await flushFontsAndSettle(tester);
+      expect(find.descendant(of: card, matching: find.text('0 APPS')), findsOneWidget);
+      expect(find.textContaining('No uninstalled apps.'), findsOneWidget);
+    });
+  }
+
+  for (final scenario in [
+    (name: 'light phone', size: const Size(390, 844), mode: ThemeMode.light),
     (name: 'dark phone', size: const Size(390, 844), mode: ThemeMode.dark),
     (name: 'light tablet', size: const Size(1024, 1300), mode: ThemeMode.light),
     (name: 'dark tablet', size: const Size(1024, 1300), mode: ThemeMode.dark),
@@ -1666,6 +1796,16 @@ void main() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
       });
+      mockPlatform.installedApps = const [
+        DiscoveredAppInfo(packageName: 'com.slack', displayName: 'Slack'),
+      ];
+      await repository.addApp(ManagedApp(
+        id: 'app_import_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
       final backup = repository.exportRulesJson();
       mockPlatform.backupPicker = Completer<String?>();
       await tester.pumpWidget(MaterialApp(
@@ -1690,7 +1830,21 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Importing backup…'), findsNothing);
-      expect(find.text('Backup file restored successfully!'), findsOneWidget);
+      expect(find.text('Import complete'), findsOneWidget);
+      expect(find.byKey(const ValueKey('import-summary-imported')), findsOneWidget);
+      expect(find.text('Backup file restored successfully!'), findsNothing);
+
+      // Sections start expanded; the chevron collapses them.
+      final importedSection = find.byKey(const ValueKey('import-summary-imported'));
+      const firstApp = 'Slack';
+      expect(find.descendant(of: importedSection, matching: find.text(firstApp)), findsOneWidget);
+      await tester.tap(find.descendant(of: importedSection, matching: find.text('Imported')));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.descendant(of: importedSection, matching: find.text(firstApp)), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('import-summary-done')));
+      await flushFontsAndSettle(tester);
+      expect(find.text('Import complete'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -1726,7 +1880,6 @@ void main() {
         'Allow Priority Phone Calls',
         '24-Hour Time Format',
         'ON-DEVICE INTEGRITY & STORAGE',
-        'Encrypted Local Storage',
         'Zero Telemetry Guarantee',
         'View Security & Privacy Audit Report',
       ]) {
@@ -1734,6 +1887,9 @@ void main() {
       }
       expect(find.textContaining('Focus Shield'), findsOneWidget);
       expect(find.text('Engine health, security & preferences'), findsNothing);
+      expect(find.text('0.00 B'), findsNothing);
+      expect(find.text(scenario.tablet ? 'Encrypted Local Storage' : 'Encrypted Locally'), findsOneWidget);
+      expect(find.textContaining('No internet needed. Your data stays on this'), findsOneWidget);
 
       final tabletOnly = [
         'ENGINE & BACKGROUND SERVICES',

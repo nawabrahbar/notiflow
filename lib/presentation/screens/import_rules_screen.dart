@@ -5,6 +5,7 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/managed_app.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/import_summary_sheet.dart';
 import 'main_navigation_shell.dart';
 
 /// Onboarding step three: optional .notiflow backup import.
@@ -58,7 +59,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
       excludeUninstalled = (choice == 'exclude');
     }
 
-    final success = await widget.repository.importRulesJson(
+    final report = await widget.repository.importRulesWithReport(
       rawContent,
       replaceAll: true,
       vaultUninstalled: !excludeUninstalled,
@@ -66,6 +67,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     );
 
     if (!mounted) return;
+    final success = report != null;
     setState(() {
       _isProcessing = false;
       if (success) {
@@ -80,8 +82,13 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     });
 
     if (success) {
-      AppToast.show(context, message: 'Backup file restored successfully!');
-      await _finishFlow();
+      final viewRules = await showImportSummarySheet(context, report,
+          repository: widget.repository);
+      await _finishFlow(
+        initialIndex: viewRules
+            ? MainNavigationShell.rulesTab
+            : MainNavigationShell.dashboardTab,
+      );
     } else {
       AppToast.show(
         context,
@@ -91,14 +98,19 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
     }
   }
 
-  Future<void> _finishFlow() async {
+  Future<void> _finishFlow({
+    int initialIndex = MainNavigationShell.dashboardTab,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('pref_onboarding_completed', true);
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (context) => MainNavigationShell(repository: widget.repository),
+        builder: (context) => MainNavigationShell(
+          repository: widget.repository,
+          initialIndex: initialIndex,
+        ),
       ),
       (route) => false,
     );
@@ -575,20 +587,24 @@ Future<bool> restoreBackupFromFile(
       showProgress();
     }
 
-    final success = await repository.importRulesJson(
+    final report = await repository.importRulesWithReport(
       rawContent,
       replaceAll: true,
       vaultUninstalled: !excludeUninstalled,
       excludeUninstalled: excludeUninstalled,
     );
     hideProgress();
-    toast(
-      success
-          ? 'Backup file restored successfully!'
-          : 'Invalid .notiflow backup file.',
-      success: success,
-    );
-    return success;
+    if (report == null) {
+      toast('Invalid .notiflow backup file.', success: false);
+      return false;
+    }
+    if (context.mounted) {
+      final shell = MainNavigationShell.of(context);
+      final viewRules = await showImportSummarySheet(context, report,
+          repository: repository);
+      if (viewRules) shell?.switchTab(MainNavigationShell.rulesTab);
+    }
+    return true;
   } finally {
     hideProgress();
   }

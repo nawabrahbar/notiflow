@@ -58,6 +58,7 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
           displayName: map['displayName'] as String,
           iconBytes: map['iconBytes'] as Uint8List?,
           isSystemApp: map['isSystemApp'] as bool? ?? false,
+          androidCategory: map['category'] as int? ?? -1,
         );
       }).toList();
     } on PlatformException {
@@ -77,6 +78,7 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
           packageName: map['packageName'] as String,
           displayName: map['displayName'] as String,
           isSystemApp: map['isSystemApp'] as bool? ?? false,
+          androidCategory: map['category'] as int? ?? -1,
         );
       }).toList();
     } on PlatformException {

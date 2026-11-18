@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/stitch_switch.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/import_summary_sheet.dart';
 import 'import_rules_screen.dart';
 import 'schedule_editor_screen.dart';
 
@@ -606,7 +607,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final granted = _isAccessGranted;
     final title = granted ? 'Focus Shield Active' : 'Focus Shield Paused';
     final body = granted
-        ? 'NotificationListenerService intercepting real-time bundles'
+        ? 'Filtering your notifications. You can turn this off anytime from Manage Access.'
         : 'Notification access is off. Grant access to start filtering.';
     final statusPill = _pill(
       granted ? 'ACTIVE' : 'NEEDS ACCESS',
@@ -1062,45 +1063,58 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
         ),
-        if (dormantCount > 0) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: _cardDecoration(p),
-            child: Row(
-              children: [
-                _iconBox(Icons.inventory_2_outlined,
-                    bg: p.isTablet ? p.inner : p.lowest,
-                    fg: p.isDark ? p.primaryContainer : p.primary,
-                    circle: p.isTablet),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text('Dormant Vault Active',
-                                style: _titleStyle(p, size: 14)),
-                          ),
-                          const SizedBox(width: 6),
-                          _pill('$dormantCount APPS',
-                              bg: p.high, fg: p.textMuted),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Rules for $dormantCount uninstalled apps are parked and will auto-apply when installed.',
-                        style: _bodyStyle(p),
-                      ),
-                    ],
+        SizedBox(height: p.isTablet ? 16 : 12),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const ValueKey('settings-dormant-vault'),
+            onTap: () => showDormantVaultSheet(
+              context,
+              repository: widget.repository,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            child: Ink(
+              padding: EdgeInsets.all(p.isTablet ? 20 : 14),
+              decoration: _cardDecoration(p),
+              child: Row(
+                children: [
+                  _iconBox(Icons.inventory_2_outlined,
+                      bg: p.isTablet ? p.inner : p.lowest,
+                      fg: p.isDark ? p.primaryContainer : p.primary,
+                      circle: p.isTablet),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text('Dormant Vault',
+                                  style: _titleStyle(p, size: 14)),
+                            ),
+                            const SizedBox(width: 6),
+                            _pill('$dormantCount ${dormantCount == 1 ? 'APP' : 'APPS'}',
+                                bg: p.high, fg: p.textMuted),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dormantCount == 0
+                              ? 'No uninstalled apps. Rules you keep for apps that aren\'t installed will be parked here.'
+                              : 'Rules for $dormantCount uninstalled ${dormantCount == 1 ? 'app is' : 'apps are'} parked and will auto-apply when installed.',
+                          style: _bodyStyle(p),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Icon(Icons.chevron_right_rounded, color: p.textMuted),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ],
     );
   }
@@ -1463,7 +1477,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       required Color iconBg,
       required Color iconFg,
       required String title,
-      required Widget pill,
+      Widget? pill,
       required String body,
     }) {
       return Row(
@@ -1478,14 +1492,16 @@ class _SettingsScreenState extends State<SettingsScreen>
               children: [
                 Row(
                   children: [
-                    Flexible(
+                    Expanded(
                       child: Text(title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: _titleStyle(p)),
                     ),
-                    const SizedBox(width: 8),
-                    pill,
+                    if (pill != null) ...[
+                      const SizedBox(width: 8),
+                      pill,
+                    ],
                   ],
                 ),
                 const SizedBox(height: 3),
@@ -1505,7 +1521,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       icon: p.isTablet ? Icons.enhanced_encryption_outlined : Icons.lock_outline_rounded,
       iconBg: p.isTablet ? p.tertiaryFixed : p.primaryFixed,
       iconFg: p.isTablet ? p.tertiary : p.primary,
-      title: 'Encrypted Local Storage',
+      title: p.isTablet ? 'Encrypted Local Storage' : 'Encrypted Locally',
       pill: _pill('AES-256', bg: p.isTablet ? p.inner : p.high, fg: p.textMuted),
       body: 'Zero cloud accounts · 24 KB local database',
     );
@@ -1514,10 +1530,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       iconBg: p.isTablet ? p.secContainer : p.tertiaryFixed,
       iconFg: p.isTablet ? p.onSecContainer : p.tertiary,
       title: 'Zero Telemetry Guarantee',
-      pill: p.isTablet
-          ? _pill('0.00 B', bg: p.inner, fg: p.textMuted)
-          : _pill('0.00 B', bg: p.secContainer, fg: p.onSecContainer),
-      body: 'No internet permission declared in AndroidManifest',
+      body: p.isTablet
+          ? 'No internet needed. Your data stays on this device.'
+          : 'No internet needed. Your data stays on this phone.',
     );
 
     if (!p.isTablet) {

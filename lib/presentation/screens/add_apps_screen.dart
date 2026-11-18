@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../data/services/installed_apps_cache.dart';
+import '../../domain/engine/app_category.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
@@ -143,40 +144,6 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
     super.dispose();
   }
 
-  String _getAppCategory(String name, String packageName) {
-    final combined = '${name.toLowerCase()} ${packageName.toLowerCase()}';
-    if (combined.contains('whatsapp') ||
-        combined.contains('telegram') ||
-        combined.contains('signal') ||
-        combined.contains('message') ||
-        combined.contains('chat') ||
-        combined.contains('sms')) {
-      return 'messaging';
-    }
-    if (combined.contains('insta') ||
-        combined.contains('facebook') ||
-        combined.contains('twitter') ||
-        combined.contains('x.com') ||
-        combined.contains('tiktok') ||
-        combined.contains('youtube') ||
-        combined.contains('snapchat') ||
-        combined.contains('reddit')) {
-      return 'social';
-    }
-    if (combined.contains('slack') ||
-        combined.contains('teams') ||
-        combined.contains('meet') ||
-        combined.contains('zoom') ||
-        combined.contains('jira') ||
-        combined.contains('notion') ||
-        combined.contains('trello') ||
-        combined.contains('gmail') ||
-        combined.contains('outlook') ||
-        combined.contains('mail')) {
-      return 'productivity';
-    }
-    return 'system';
-  }
 
   IconData _getDefaultIconForApp(String name) {
     final lower = name.toLowerCase();
@@ -246,7 +213,7 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
           app.displayName.toLowerCase().contains(query) ||
           app.packageName.toLowerCase().contains(query);
 
-      final category = _getAppCategory(app.displayName, app.packageName);
+      final category = appCategoryFor(app);
       final matchesCategory =
           _selectedCategory == 'all' || category == _selectedCategory;
 
@@ -294,6 +261,8 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                                 const SizedBox(width: 8),
                                 _buildCategoryChip(
                                     'productivity', 'PRODUCTIVITY', isDark),
+                                const SizedBox(width: 8),
+                                _buildCategoryChip('other', 'OTHER', isDark),
                                 const SizedBox(width: 8),
                                 _buildCategoryChip('system', 'SYSTEM', isDark),
                               ],
@@ -646,7 +615,7 @@ class _AddAppsScreenState extends State<AddAppsScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _getAppCategory(app.displayName, app.packageName).toUpperCase(),
+                  appCategoryFor(app).toUpperCase(),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,

@@ -932,7 +932,64 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   color: textMuted,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
+              // Duration & Overnight Indicators
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cardBgHighest,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Duration: $spanHours hrs',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: textMuted,
+                      ),
+                    ),
+                  ),
+                  if (_isOvernight) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: primaryCol.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.bedtime_rounded,
+                            size: 12,
+                            color: primaryCol,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '+1 DAY OVERNIGHT',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.5,
+                              color: primaryCol,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   // Starts At Card
@@ -1056,65 +1113,6 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                       ),
                     ),
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
-              // Duration & Overnight Indicators
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: cardBgHighest,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Duration: $spanHours hrs',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: textMuted,
-                      ),
-                    ),
-                  ),
-                  if (_isOvernight) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primaryCol.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.bedtime_rounded,
-                            size: 12,
-                            color: primaryCol,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '+1 DAY OVERNIGHT',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                              color: primaryCol,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
 

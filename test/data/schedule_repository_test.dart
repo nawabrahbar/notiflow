@@ -27,8 +27,11 @@ class MockPlatformService implements NotificationPlatformInterface {
   @override
   Future<void> openAppDetailsSettings() async {}
 
+  List<DiscoveredAppInfo> installedApps = [];
+
   @override
-  Future<List<DiscoveredAppInfo>> getInstalledApplications() async => [];
+  Future<List<DiscoveredAppInfo>> getInstalledApplications() async =>
+      installedApps;
 
   @override
   Future<List<DiscoveredAppInfo>> getInstalledAppsLite() async => [];
@@ -331,6 +334,66 @@ void main() {
     }
     ''';
     expect(await repository.importRulesJson(badDaysJson), false);
+  });
+
+  group('importRulesWithReport', () {
+    String backup() {
+      ManagedApp app(String id) => ManagedApp(
+            id: id,
+            packageName: 'com.$id',
+            displayName: id.toUpperCase(),
+            enabled: true,
+            createdAt: DateTime(2026),
+            updatedAt: DateTime(2026),
+          );
+      Map<String, dynamic> rule(String id, String appId) => {
+            'id': id,
+            'appId': appId,
+            'mode': 'blockDuring',
+            'startTime': {'hour': 9, 'minute': 0},
+            'endTime': {'hour': 17, 'minute': 0},
+            'daysOfWeek': [1, 2, 3],
+            'createdAt': '2026-10-05T10:00:00.000',
+            'updatedAt': '2026-10-05T10:00:00.000',
+          };
+      return jsonEncode({
+        'managedApps': [app('a').toJson(), app('b').toJson()],
+        'schedules': [rule('r1', 'a'), rule('r2', 'a'), rule('r3', 'b')],
+        'ruleTemplates': [RuleTemplate.defaultWorkFocus.toJson()],
+      });
+    }
+
+    setUp(() {
+      mockPlatform.installedApps = [
+        DiscoveredAppInfo(packageName: 'com.a', displayName: 'A'),
+      ];
+    });
+
+    test('lists installed apps as imported and vaulted apps as waiting', () async {
+      final report = await repository.importRulesWithReport(backup());
+      expect(report!.imported.map((a) => a.app.id), ['a']);
+      expect(report.imported.single.ruleCount, 2);
+      expect(report.waiting.map((a) => a.app.id), ['b']);
+      expect(report.waiting.single.ruleCount, 1);
+      expect(report.skipped, isEmpty);
+      expect(report.savedRules, [RuleTemplate.defaultWorkFocus.name]);
+    });
+
+    test('lists excluded apps as skipped', () async {
+      final report = await repository.importRulesWithReport(
+        backup(),
+        vaultUninstalled: false,
+        excludeUninstalled: true,
+      );
+      expect(report!.imported.map((a) => a.app.id), ['a']);
+      expect(report.waiting, isEmpty);
+      expect(report.skipped.map((a) => a.app.id), ['b']);
+      expect(repository.managedApps.map((a) => a.id), ['a']);
+    });
+
+    test('returns null for an invalid backup', () async {
+      expect(await repository.importRulesWithReport('not json'), isNull);
+    });
   });
 
   test('Legacy "Work Focus Hours" default is renamed; a custom default name is kept', () async {

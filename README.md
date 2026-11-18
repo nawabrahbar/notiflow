@@ -53,7 +53,7 @@ Every push to `main` is automatically built and published by GitHub Actions. You
 
 ### 4. Rules Backup & Portability (`.notiflow`)
 - **Export `.notiflow` Backup File**: Serialize all managed apps, schedules, and preferences into a `.notiflow` file (`notiflow_backup_<timestamp>.notiflow`) and save it directly to your chosen folder on device storage via Android's native Storage Access Framework (`Intent.ACTION_CREATE_DOCUMENT`).
-- **1-Tap Import from Storage**: Settings → Import opens the system file picker directly (`Intent.ACTION_OPEN_DOCUMENT`) and restores the selected `.notiflow` file in place.
+- **1-Tap Import from Storage**: Settings → Import opens the system file picker directly (`Intent.ACTION_OPEN_DOCUMENT`) and restores the selected `.notiflow` file in place, then shows an **Import complete** bottom sheet listing imported apps, apps waiting for install, skipped apps and saved rules.
 
 ### 5. 100% On-Device Privacy, Semantic Feedback & Zero Telemetry
 - **Zero Network Access**: `android.permission.INTERNET` is completely omitted from [`AndroidManifest.xml`](android/app/src/main/AndroidManifest.xml). It is physically impossible for the app to transmit data off your device.
@@ -103,6 +103,7 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
   - **Swipe to delete**: swipe an Activity log or Digest card from left to right to delete it, with Undo; deleted messages leave both the log and the digest.
   - **New toasts**: one shared `AppToast` (`lib/presentation/widgets/app_toast.dart`) replaces every SnackBar. It is a rounded card with a type icon, message, × (or Undo) and a countdown bar. It slides in from the left, slides out to the right after 3 s (4 s with Undo, at once on ×), and floats above everything, including the phone nav bar, dialogs and sheets.
   - **Quick Mute · All apps**: replaces the old Quick Session Overrides on the Dashboard (phone and tablet). It mutes every app for 15m, 30m or 1h, then shows a live "All apps muted · N min left" card with +15m and End now. Repeat callers (a 2nd call within 3 min) now ring through during these mutes when "Let repeat callers ring through" is on.
+  - **Import summary sheet**: after a successful `.notiflow` import (Settings or onboarding), an **Import complete** bottom sheet replaces the success toast. Collapsible sections (all expanded at first) show Imported apps with rule counts, apps Waiting for install (vaulted; each has a × to remove it from the vault after a confirmation dialog), Skipped apps (excluded) and Saved rules, with View Rules and Done buttons. `ScheduleRepository.importRulesWithReport` returns the `ImportReport` behind it.
 - **v1.6.0 (`+10`) — Botanical Sanctuary Redesign, Rule Templates, Tablet Expansion & Native Hardening**:
   - **Botanical Sanctuary & Nocturne Redesign**: Warm Canvas (`#FEF8F6`) / Deep Forest (`#101412`), Terracotta (`#7D562D` / `#FCBC76`), and Sage Green (`#5A6242` / `#BECCA3`) with elegant Newsreader display serifs and Plus Jakarta Sans body typography.
   - **Seamless Canvas Flow**: Completely eliminated header bottom borders and dividers across all screens for a unified, tranquil surface.
@@ -118,7 +119,7 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
     - **Schedule Editor Screen**: 7:5 two-column split on tablet.
     - **Settings Screen**: 6:6 two-column bento on tablet with storage audit and diagnostic cards.
     - **Onboarding & Permission Centers**: Centered editorial cards (max 680dp) on tablet.
-  - **Smart Backup Import & Dormant Vault**: Detects uninstalled apps in `.notiflow` backups and offers to *"Keep in Vault & Auto-Apply on Install"* (safely parked in local DB and auto-applied when installed) or *"Exclude These Apps"*.
+  - **Smart Backup Import & Dormant Vault**: Detects uninstalled apps in `.notiflow` backups and offers to *"Keep in Vault & Auto-Apply on Install"* (safely parked in local DB and auto-applied when installed) or *"Exclude These Apps"*. Settings → **Dormant Vault** card opens a sheet listing parked apps, each with a × to remove it (after confirmation).
   - **Quick Load Rule Templates**: Reusable schedule rule dropdown with deduplication, pre-seeded with `"Focus Hours"` (09:00 AM – 05:00 PM, Mon–Fri); the default is fixed, while other saved rules can be fully edited (name, behaviour, times, days, VIP) from Settings → Saved Rules without changing apps already using them.
   - **Multiple Schedules per App**: Full support for attaching multiple active schedules to a single app with independent monitoring switches.
   - **Unified `.notiflow` Backup**: Single backup file format bundling rule templates alongside managed apps and schedules with 100% backward compatibility.
