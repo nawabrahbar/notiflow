@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
+import 'package:notification_handler/domain/models/bulk_apply.dart';
 import 'package:notification_handler/domain/models/managed_app.dart';
 import 'package:notification_handler/domain/models/rule_template.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
@@ -460,5 +461,110 @@ void main() {
     );
     expect(repository.findDuplicateTemplate(asDefault)?.id, RuleTemplate.defaultWorkFocus.id);
     expect(repository.findDuplicateTemplate(saved), isNull);
+  });
+
+  group('bulk apply', () {
+    final night = RuleTemplate(
+      id: 'tpl_night',
+      name: 'Night',
+      mode: ScheduleMode.blockDuring,
+      startTime: const TimeOfDayValue(hour: 22, minute: 0),
+      endTime: const TimeOfDayValue(hour: 7, minute: 0),
+      daysOfWeek: {1, 2, 3, 4, 5, 6, 7},
+      allowVipContacts: false,
+      createdAt: DateTime(2026),
+    );
+    final focus = RuleTemplate.defaultWorkFocus;
+    const slack = BulkApplyTarget(packageName: 'com.slack', displayName: 'Slack');
+    const mail = BulkApplyTarget(packageName: 'com.mail', displayName: 'Mail');
+
+    setUp(() async {
+      await repository.addApp(ManagedApp(
+        id: 'app_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
+      await repository.saveRule(
+        ScheduleRule(
+          id: 'existing',
+          appId: 'app_slack',
+          mode: focus.mode,
+          startTime: focus.startTime,
+          endTime: focus.endTime,
+          daysOfWeek: focus.daysOfWeek,
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        ),
+        autoSaveTemplate: false,
+      );
+    });
+
+    test('preview and apply skip duplicates and add unmanaged apps', () async {
+      final preview =
+          repository.previewBulkApply([focus, night], ['com.slack', 'com.mail']);
+      expect(preview.toAdd, 3);
+      expect(preview.skipped, 1);
+
+      final result = await repository.applyTemplatesToApps(
+        templates: [focus, night],
+        targets: [slack, mail],
+      );
+      expect(result.addedCount, 3);
+      expect(result.skippedCount, 1);
+
+      final slackResult = result.apps.firstWhere((a) => a.app.id == 'app_slack');
+      expect(slackResult.appAdded, isFalse);
+      expect(slackResult.skipped.single.id, focus.id);
+      expect(slackResult.addedRules.single.name, 'Night');
+      expect(slackResult.addedRules.single.allowVipContacts, isFalse);
+
+      final mailApp = repository.managedApps.firstWhere((a) => a.packageName == 'com.mail');
+      expect(repository.getRulesForApp(mailApp.id).length, 2);
+      expect(repository.getRulesForApp('app_slack').length, 2);
+
+      final again = await repository.applyTemplatesToApps(
+        templates: [focus, night],
+        targets: [slack, mail],
+      );
+      expect(again.addedCount, 0);
+      expect(again.skippedCount, 4);
+    });
+
+    test('undo removes only batch rules and only apps the batch added', () async {
+      final result = await repository.applyTemplatesToApps(
+        templates: [night],
+        targets: [slack, mail],
+      );
+      final added = {for (final a in result.apps) if (a.appAdded) a.app.id};
+      final ids = [for (final a in result.apps) ...a.addedRules.map((r) => r.id)];
+
+      await repository.removeBulkAppliedRules(ids, addedAppIds: added);
+
+      expect(repository.schedules.map((r) => r.id), ['existing']);
+      expect(repository.managedApps.map((a) => a.packageName), ['com.slack']);
+    });
+
+    test('pre-existing app stays when its last rule is undone', () async {
+      await repository.deleteRule('existing');
+      await repository.addApp(ManagedApp(
+        id: 'app_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
+      final result = await repository.applyTemplatesToApps(
+        templates: [night],
+        targets: [slack],
+      );
+      expect(result.apps.single.appAdded, isFalse);
+      await repository.removeBulkAppliedRules(
+        result.apps.single.addedRules.map((r) => r.id),
+      );
+      expect(repository.managedApps.single.id, 'app_slack');
+      expect(repository.schedules, isEmpty);
+    });
   });
 }

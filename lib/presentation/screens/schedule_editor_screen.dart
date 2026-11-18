@@ -27,6 +27,9 @@ class ScheduleEditorScreen extends StatefulWidget {
   /// When set, the screen edits this saved rule instead of an app's schedule.
   final RuleTemplate? editingTemplate;
 
+  /// When true, the screen creates a new saved rule and pops with it.
+  final bool createTemplate;
+
   const ScheduleEditorScreen({
     super.key,
     required this.repository,
@@ -34,6 +37,7 @@ class ScheduleEditorScreen extends StatefulWidget {
     this.targetApp,
     this.existingRule,
     this.editingTemplate,
+    this.createTemplate = false,
   });
 
   @override
@@ -52,7 +56,8 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   String? _selectedTemplateId;
   bool _isSaving = false;
 
-  bool get _isEditingTemplate => widget.editingTemplate != null;
+  bool get _isEditingTemplate =>
+      widget.editingTemplate != null || widget.createTemplate;
 
   ManagedApp get _effectiveApp {
     final explicit = widget.app ?? widget.targetApp;
@@ -98,7 +103,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
       _allowUrgent = rule.allowVipContacts;
     } else {
       _nameController = TextEditingController(
-        text: RuleTemplate.defaultWorkFocus.name,
+        text: widget.createTemplate ? '' : RuleTemplate.defaultWorkFocus.name,
       );
       _mode = ScheduleMode.blockDuring;
       _startHour = 9;
@@ -236,6 +241,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
   }
 
   Future<void> _handleSaveTemplate() async {
+    if (widget.createTemplate) return _handleCreateTemplate();
     final original = widget.editingTemplate!;
     final name = _nameController.text.trim();
     if (name.isEmpty) {
@@ -274,7 +280,53 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     Navigator.pop(context);
   }
 
-  Future<bool?> _confirmDuplicate(String otherName) {
+  Future<void> _handleCreateTemplate() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      _showToast('Please enter a rule name.', error: true);
+      return;
+    }
+    if (_daysOfWeek.isEmpty) {
+      _showToast('Please choose at least one day.', error: true);
+      return;
+    }
+    final created = RuleTemplate(
+      id: 'template_${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      mode: _mode,
+      startTime: TimeOfDayValue(hour: _startHour, minute: _startMinute),
+      endTime: TimeOfDayValue(hour: _endHour, minute: _endMinute),
+      daysOfWeek: Set<int>.from(_daysOfWeek),
+      allowVipContacts: _allowUrgent,
+      createdAt: DateTime.now(),
+    );
+
+    // Saved rules can't share the same schedule, so offer the existing one.
+    final duplicate = widget.repository.findDuplicateTemplate(created);
+    if (duplicate != null) {
+      final useExisting = await _confirmDuplicate(
+        duplicate.name,
+        message:
+            '"${duplicate.name}" already has the same behaviour, times and days. Use it instead?',
+        confirmLabel: 'Use ${duplicate.name}',
+      );
+      if (useExisting == true && mounted) Navigator.pop(context, duplicate);
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final saved = await widget.repository.saveRuleTemplate(created);
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+    _showToast('Saved rule created.');
+    Navigator.pop(context, saved);
+  }
+
+  Future<bool?> _confirmDuplicate(
+    String otherName, {
+    String? message,
+    String confirmLabel = 'Save anyway',
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textMain = isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface;
     final textMuted = isDark
@@ -297,7 +349,8 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
           ),
         ),
         content: Text(
-          '"$otherName" already has the same behaviour, times and days. Save anyway?',
+          message ??
+              '"$otherName" already has the same behaviour, times and days. Save anyway?',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 13,
             height: 1.45,
@@ -327,7 +380,7 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(
-              'Save anyway',
+              confirmLabel,
               style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
             ),
           ),
@@ -386,7 +439,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
             children: [
               Expanded(
                 child: Text(
-                  _isEditingTemplate
+                  widget.createTemplate
+                      ? 'New Rule'
+                      : _isEditingTemplate
                       ? 'Edit Saved Rule'
                       : 'Schedule Rule Editor',
                   style: AppTheme.headerTitleStyle(context, textMain),
@@ -1286,7 +1341,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(
-                      _isEditingTemplate
+                      widget.createTemplate
+                          ? 'Save Rule'
+                          : _isEditingTemplate
                           ? 'Save Changes'
                           : widget.existingRule != null
                           ? 'Update Schedule Rule'
@@ -1305,7 +1362,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Apps already using this rule keep their current schedule.',
+                      widget.createTemplate
+                          ? 'Saved to your rules, so you can use it again later.'
+                          : 'Apps already using this rule keep their current schedule.',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,

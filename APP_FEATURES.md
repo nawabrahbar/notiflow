@@ -32,7 +32,7 @@ Notiflow consists of **11 dedicated screens/pages** structured across a startup 
 | **3** | **Permission & Health Center** (`PermissionScreen`) | Recovery Screen | Access restoration, OEM battery kill guides, Android 13+ sideload helper |
 | **4** | **Import Rules Screen** (`ImportRulesScreen`) | Onboarding Step 3 | Optional `.notiflow` backup import during onboarding |
 | **5** | **Main Navigation Shell** (`MainNavigationShell`) | Container Screen | Phone bottom bar / tablet rail: Dashboard, Rules, Activity, Settings |
-| **6** | **Dashboard / Rules Screen** (`DashboardScreen`) | Tabs 1 & 2 | `DashboardView.home`: greetings, Intercepted/Permitted metrics, quick pauses, digest overview. `DashboardView.rules`: managed apps list |
+| **6** | **Dashboard / Rules Screen** (`DashboardScreen`) | Tabs 1 & 2 | `DashboardView.home`: greetings, Intercepted/Permitted metrics, quick pauses, digest overview. `DashboardView.rules`: managed apps list, *Apply rules* button (bulk-apply saved rules to many apps) |
 | **7** | **Add Apps Screen** (`AddAppsScreen`) | Sub-Screen (from Rules) | Device app discovery, search filtering, category chips, batch app addition |
 | **8** | **App Details Screen** (`AppDetailsScreen`) | Sub-Screen | App master toggle, quick mute pills, schedule list |
 | **9** | **Schedule Rule Editor** (`ScheduleEditorScreen`) | Sub-Screen | BLOCK vs ALLOW modes, time pickers with overnight math, 7-day selector pills |
@@ -44,6 +44,7 @@ Notiflow consists of **11 dedicated screens/pages** structured across a startup 
 * **Paste JSON Rules Modal**: In-app modal dialog to paste raw `.notiflow` JSON directly.
 * **Privacy & Security Audit Sheet**: Transparent on-device audit modal demonstrating zero network egress and zero tracking.
 * **Reset All Rules Confirmation Modal**: Destructive data wipe warning dialog with native cache sync.
+* **Apply Rules wizard & Rules applied sheet**: Full-screen wizard from the Rules tab's *Apply rules* button, then a result sheet with per-rule, per-app and Undo all actions ([`docs/apply-rules.md`](docs/apply-rules.md)).
 
 ---
 
@@ -75,7 +76,7 @@ flowchart TD
     Tab0 -->|Tap digest card| Tab2
     
     %% Dashboard Sub-flows
-    Tab1 -->|Tap '+ Add App'| AddApps[7. Add Apps Screen]
+    Tab1 -->|Tap 'Add app' button| AddApps[7. Add Apps Screen]
     AddApps -->|Select & Save| Tab1
     Tab1 -->|Tap Managed App| AppDetails[8. App Details Screen]
     
@@ -102,7 +103,7 @@ flowchart TD
    - App automatically detects permission resumption and advances to Step 3 (Rules Import) or Dashboard.
 3. **Daily Management Flow**:
    - User views dynamic time greeting and triage counters on the **Dashboard (Rules)** tab.
-   - User taps `+ Add App` to scan installed apps, selects target apps (e.g. WhatsApp, Slack), and adds them.
+   - User taps the floating **Add app** button to scan installed apps, selects target apps (e.g. WhatsApp, Slack), and adds them.
    - User taps a managed app to view the **App Details Screen** and sets up rules in the **Schedule Editor Screen** (e.g., Block 09:00 to 17:00 on weekdays).
    - Incoming notifications arriving during the scheduled window are silenced by the native engine.
    - User checks the **Activity** tab to inspect intercepted and permitted alerts.
@@ -231,7 +232,12 @@ flowchart TD
     - Tap card to open `AppDetailsScreen`.
     - **Multi-select delete**: long-pressing a card shows a selection bar with a select-all checkbox, *"N Selected"* and a red delete icon (icon only, no label or background) that asks *"Delete N Rules?"* before deleting.
     - **Uninstalled apps**: if an app with rules is uninstalled, its card turns grey, shows an `UNINSTALLED` badge instead of the status, and the toggle is disabled. Tapping still opens the details so the rule can be deleted; reinstalling the app restores the card.
-  * **Floating Action Button (`+ Add App`)**: Jumps to `AddAppsScreen`.
+  * **Add App (floating button, Rules tab)**: *"Add app"* button (`rules-add-app-fab`, same colours and style as *Apply rules*) stacked above *Apply rules*, bottom-right; opens `AddAppsScreen`. It replaces the old *"+ Add App"* text button in the MANAGED APPS header, shrinks to an icon with *Apply rules* while scrolling down, hides during multi-select, and only shows once at least one app is managed (the empty state keeps its big *Add Apps* button).
+  * **Apply rules (floating button, Rules tab)**: bottom-right *"Apply rules"* button (`rules-apply-fab`) that applies one or more saved rules to many apps in one go. It shrinks to an icon while scrolling down, expands on scroll up, and hides during multi-select; the list has extra bottom space so the last card isn't covered. It opens **Apply Rules** (`BulkApplyScreen`, `lib/presentation/screens/bulk_apply_screen.dart`):
+    - **Phone**: 3 steps with a step indicator (1. Rules → 2. Apps → 3. Review) and Back / Next / Apply. Step 1 picks saved rules (each with a summary like *"Block · 9:00 AM - 5:00 PM · Mon-Fri"*), or **New rule** creates one in the Schedule Rule Editor (*New Rule*) and comes back with it selected (a same-schedule rule offers *Use <rule>* instead). Step 2 picks apps (Notiflow apps first, then installed apps), with search, category chips and Select all / Clear. Step 3 reviews *"N rules → M apps"* and *"X new schedules · Y already applied"*, marking apps that will be added with **NEW**.
+    - **Tablet**: rules and apps panels side by side with a bottom review bar and **Apply**.
+    - Duplicates (same mode, times and days already on the app) are skipped; overlapping times are allowed; apps not yet in Notiflow are added (a vaulted match is restored). Apply is disabled (*"Already applied"*) when nothing is new.
+    - Afterwards a **Rules applied** bottom sheet (`BulkApplyResultSheet`, `lib/presentation/widgets/bulk_apply_result_sheet.dart`) lists each app with its new rules. Undo is flexible: **×** on a rule chip removes that rule from that app, **×** on an app undoes the batch for that app, and **Undo all** removes the whole batch. Each undo confirms first and shows a toast. Schedules the apps already had are never touched, and apps you already managed are never removed. Full spec: [`docs/apply-rules.md`](docs/apply-rules.md).
 
 ---
 
@@ -275,6 +281,7 @@ flowchart TD
 ### Page 9: Schedule Rule Editor (`ScheduleEditorScreen`)
 
 * **Purpose**: Form interface for creating and modifying time-based schedule rules.
+* **Modes**: an app's schedule (*Schedule Rule Editor*), editing a saved rule from Settings (*Edit Saved Rule*), or creating a saved rule from the Apply Rules wizard (*New Rule*, `createTemplate: true`, pops with the new `RuleTemplate`). The saved-rule modes hide the Quick Load dropdown.
 * **Visual & Functional Elements**:
   * **Rule Name Input**: Text field to assign custom labels (e.g., *"Focus Hours"*, *"Sleep Shield"*).
   * **Interception Behavior (Mode Toggle)**:
@@ -385,4 +392,5 @@ flowchart TD
 
 * [x] **Catch-Up Digest Phase 1**: Dashboard tab (greeting, Intercepted/Permitted cards, quick pauses, digest overview), Digest view in Activity, and on-device SQLite storage with 30-day retention.
 * [x] **Catch-Up Digest Phase 2**: When a rule window ends, silenced notifications come back (Android snooze) and one short Notiflow notification says how many are back (device checks pending). Full spec and every agreed decision: [`docs/catch-up-digest.md`](docs/catch-up-digest.md).
+* [x] **Apply rules to many apps** (v1.6.1): Floating *Apply rules* button on the Rules tab opens a wizard (phone: Rules → Apps → Review; tablet: side by side) to apply several saved rules to several apps at once, skipping duplicates, followed by a result sheet with flexible undo. Full spec: [`docs/apply-rules.md`](docs/apply-rules.md).
 * [x] **Shared installed-apps list & uninstalled apps** (v1.6.1): One app-wide installed-apps list loaded in the background from the dashboard; icons fetched on demand (Activity log shows instantly, Add Apps loads icons in screen-sized batches on phone and tablet); apps with rules that get uninstalled are shown greyed with an "Uninstalled" badge on Rules and Activity. Full spec: [`docs/installed-apps-cache.md`](docs/installed-apps-cache.md).

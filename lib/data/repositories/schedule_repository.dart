@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/engine/schedule_evaluator.dart';
+import '../../domain/models/bulk_apply.dart';
 import '../../domain/models/import_report.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_decision.dart';
@@ -393,6 +394,122 @@ class ScheduleRepository extends ChangeNotifier {
     _schedules.removeWhere((r) => idSet.contains(r.appId));
     for (final id in idSet) {
       _overrides.remove(id);
+    }
+    await _persist();
+  }
+
+  ManagedApp? _managedAppForPackage(String packageName) {
+    final lower = packageName.toLowerCase();
+    for (final a in _managedApps) {
+      if (a.packageName.toLowerCase() == lower) return a;
+    }
+    return null;
+  }
+
+  /// How many schedules applying [templates] to [packageNames] would create,
+  /// and how many would be skipped because the app already has them.
+  ({int toAdd, int skipped}) previewBulkApply(
+    List<RuleTemplate> templates,
+    Iterable<String> packageNames,
+  ) {
+    var toAdd = 0;
+    var skipped = 0;
+    for (final pkg in packageNames) {
+      final app = _managedAppForPackage(pkg);
+      final rules = app == null ? const <ScheduleRule>[] : getRulesForApp(app.id);
+      for (final t in templates) {
+        if (templateAlreadyApplied(t, rules)) {
+          skipped++;
+        } else {
+          toAdd++;
+        }
+      }
+    }
+    return (toAdd: toAdd, skipped: skipped);
+  }
+
+  /// Applies every saved rule in [templates] to every app in [targets] in one
+  /// save. Unmanaged apps are added first; schedules an app already has are
+  /// skipped.
+  Future<BulkApplyResult> applyTemplatesToApps({
+    required List<RuleTemplate> templates,
+    required List<BulkApplyTarget> targets,
+  }) async {
+    final now = DateTime.now();
+    final stamp = now.millisecondsSinceEpoch;
+    var seq = 0;
+    final results = <BulkApplyAppResult>[];
+
+    for (final target in targets) {
+      var app = _managedAppForPackage(target.packageName);
+      final appAdded = app == null;
+      if (app == null) {
+        app = ManagedApp(
+          id: 'app_${target.packageName}_${stamp}_${seq++}',
+          packageName: target.packageName,
+          displayName: target.displayName,
+          iconBytes: target.iconBytes,
+          enabled: true,
+          createdAt: now,
+          updatedAt: now,
+        );
+        _managedApps.add(app);
+      } else if (app.isDormantVault) {
+        // The picker only lists installed apps, so a vaulted entry is live again.
+        final index = _managedApps.indexOf(app);
+        app = app.copyWith(isDormantVault: false, updatedAt: now);
+        _managedApps[index] = app;
+      }
+
+      final existing = getRulesForApp(app.id);
+      final added = <ScheduleRule>[];
+      final skipped = <RuleTemplate>[];
+      for (final t in templates) {
+        if (templateAlreadyApplied(t, existing) ||
+            templateAlreadyApplied(t, added)) {
+          skipped.add(t);
+          continue;
+        }
+        added.add(ScheduleRule(
+          id: 'rule_${app.id}_${stamp}_${seq++}',
+          appId: app.id,
+          name: t.name,
+          mode: t.mode,
+          startTime: t.startTime,
+          endTime: t.endTime,
+          daysOfWeek: Set<int>.from(t.daysOfWeek),
+          allowVipContacts: t.allowVipContacts,
+          createdAt: now,
+          updatedAt: now,
+        ));
+      }
+      _schedules.addAll(added);
+      results.add(BulkApplyAppResult(
+        app: app,
+        appAdded: appAdded,
+        addedRules: added,
+        skipped: skipped,
+      ));
+    }
+
+    await _persist();
+    return BulkApplyResult(results);
+  }
+
+  /// Removes schedules created by a bulk apply. Apps in [addedAppIds] (added by
+  /// that batch) are removed too once they have no schedules left; apps that
+  /// were managed before are always kept.
+  Future<void> removeBulkAppliedRules(
+    Iterable<String> ruleIds, {
+    Set<String> addedAppIds = const {},
+  }) async {
+    final ids = ruleIds.toSet();
+    _schedules.removeWhere((r) => ids.contains(r.id));
+    for (final appId in addedAppIds) {
+      if (!_schedules.any((r) => r.appId == appId)) {
+        _managedApps.removeWhere((a) => a.id == appId);
+        _overrides.remove(appId);
+      }
     }
     await _persist();
   }

@@ -8,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:notification_handler/data/repositories/schedule_repository.dart';
+import 'package:notification_handler/domain/models/bulk_apply.dart';
 import 'package:notification_handler/domain/models/managed_app.dart';
 import 'package:notification_handler/domain/models/rule_template.dart';
 import 'package:notification_handler/domain/models/schedule_rule.dart';
@@ -20,6 +21,7 @@ import 'package:notification_handler/presentation/screens/main_navigation_shell.
 import 'package:notification_handler/presentation/screens/onboarding_screen.dart';
 import 'package:notification_handler/presentation/screens/activity_screen.dart';
 import 'package:notification_handler/presentation/screens/add_apps_screen.dart';
+import 'package:notification_handler/presentation/screens/bulk_apply_screen.dart';
 import 'package:notification_handler/presentation/screens/permission_screen.dart';
 import 'package:notification_handler/presentation/screens/settings_screen.dart';
 import 'package:notification_handler/presentation/screens/app_details_screen.dart';
@@ -1197,11 +1199,15 @@ void main() {
     await tester.pumpWidget(wrapWithTheme(DashboardScreen(repository: repository)));
     await flushFontsAndSettle(tester);
 
-    final addAppButton = find.widgetWithText(TextButton, '+ Add App');
-    expect(addAppButton, findsOneWidget);
+    final addAppFab = find.byKey(const ValueKey('rules-add-app-fab'));
+    final applyFab = find.byKey(const ValueKey('rules-apply-fab'));
+    expect(addAppFab, findsOneWidget);
+    expect(find.text('+ Add App'), findsNothing);
     expect(find.text('Add Apps'), findsNothing);
-    // Ensure no redundant Icons.add_rounded is placed inside this TextButton
-    expect(find.descendant(of: addAppButton, matching: find.byIcon(Icons.add_rounded)), findsNothing);
+    expect(tester.getCenter(addAppFab).dy, lessThan(tester.getCenter(applyFab).dy));
+    await tester.tap(addAppFab);
+    await flushFontsAndSettle(tester);
+    expect(find.byType(AddAppsScreen), findsOneWidget);
   });
 
   testWidgets('DashboardScreen shows only the big Add Apps button when no apps are managed', (WidgetTester tester) async {
@@ -1217,7 +1223,7 @@ void main() {
 
     expect(find.text('No apps managed yet'), findsOneWidget);
     expect(find.text('Add Apps'), findsOneWidget);
-    expect(find.text('+ Add App'), findsNothing);
+    expect(find.byKey(const ValueKey('rules-add-app-fab')), findsNothing);
   });
 
   for (final scenario in [
@@ -1997,4 +2003,188 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('Apply rules wizard', () {
+    Future<void> seed() async {
+      mockPlatform.installedApps = [
+        DiscoveredAppInfo(packageName: 'com.slack', displayName: 'Slack'),
+        DiscoveredAppInfo(packageName: 'com.mail', displayName: 'Mail'),
+      ];
+      await repository.addApp(ManagedApp(
+        id: 'app_slack',
+        packageName: 'com.slack',
+        displayName: 'Slack',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
+    }
+
+    testWidgets('phone: FAB → rules → apps → review → apply, then undo per rule and all',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seed();
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: DashboardScreen(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      final fab = find.byKey(const ValueKey('rules-apply-fab'));
+      expect(fab, findsOneWidget);
+      await tester.longPress(find.text('Slack'));
+      await flushFontsAndSettle(tester);
+      expect(fab, findsNothing, reason: 'hidden during multi-select');
+      await tester.tap(find.byKey(const Key('select_all_checkbox')));
+      await flushFontsAndSettle(tester);
+      expect(fab, findsOneWidget);
+
+      await tester.tap(fab);
+      await flushFontsAndSettle(tester);
+      expect(find.byType(BulkApplyScreen), findsOneWidget);
+
+      final next = find.byKey(const ValueKey('bulk-next'));
+      expect(tester.widget<FilledButton>(next).onPressed, isNull);
+      await tester.tap(find.byKey(const ValueKey('bulk-rule-template_work_focus')));
+      await tester.pumpAndSettle();
+      expect(find.text('Block · 9:00 AM - 5:00 PM · Mon-Fri'), findsOneWidget);
+      await tester.tap(next);
+      await flushFontsAndSettle(tester);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-select-all')));
+      await tester.pumpAndSettle();
+      await tester.tap(next);
+      await flushFontsAndSettle(tester);
+
+      expect(find.text('1 rule → 2 apps'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey('bulk-review-line'))).data,
+        '2 new schedules',
+      );
+      expect(find.text('NEW'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-apply')));
+      await flushFontsAndSettle(tester);
+
+      expect(find.text('Rules applied'), findsOneWidget);
+      expect(repository.schedules.length, 2);
+      final mail = repository.managedApps.firstWhere((a) => a.packageName == 'com.mail');
+
+      final slackRule = repository.getRulesForApp('app_slack').single;
+      await tester.tap(find.byKey(ValueKey('bulk-result-remove-rule-${slackRule.id}')));
+      await flushFontsAndSettle(tester);
+      expect(find.text('Remove Focus Hours?'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('bulk-result-confirm')));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      expect(repository.getRulesForApp('app_slack'), isEmpty);
+      expect(repository.managedApps.any((a) => a.id == 'app_slack'), isTrue,
+          reason: 'pre-existing app is kept');
+      expect(find.text('Removed Focus Hours from Slack'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 5));
+
+      await tester.tap(find.byKey(const ValueKey('bulk-result-undo-all')));
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('bulk-result-confirm')));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      expect(repository.schedules, isEmpty);
+      expect(repository.managedApps.any((a) => a.id == mail.id), isFalse,
+          reason: 'app added by the batch is removed when empty');
+      expect(find.text('Rules applied'), findsNothing);
+      await pumpFor(tester, const Duration(seconds: 5));
+    });
+
+    testWidgets('step 1: New rule creates a saved rule and selects it', (tester) async {
+      tester.view.physicalSize = const Size(390, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seed();
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: BulkApplyScreen(repository: repository),
+      ));
+      await flushFontsAndSettle(tester);
+
+      // Same schedule as Focus Hours: offered to use the existing rule.
+      await tester.tap(find.byKey(const ValueKey('bulk-new-rule')));
+      await flushFontsAndSettle(tester);
+      expect(find.text('New Rule'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).first, 'Copy');
+      await tester.tap(find.text('Save Rule'));
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.text('Use Focus Hours'));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+      expect(repository.ruleTemplates.length, 1);
+      expect(find.text('1 rule selected'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-new-rule')));
+      await flushFontsAndSettle(tester);
+      await tester.enterText(find.byType(TextField).first, 'Weekend calm');
+      await tester.ensureVisible(find.text('Weekends'));
+      await tester.tap(find.text('Weekends'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Save Rule'));
+      await tester.tap(find.text('Save Rule'));
+      await pumpFor(tester, const Duration(milliseconds: 600));
+
+      final created = repository.ruleTemplates.firstWhere((t) => t.name == 'Weekend calm');
+      expect(created.daysOfWeek, {6, 7});
+      expect(find.byKey(ValueKey('bulk-rule-${created.id}')), findsOneWidget);
+      expect(find.text('2 rules selected'), findsOneWidget);
+      await pumpFor(tester, const Duration(seconds: 5));
+    });
+
+    testWidgets('tablet: panels side by side with review bar Apply', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await seed();
+
+      BulkApplyResult? popped;
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () async {
+                popped = await Navigator.of(context).push<BulkApplyResult>(
+                  MaterialPageRoute(
+                      builder: (_) => BulkApplyScreen(repository: repository)),
+                );
+              },
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await flushFontsAndSettle(tester);
+
+      expect(find.byKey(const ValueKey('bulk-next')), findsNothing);
+      expect(find.text('Choose rules and apps'), findsOneWidget);
+      final rule = find.byKey(const ValueKey('bulk-rule-template_work_focus'));
+      final app = find.byKey(const ValueKey('bulk-app-com.mail'));
+      expect(tester.getCenter(rule).dx, lessThan(tester.getCenter(app).dx));
+
+      await tester.tap(rule);
+      await tester.tap(app);
+      await tester.pumpAndSettle();
+      expect(find.text('1 rule → 1 app'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('bulk-apply')));
+      await flushFontsAndSettle(tester);
+      expect(popped?.addedCount, 1);
+      expect(repository.managedApps.any((a) => a.packageName == 'com.mail'), isTrue);
+    });
+  });
 }

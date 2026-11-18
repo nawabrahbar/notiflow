@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../data/services/installed_apps_cache.dart';
+import '../../domain/models/bulk_apply.dart';
 import '../../domain/models/managed_app.dart';
 import '../../domain/models/schedule_rule.dart';
 import '../../platform/android_notification_platform.dart';
@@ -10,9 +12,11 @@ import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_switch.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/bulk_apply_result_sheet.dart';
 import '../widgets/quick_mute_card.dart';
 import 'add_apps_screen.dart';
 import 'app_details_screen.dart';
+import 'bulk_apply_screen.dart';
 import 'permission_screen.dart';
 
 /// Which part of the home experience a [DashboardScreen] renders.
@@ -56,6 +60,7 @@ class DashboardScreenState extends State<DashboardScreen>
   late bool _showRestorationBanner;
   final Set<String> _selectedAppIds = <String>{};
   int _unreviewedDigestCount = 0;
+  bool _fabExtended = true;
 
   bool get _isHome => widget.view == DashboardView.home;
 
@@ -202,6 +207,95 @@ class DashboardScreenState extends State<DashboardScreen>
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _openBulkApply() async {
+    final result = await Navigator.of(context).push<BulkApplyResult>(
+      MaterialPageRoute(
+        builder: (_) => BulkApplyScreen(repository: widget.repository),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await showBulkApplyResultSheet(
+      context,
+      result,
+      repository: widget.repository,
+    );
+  }
+
+  /// Shrinks the Apply Rules button to an icon while scrolling down the list.
+  bool _onRulesScroll(UserScrollNotification n) {
+    if (n.metrics.axis != Axis.vertical) return false;
+    final extended = switch (n.direction) {
+      ScrollDirection.reverse => false,
+      ScrollDirection.forward => true,
+      ScrollDirection.idle => _fabExtended,
+    };
+    if (extended != _fabExtended) setState(() => _fabExtended = extended);
+    return false;
+  }
+
+  void _openAddApps() {
+    final onTap = widget.onAddAppTap;
+    if (onTap != null) return onTap();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddAppsScreen(repository: widget.repository),
+      ),
+    );
+  }
+
+  /// Rules page floating buttons: Add App (when apps exist) above Apply rules.
+  Widget _buildRulesFabs(bool isDark, {required bool showAddApp}) {
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final onPrimary = isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnPrimary;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (showAddApp) ...[
+          FloatingActionButton.extended(
+            key: const ValueKey('rules-add-app-fab'),
+            heroTag: 'rules-add-app-fab',
+            onPressed: _openAddApps,
+            tooltip: 'Add apps',
+            backgroundColor: primary,
+            foregroundColor: onPrimary,
+            isExtended: _fabExtended,
+            extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            icon: const Icon(Icons.add_rounded),
+            label: Text(
+              'Add app',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        _buildApplyRulesFab(isDark),
+      ],
+    );
+  }
+
+  Widget _buildApplyRulesFab(bool isDark) {
+    final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
+    final onPrimary = isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnPrimary;
+    return FloatingActionButton.extended(
+      key: const ValueKey('rules-apply-fab'),
+      heroTag: 'rules-apply-fab',
+      onPressed: _openBulkApply,
+      tooltip: 'Apply rules to many apps',
+      backgroundColor: primary,
+      foregroundColor: onPrimary,
+      isExtended: _fabExtended,
+      extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      icon: const Icon(Icons.playlist_add_check_rounded),
+      label: Text(
+        'Apply rules',
+        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -698,6 +792,9 @@ class DashboardScreenState extends State<DashboardScreen>
 
         return Scaffold(
           backgroundColor: bg,
+          floatingActionButton: !_isHome && _selectedAppIds.isEmpty
+              ? _buildRulesFabs(isDark, showAddApp: apps.isNotEmpty)
+              : null,
           body: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -975,32 +1072,6 @@ class DashboardScreenState extends State<DashboardScreen>
                             ),
                           ],
                         ),
-                        if (apps.isNotEmpty)
-                          TextButton(
-                          onPressed: widget.onAddAppTap ??
-                              () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => AddAppsScreen(
-                                        repository: widget.repository),
-                                  ),
-                                );
-                              },
-                          style: TextButton.styleFrom(
-                            foregroundColor: primary,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            '+ Add App',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -1045,15 +1116,7 @@ class DashboardScreenState extends State<DashboardScreen>
                                     ? AppTheme.darkOnPrimary
                                     : AppTheme.lightOnPrimary,
                               ),
-                              onPressed: widget.onAddAppTap ??
-                                  () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => AddAppsScreen(
-                                            repository: widget.repository),
-                                      ),
-                                    );
-                                  },
+                              onPressed: _openAddApps,
                             ),
                           ],
                         ),
@@ -1080,27 +1143,28 @@ class DashboardScreenState extends State<DashboardScreen>
                 );
 
                 if (!_isHome) {
-                  if (isTablet) {
-                    return SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ?permissionBanner,
-                          rightColumnContent,
-                        ],
-                      ),
-                    );
-                  }
-                  return ListView(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    children: [
-                      ?permissionBanner,
-                      rightColumnContent,
-                      const SizedBox(height: 32),
-                    ],
+                  // Bottom space keeps the last card clear of the floating buttons.
+                  final Widget list = isTablet
+                      ? SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(24, 16, 24, 160),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ?permissionBanner,
+                              rightColumnContent,
+                            ],
+                          ),
+                        )
+                      : ListView(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 152),
+                          children: [
+                            ?permissionBanner,
+                            rightColumnContent,
+                          ],
+                        );
+                  return NotificationListener<UserScrollNotification>(
+                    onNotification: _onRulesScroll,
+                    child: list,
                   );
                 }
 
