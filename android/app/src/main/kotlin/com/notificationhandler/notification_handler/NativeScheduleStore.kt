@@ -8,7 +8,8 @@ import java.util.Calendar
 data class NativeManagedApp(
     val id: String,
     val packageName: String,
-    val enabled: Boolean
+    val enabled: Boolean,
+    val isHistoryOnly: Boolean = false
 )
 
 data class NativeTimeOfDay(
@@ -110,7 +111,8 @@ class NativeScheduleEvaluator {
                 val app = NativeManagedApp(
                     id = obj.getString("id"),
                     packageName = obj.getString("packageName"),
-                    enabled = obj.optBoolean("enabled", true)
+                    enabled = obj.optBoolean("enabled", true),
+                    isHistoryOnly = obj.optBoolean("isHistoryOnly", false)
                 )
                 appsMap[app.packageName] = app
             }
@@ -330,6 +332,14 @@ class NativeScheduleEvaluator {
             )
         }
 
+        if (app.isHistoryOnly) {
+            return NativeEvaluationDecision(
+                shouldBlock = false,
+                isManagedOrOverridden = true,
+                reason = "Recorded for history; no app-specific rules"
+            )
+        }
+
         val activeRules = cachedRules.filter { it.appId == app.id && it.enabled }
         if (activeRules.isEmpty()) {
             return NativeEvaluationDecision(
@@ -488,6 +498,9 @@ class NativeScheduleEvaluator {
         val app = findManagedApp(packageName) ?: return false
         return app.enabled
     }
+
+    fun isHistoryOnlyPackage(packageName: String): Boolean =
+        findManagedApp(packageName)?.isHistoryOnly == true
 
     private fun formatRuleWindow(rule: NativeScheduleRule): String {
         if (rule.mode == "allDayAllow" || rule.mode == "allDayBlock") {
@@ -661,7 +674,8 @@ class NativeScheduleStore(context: Context) {
                 timeWindow = decision.timeWindow,
                 isGroupSummary = isGroupSummary,
                 notificationKey = notificationKey,
-                conversationKey = conversationKey
+                conversationKey = conversationKey,
+                isHistoryOnly = evaluator.isHistoryOnlyPackage(packageName)
             )
         }
 
@@ -828,7 +842,8 @@ class NativeScheduleStore(context: Context) {
         timeWindow: String? = null,
         isGroupSummary: Boolean = false,
         notificationKey: String = "",
-        conversationKey: String = ""
+        conversationKey: String = "",
+        isHistoryOnly: Boolean = false
     ): Long? {
         return try {
             val effectiveReason = reason ?: if (isBlocked) "Silenced by schedule rule" else "Allowed by schedule window"
@@ -853,7 +868,8 @@ class NativeScheduleStore(context: Context) {
                     reason = effectiveReason,
                     ruleName = ruleName,
                     timeWindow = timeWindow,
-                    isGroupSummary = isGroupSummary
+                    isGroupSummary = isGroupSummary,
+                    isHistoryOnly = isHistoryOnly
                 ),
                 windowId,
                 DEDUP_WINDOW_MS
@@ -893,6 +909,12 @@ class NativeScheduleStore(context: Context) {
     }
 
     fun deleteActivityEvents(ids: List<Long>) = afterDelete { database.deleteEvents(ids) }
+
+    fun deleteHistoryForApp(packageName: String) {
+        database.deleteHistoryForApp(packageName)
+        DigestNotifier.onReviewed(appContext)
+        onActivityUpdatedListener?.invoke()
+    }
 
     fun deleteDigestWindows(ids: List<Long>) = afterDelete { database.deleteWindowEvents(ids) }
 

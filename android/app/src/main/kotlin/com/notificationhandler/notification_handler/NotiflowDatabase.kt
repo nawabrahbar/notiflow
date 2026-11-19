@@ -16,7 +16,7 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
 
     companion object {
         const val DB_NAME = "notiflow.db"
-        private const val DB_VERSION = 2
+        private const val DB_VERSION = 3
         const val RETENTION_MS = 30L * 24 * 60 * 60 * 1000
         private const val MAX_TEXT_LENGTH = 1000
         /** A group summary posted this close to a real message of the same app repeats it. */
@@ -61,7 +61,8 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
                 time_window TEXT,
                 window_id INTEGER,
                 is_group_summary INTEGER NOT NULL DEFAULT 0,
-                delivery TEXT
+                delivery TEXT,
+                history_only INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )
@@ -90,6 +91,9 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE notification_events ADD COLUMN delivery TEXT")
             createHeldTable(db)
+        }
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE notification_events ADD COLUMN history_only INTEGER NOT NULL DEFAULT 0")
         }
     }
 
@@ -129,7 +133,8 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
         val reason: String,
         val ruleName: String?,
         val timeWindow: String?,
-        val isGroupSummary: Boolean
+        val isGroupSummary: Boolean,
+        val isHistoryOnly: Boolean = false
     )
 
     /**
@@ -200,6 +205,7 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
             put("time_window", input.timeWindow)
             if (windowId != null) put("window_id", windowId) else putNull("window_id")
             put("is_group_summary", if (input.isGroupSummary) 1 else 0)
+            put("history_only", if (input.isHistoryOnly) 1 else 0)
         }
 
         if (input.isGroupSummary && hasMessageSibling(db, input.packageName, input.postTimeMs)) return false
@@ -207,6 +213,8 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
         if (windowId != null && (input.notificationKey.isNotBlank() || input.conversationKey.isNotBlank())) {
             val existingId = findWindowDuplicate(db, windowId, input)
             if (existingId != null) {
+                // Capture source belongs to the original row, not today's app mode.
+                values.remove("history_only")
                 db.update("notification_events", values, "id = ?", arrayOf(existingId.toString()))
                 return true
             }
@@ -367,13 +375,24 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
         }
     }
 
+    /** Deletes History-source entries without touching this app's scheduled activity. */
+    @Synchronized
+    fun deleteHistoryForApp(packageName: String) {
+        val ids = mutableListOf<Long>()
+        readableDatabase.rawQuery(
+            "SELECT id FROM notification_events WHERE package_name = ? AND history_only = 1",
+            arrayOf(packageName)
+        ).use { c -> while (c.moveToNext()) ids.add(c.getLong(0)) }
+        deleteEvents(ids)
+    }
+
     /** Activity log JSON (newest first) in the shape the Flutter Activity screen expects. */
     @Synchronized
     fun getEventsJson(sinceMs: Long): String {
         val result = JSONArray()
         readableDatabase.rawQuery(
             "SELECT id, package_name, app_name, title, message, sub_text, category, post_time_ms, action, " +
-                "reason, rule_name, time_window, window_id, delivery, conversation_key FROM notification_events e " +
+                "reason, rule_name, time_window, window_id, delivery, conversation_key, history_only FROM notification_events e " +
                 "WHERE post_time_ms >= ? AND NOT (is_group_summary = 1 AND EXISTS (" +
                 "SELECT 1 FROM notification_events s WHERE s.package_name = e.package_name AND s.is_group_summary = 0 " +
                 "AND s.post_time_ms BETWEEN e.post_time_ms - ? AND e.post_time_ms + ?)) " +
@@ -395,6 +414,8 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
         c.getString(6)?.takeIf { it.isNotBlank() }?.let { put("category", it) }
         put("timestampMs", c.getLong(7))
         put("isBlocked", c.getString(8) != "allowed")
+        val historyIdx = c.getColumnIndex("history_only")
+        put("isHistoryOnly", historyIdx >= 0 && c.getInt(historyIdx) != 0)
         put("reason", c.getString(9) ?: "")
         c.getString(10)?.takeIf { it.isNotBlank() }?.let { put("ruleName", it) }
         c.getString(11)?.takeIf { it.isNotBlank() }?.let { put("timeWindow", it) }
@@ -426,7 +447,7 @@ class NotiflowDatabase internal constructor(context: Context, databaseName: Stri
                 var priority = false
                 db.rawQuery(
                     "SELECT id, package_name, app_name, title, message, sub_text, category, post_time_ms, action, " +
-                        "reason, rule_name, time_window, window_id, conversation_key, delivery FROM notification_events " +
+                        "reason, rule_name, time_window, window_id, conversation_key, delivery, history_only FROM notification_events " +
                         "WHERE window_id = ? AND is_group_summary = 0 ORDER BY post_time_ms DESC, id DESC",
                     arrayOf(windowId.toString())
                 ).use { ec ->

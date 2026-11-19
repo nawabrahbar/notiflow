@@ -14,6 +14,8 @@ import '../widgets/stitch_switch.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/bulk_apply_result_sheet.dart';
 import '../widgets/quick_mute_card.dart';
+import '../widgets/animated_fab_label.dart';
+import '../widgets/stitch_header.dart';
 import 'add_apps_screen.dart';
 import 'app_details_screen.dart';
 import 'bulk_apply_screen.dart';
@@ -263,14 +265,11 @@ class DashboardScreenState extends State<DashboardScreen>
             tooltip: 'Add apps',
             backgroundColor: primary,
             foregroundColor: onPrimary,
-            isExtended: _fabExtended,
+            extendedIconLabelSpacing: 0,
             extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             icon: const Icon(Icons.add_rounded),
-            label: Text(
-              'Add app',
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-            ),
+            label: AnimatedFabLabel(extended: _fabExtended, label: 'Add app'),
           ),
           const SizedBox(height: 12),
         ],
@@ -289,14 +288,11 @@ class DashboardScreenState extends State<DashboardScreen>
       tooltip: 'Apply rules to many apps',
       backgroundColor: primary,
       foregroundColor: onPrimary,
-      isExtended: _fabExtended,
+      extendedIconLabelSpacing: 0,
       extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       icon: const Icon(Icons.playlist_add_check_rounded),
-      label: Text(
-        'Apply rules',
-        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
-      ),
+      label: AnimatedFabLabel(extended: _fabExtended, label: 'Apply rules'),
     );
   }
 
@@ -796,7 +792,8 @@ class DashboardScreenState extends State<DashboardScreen>
               ? _buildRulesFabs(isDark, showAddApp: apps.isNotEmpty)
               : null,
           body: SafeArea(
-            child: LayoutBuilder(
+            child: HeaderScrollTransition(
+              child: LayoutBuilder(
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth >= 600;
 
@@ -1215,6 +1212,7 @@ class DashboardScreenState extends State<DashboardScreen>
                   ],
                 );
               },
+            ),
             ),
           ),
         );

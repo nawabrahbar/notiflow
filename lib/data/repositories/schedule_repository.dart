@@ -51,7 +51,9 @@ class ScheduleRepository extends ChangeNotifier {
   String get defaultScheduleMode => _defaultScheduleMode;
   bool get use24HourFormat => _use24HourFormat;
   List<ManagedApp> get managedApps =>
-      List.unmodifiable(_managedApps.where((a) => !a.isDormantVault));
+      List.unmodifiable(_managedApps.where((a) => !a.isDormantVault && !a.isHistoryOnly));
+  List<ManagedApp> get historyApps =>
+      List.unmodifiable(_managedApps.where((a) => a.isHistoryOnly));
   List<ManagedApp> get allManagedApps => List.unmodifiable(_managedApps);
   List<ManagedApp> get dormantVaultApps =>
       List.unmodifiable(_managedApps.where((a) => a.isDormantVault));
@@ -187,6 +189,16 @@ class ScheduleRepository extends ChangeNotifier {
     String? category,
   }) async {
     final now = DateTime.now();
+    final existing = _managedAppForPackage(packageName);
+    if (existing != null) {
+      final app = existing.copyWith(
+        isHistoryOnly: false,
+        isDormantVault: false,
+        updatedAt: now,
+      );
+      await addApp(app);
+      return app;
+    }
     final app = ManagedApp(
       id: 'app_${packageName}_${now.millisecondsSinceEpoch}',
       packageName: packageName,
@@ -199,6 +211,48 @@ class ScheduleRepository extends ChangeNotifier {
     );
     await addApp(app);
     return app;
+  }
+
+  Future<void> startHistoryOnly({
+    required String packageName,
+    required String displayName,
+    Uint8List? iconBytes,
+  }) async {
+    final existing = _managedAppForPackage(packageName);
+    if (existing != null) {
+      if (!existing.isHistoryOnly) {
+        throw StateError('Apps with rules already record notification activity.');
+      }
+      return;
+    }
+    final now = DateTime.now();
+    await addApp(ManagedApp(
+      id: 'history_${packageName}_${now.microsecondsSinceEpoch}',
+      packageName: packageName,
+      displayName: displayName,
+      iconBytes: iconBytes,
+      isHistoryOnly: true,
+      createdAt: now,
+      updatedAt: now,
+    ));
+  }
+
+  /// Stops future History-only capture without deleting stored notifications.
+  Future<void> stopHistoryOnly(String appId) async {
+    final app = _managedApps.where((a) => a.id == appId).firstOrNull;
+    if (app == null || !app.isHistoryOnly) {
+      throw StateError('This app is not recording history only.');
+    }
+    await removeApp(appId);
+  }
+
+  void _promoteHistoryApp(String appId) {
+    final index = _managedApps.indexWhere((a) => a.id == appId && a.isHistoryOnly);
+    if (index < 0) return;
+    _managedApps[index] = _managedApps[index].copyWith(
+      isHistoryOnly: false,
+      updatedAt: DateTime.now(),
+    );
   }
 
   /// Removes an app and all its associated schedule rules and overrides.
@@ -242,6 +296,7 @@ class ScheduleRepository extends ChangeNotifier {
 
   /// Adds or updates a schedule rule, and automatically evaluates caching it as a saved template.
   Future<void> saveRule(ScheduleRule rule, {bool autoSaveTemplate = true}) async {
+    _promoteHistoryApp(rule.appId);
     final index = _schedules.indexWhere((r) => r.id == rule.id);
     if (index != -1) {
       _schedules[index] = rule;
@@ -443,6 +498,7 @@ class ScheduleRepository extends ChangeNotifier {
     for (final target in targets) {
       var app = _managedAppForPackage(target.packageName);
       final appAdded = app == null;
+      final wasHistoryOnly = app?.isHistoryOnly ?? false;
       if (app == null) {
         app = ManagedApp(
           id: 'app_${target.packageName}_${stamp}_${seq++}',
@@ -484,9 +540,13 @@ class ScheduleRepository extends ChangeNotifier {
         ));
       }
       _schedules.addAll(added);
+      if (added.isNotEmpty) {
+        _promoteHistoryApp(app.id);
+      }
       results.add(BulkApplyAppResult(
         app: app,
         appAdded: appAdded,
+        wasHistoryOnly: wasHistoryOnly,
         addedRules: added,
         skipped: skipped,
       ));
@@ -498,10 +558,11 @@ class ScheduleRepository extends ChangeNotifier {
 
   /// Removes schedules created by a bulk apply. Apps in [addedAppIds] (added by
   /// that batch) are removed too once they have no schedules left; apps that
-  /// were managed before are always kept.
+  /// were managed before are kept, restoring History-only mode when applicable.
   Future<void> removeBulkAppliedRules(
     Iterable<String> ruleIds, {
     Set<String> addedAppIds = const {},
+    Set<String> historyAppIds = const {},
   }) async {
     final ids = ruleIds.toSet();
     _schedules.removeWhere((r) => ids.contains(r.id));
@@ -509,6 +570,16 @@ class ScheduleRepository extends ChangeNotifier {
       if (!_schedules.any((r) => r.appId == appId)) {
         _managedApps.removeWhere((a) => a.id == appId);
         _overrides.remove(appId);
+      }
+    }
+    for (final appId in historyAppIds) {
+      if (_schedules.any((r) => r.appId == appId)) continue;
+      final index = _managedApps.indexWhere((a) => a.id == appId);
+      if (index >= 0) {
+        _managedApps[index] = _managedApps[index].copyWith(
+          isHistoryOnly: true,
+          updatedAt: DateTime.now(),
+        );
       }
     }
     await _persist();
@@ -941,16 +1012,22 @@ class ScheduleRepository extends ChangeNotifier {
         }
         _overrides.clear();
       } else {
+        final appIdRemap = <String, String>{};
         for (final app in importedApps) {
-          if (!_managedApps.any((a) =>
+          final existing = _managedApps.where((a) =>
               a.id == app.id ||
-              a.packageName.toLowerCase() == app.packageName.toLowerCase())) {
+              a.packageName.toLowerCase() == app.packageName.toLowerCase()).firstOrNull;
+          if (existing == null) {
             _managedApps.add(app);
+          } else {
+            appIdRemap[app.id] = existing.id;
           }
         }
         for (final rule in importedSchedules) {
           if (!_schedules.any((r) => r.id == rule.id)) {
-            _schedules.add(rule);
+            _schedules.add(rule.copyWith(
+              appId: appIdRemap[rule.appId] ?? rule.appId,
+            ));
           }
         }
         for (final tmpl in importedTemplates) {
@@ -965,6 +1042,10 @@ class ScheduleRepository extends ChangeNotifier {
             _ruleTemplates.add(tmpl);
           }
         }
+      }
+
+      for (final rule in _schedules) {
+        _promoteHistoryApp(rule.appId);
       }
 
       // Always ensure the default pre-seeded template exists
@@ -1032,6 +1113,7 @@ class ScheduleRepository extends ChangeNotifier {
           appIdRemap[rawApp.id] = existing.id;
           _managedApps[existingIndex] = existing.copyWith(
             enabled: true,
+            isHistoryOnly: false,
             isDormantVault: false,
             iconBytes: existing.iconBytes ?? app.iconBytes,
           );
@@ -1073,7 +1155,7 @@ class ScheduleRepository extends ChangeNotifier {
 
   Future<void> _syncToNative() async {
     await _platformService.syncSchedules(
-      managedApps: managedApps,
+      managedApps: _managedApps.where((a) => !a.isDormantVault).toList(),
       schedules: _schedules,
       overrides: _overrides.values.toList(),
       unmanagedAppsUntouched: _unmanagedAppsUntouched,

@@ -4,6 +4,7 @@ import '../../data/repositories/schedule_repository.dart';
 import '../../platform/notification_platform_interface.dart';
 import '../../platform/platform_factory.dart';
 import '../theme/app_theme.dart';
+import '../widgets/stitch_header.dart';
 import 'import_rules_screen.dart';
 
 /// 3-Step Onboarding Journey faithfully adhering to Botanical Nocturne & Sanctuary UX:
@@ -66,8 +67,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBinding
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: switch (_currentStep) {
-            1 => _buildStepOne(isDark),
-            2 => _buildStepTwo(isDark),
+            1 => HeaderScrollTransition(
+              key: const ValueKey('onboarding-transition-1'),
+              child: _buildStepOne(isDark),
+            ),
+            2 => HeaderScrollTransition(
+              key: const ValueKey('onboarding-transition-2'),
+              child: _buildStepTwo(isDark),
+            ),
             _ => ImportRulesScreen(repository: widget.repository),
           },
         ),

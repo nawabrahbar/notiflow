@@ -118,6 +118,39 @@ class AppDetailsScreen extends StatelessWidget {
           },
           child: Scaffold(
             backgroundColor: bg,
+            floatingActionButton: FloatingActionButton.extended(
+              key: const ValueKey('app-details-done-fab'),
+              heroTag: 'app-details-done-fab',
+              onPressed: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => MainNavigationShell(
+                        repository: repository,
+                        initialIndex: MainNavigationShell.rulesTab,
+                      ),
+                    ),
+                  );
+                }
+              },
+              backgroundColor: primaryContainerCol,
+              foregroundColor: isDark
+                  ? AppTheme.darkOnPrimary
+                  : AppTheme.lightOnSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              icon: const Icon(Icons.check_rounded, size: 20),
+              label: Text(
+                'Done',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
             appBar: PreferredSize(
               preferredSize: const Size.fromHeight(60),
               child: Container(
@@ -140,7 +173,8 @@ class AppDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            body: LayoutBuilder(
+            body: HeaderScrollTransition(
+              child: LayoutBuilder(
               builder: (context, constraints) {
                 final isTablet = constraints.maxWidth >= 600;
 
@@ -954,51 +988,9 @@ class AppDetailsScreen extends StatelessWidget {
                   ),
                 );
 
-                final saveChangesButton = SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
-                      } else {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => MainNavigationShell(
-                              repository: repository,
-                              initialIndex: MainNavigationShell.rulesTab,
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.check_rounded, size: 20),
-                    label: Text(
-                      'Save Changes',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryContainerCol,
-                      foregroundColor: isDark
-                          ? AppTheme.darkOnPrimary
-                          : AppTheme.lightOnSurface,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                  ),
-                );
-
                 if (isTablet) {
                   return ListView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 16,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(28, 16, 28, 96),
                     children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1010,30 +1002,22 @@ class AppDetailsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                       removeFromRulesButton,
-                      const SizedBox(height: 12),
-                      saveChangesButton,
-                      const SizedBox(height: 32),
                     ],
                   );
                 }
 
                 return ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 12,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
                   children: [
                     leftCardColumn,
                     const SizedBox(height: 28),
                     rightRulesColumn,
                     const SizedBox(height: 20),
                     removeFromRulesButton,
-                    const SizedBox(height: 12),
-                    saveChangesButton,
-                    const SizedBox(height: 32),
                   ],
                 );
               },
+            ),
             ),
           ),
         );

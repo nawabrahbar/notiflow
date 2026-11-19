@@ -36,6 +36,58 @@ class NotiflowDatabaseTest {
         )
 
     @Test
+    fun historySourceSurvivesUpdatesAndPerAppDeletionKeepsOtherActivity() {
+        val window = database.upsertWindow("com.example.chat", "Chat", "Quick Mute", 1000, 9000)
+        database.recordEvent(event("history", 2000).copy(isHistoryOnly = true), window, 2000)
+        database.recordEvent(event("history", 5000, "Updated").copy(isHistoryOnly = false), window, 2000)
+        database.recordEvent(event("rules", 8000, "Scheduled"), window, 2000)
+        database.recordEvent(
+            event("other", 8000).copy(packageName = "com.other", isHistoryOnly = true), null, 2000
+        )
+        val before = JSONArray(database.getEventsJson(0))
+        val updated = (0 until before.length()).map { before.getJSONObject(it) }
+            .single { it.getString("title") == "Updated" }
+        assertTrue(updated.getBoolean("isHistoryOnly"))
+        val digestBefore = JSONArray(database.getDigestJson(100000)).getJSONObject(0).getJSONArray("events")
+        assertEquals(1, (0 until digestBefore.length()).count {
+            digestBefore.getJSONObject(it).getBoolean("isHistoryOnly")
+        })
+
+        database.deleteHistoryForApp("com.example.chat")
+        val after = JSONArray(database.getEventsJson(0))
+        assertEquals(2, after.length())
+        val digestAfter = JSONArray(database.getDigestJson(100000)).getJSONObject(0).getJSONArray("events")
+        assertEquals(1, digestAfter.length())
+        assertEquals("Scheduled", digestAfter.getJSONObject(0).getString("title"))
+    }
+
+    @Test
+    fun versionTwoUpgradeKeepsExistingRowsWithoutHistoryClassification() {
+        database.close()
+        context.openOrCreateDatabase(name, Context.MODE_PRIVATE, null).use { db ->
+            db.execSQL("""
+                CREATE TABLE notification_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, package_name TEXT NOT NULL,
+                    app_name TEXT, title TEXT, message TEXT, sub_text TEXT, category TEXT,
+                    post_time_ms INTEGER NOT NULL, notification_key TEXT, conversation_key TEXT,
+                    action TEXT NOT NULL, reason TEXT, rule_name TEXT, time_window TEXT,
+                    window_id INTEGER, is_group_summary INTEGER NOT NULL DEFAULT 0, delivery TEXT
+                )
+            """.trimIndent())
+            db.execSQL("""
+                INSERT INTO notification_events(package_name,title,post_time_ms,action)
+                VALUES('com.example.chat','Before upgrade',1000,'allowed')
+            """.trimIndent())
+            db.version = 2
+        }
+        database = NotiflowDatabase(context, name)
+        val events = JSONArray(database.getEventsJson(0))
+        assertEquals(1, events.length())
+        assertEquals("Before upgrade", events.getJSONObject(0).getString("title"))
+        assertFalse(events.getJSONObject(0).getBoolean("isHistoryOnly"))
+    }
+
+    @Test
     fun groupSummaryRepeatingAMessageIsHidden() {
         val message = event("child", 2000)
         val summary = message.copy(notificationKey = "summary", postTimeMs = 2010, isGroupSummary = true)

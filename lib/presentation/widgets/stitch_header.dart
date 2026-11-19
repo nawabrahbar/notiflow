@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../main.dart';
@@ -101,6 +103,107 @@ class StitchHeader extends StatelessWidget implements PreferredSizeWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Softens content at the top of its scroll viewport without blurring the header.
+class HeaderScrollTransition extends StatefulWidget {
+  const HeaderScrollTransition({
+    super.key,
+    required this.child,
+    this.backgroundColor,
+  });
+
+  final Widget child;
+  final Color? backgroundColor;
+
+  @override
+  State<HeaderScrollTransition> createState() => _HeaderScrollTransitionState();
+}
+
+class _HeaderScrollTransitionState extends State<HeaderScrollTransition> {
+  bool _scrolled = false;
+
+  void _updateScroll(ScrollMetrics metrics, int depth) {
+    if (depth != 0 || metrics.axis != Axis.vertical) return;
+    final scrolled = metrics.extentBefore > 0;
+    if (_scrolled != scrolled) setState(() => _scrolled = scrolled);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = widget.backgroundColor ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.darkBackground
+            : AppTheme.lightBackground);
+
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (notification) {
+        _updateScroll(notification.metrics, notification.depth);
+        return false;
+      },
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          _updateScroll(notification.metrics, notification.depth);
+          return false;
+        },
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            widget.child,
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 24,
+              child: IgnorePointer(
+                child: ExcludeSemantics(
+                  child: AnimatedOpacity(
+                    key: const ValueKey('header-scroll-fade'),
+                    opacity: _scrolled ? 1 : 0,
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 150),
+                    child: ClipRect(
+                      child: ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (bounds) => const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white,
+                            Colors.white,
+                            Colors.transparent,
+                          ],
+                          stops: [0, 0.2, 1],
+                        ).createShader(bounds),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  bg,
+                                  bg.withValues(alpha: 0.65),
+                                  bg.withValues(alpha: 0),
+                                ],
+                                stops: const [0, 0.35, 1],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

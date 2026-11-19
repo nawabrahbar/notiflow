@@ -46,7 +46,8 @@ String _conversationKey(Map<String, dynamic> event) {
   final conversation = (event['conversationKey'] as String? ?? '').trim();
   final title = (event['notifTitle'] as String? ?? '').trim();
   final who = conversation.isNotEmpty ? 'c:$conversation' : 't:$title';
-  return '${event['packageName']}|${event['isBlocked'] == true}|$who';
+  return '${event['packageName']}|${event['isBlocked'] == true}|'
+      '${event['isHistoryOnly'] == true}|$who';
 }
 
 int _timestampMs(Map<String, dynamic> event) =>

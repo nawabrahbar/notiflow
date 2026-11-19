@@ -12,6 +12,7 @@ class ManagedApp {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isDormantVault;
+  final bool isHistoryOnly;
 
   const ManagedApp({
     required this.id,
@@ -23,6 +24,7 @@ class ManagedApp {
     required this.createdAt,
     required this.updatedAt,
     this.isDormantVault = false,
+    this.isHistoryOnly = false,
   });
 
   ManagedApp copyWith({
@@ -35,6 +37,7 @@ class ManagedApp {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isDormantVault,
+    bool? isHistoryOnly,
   }) {
     return ManagedApp(
       id: id ?? this.id,
@@ -46,6 +49,7 @@ class ManagedApp {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isDormantVault: isDormantVault ?? this.isDormantVault,
+      isHistoryOnly: isHistoryOnly ?? this.isHistoryOnly,
     );
   }
 
@@ -60,6 +64,7 @@ class ManagedApp {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isDormantVault': isDormantVault,
+      'isHistoryOnly': isHistoryOnly,
     };
   }
 
@@ -76,6 +81,7 @@ class ManagedApp {
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       isDormantVault: json['isDormantVault'] as bool? ?? false,
+      isHistoryOnly: json['isHistoryOnly'] as bool? ?? false,
     );
   }
 
@@ -87,9 +93,11 @@ class ManagedApp {
           id == other.id &&
           packageName == other.packageName &&
           displayName == other.displayName &&
-          enabled == other.enabled;
+          enabled == other.enabled &&
+          isHistoryOnly == other.isHistoryOnly;
 
   @override
   int get hashCode =>
-      id.hashCode ^ packageName.hashCode ^ displayName.hashCode ^ enabled.hashCode;
+      id.hashCode ^ packageName.hashCode ^ displayName.hashCode ^
+      enabled.hashCode ^ isHistoryOnly.hashCode;
 }

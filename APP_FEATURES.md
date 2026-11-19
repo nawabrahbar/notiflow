@@ -10,6 +10,8 @@
 
 ## 1. Executive Overview & Core Philosophy
 
+**Installed app version:** Settings reads Android package metadata through `getAppVersion`; the phone footer, tablet version/build card and Licenses use that same result. Update `version` in `pubspec.yaml` for releases; Flutter's `--build-name` / `--build-number` overrides are also reflected automatically. While loading, Settings shows a loading label; metadata failures are logged and show **Version unavailable**, never a stale hardcoded version.
+
 **Notiflow** is an offline, privacy-first notification scheduler and focus manager built with Flutter. It grants users deterministic, schedule-based control over notifications from specific installed apps while leaving unmanaged apps completely untouched.
 
 ### Core Pillars
@@ -36,7 +38,7 @@ Notiflow consists of **11 dedicated screens/pages** structured across a startup 
 | **7** | **Add Apps Screen** (`AddAppsScreen`) | Sub-Screen (from Rules) | Device app discovery, search filtering, category chips, batch app addition |
 | **8** | **App Details Screen** (`AppDetailsScreen`) | Sub-Screen | App master toggle, quick mute pills, schedule list |
 | **9** | **Schedule Rule Editor** (`ScheduleEditorScreen`) | Sub-Screen | BLOCK vs ALLOW modes, time pickers with overnight math, 7-day selector pills |
-| **10** | **Activity / History Screen** (`ActivityScreen`) | Tab 3 | Chronological 30-day triage feed with All / Silenced / Allowed / Digest filters |
+| **10** | **Activity / History Screen** (`ActivityScreen`) | Tab 3 | Chronological 30-day triage feed with All / Digest / History / Silenced / Allowed filters |
 | **11** | **Settings Screen** (`SettingsScreen`) | Tab 4 | Engine health, battery guides, storage badges, Saved Rules (fixed *Focus Hours* default; other saved rules can be fully edited in *Edit Saved Rule* or deleted), export/import backups, reset |
 
 ### Key Interactive Modals
@@ -233,6 +235,7 @@ flowchart TD
     - **Multi-select delete**: long-pressing a card shows a selection bar with a select-all checkbox, *"N Selected"* and a red delete icon (icon only, no label or background) that asks *"Delete N Rules?"* before deleting.
     - **Uninstalled apps**: if an app with rules is uninstalled, its card turns grey, shows an `UNINSTALLED` badge instead of the status, and the toggle is disabled. Tapping still opens the details so the rule can be deleted; reinstalling the app restores the card.
   * **Add App (floating button, Rules tab)**: *"Add app"* button (`rules-add-app-fab`, same colours and style as *Apply rules*) stacked above *Apply rules*, bottom-right; opens `AddAppsScreen`. It replaces the old *"+ Add App"* text button in the MANAGED APPS header, shrinks to an icon with *Apply rules* while scrolling down, hides during multi-select, and only shows once at least one app is managed (the empty state keeps its big *Add Apps* button).
+  * **Floating-button transitions (phone and tablet)**: Add app and Apply rules animate their width and text opacity together over 250 ms, keeping the right edges anchored; interrupted transitions reverse smoothly. Reduced-motion settings switch immediately instead.
   * **Apply rules (floating button, Rules tab)**: bottom-right *"Apply rules"* button (`rules-apply-fab`) that applies one or more saved rules to many apps in one go. It shrinks to an icon while scrolling down, expands on scroll up, and hides during multi-select; the list has extra bottom space so the last card isn't covered. It opens **Apply Rules** (`BulkApplyScreen`, `lib/presentation/screens/bulk_apply_screen.dart`):
     - **Phone**: 3 steps with a step indicator (1. Rules → 2. Apps → 3. Review) and Back / Next / Apply. Step 1 picks saved rules (each with a summary like *"Block · 9:00 AM - 5:00 PM · Mon-Fri"*), or **New rule** creates one in the Schedule Rule Editor (*New Rule*) and comes back with it selected (a same-schedule rule offers *Use <rule>* instead). Step 2 picks apps (Notiflow apps first, then installed apps), with search, category chips and Select all / Clear. Step 3 reviews *"N rules → M apps"* and *"X new schedules · Y already applied"*, marking apps that will be added with **NEW**.
     - **Tablet**: rules and apps panels side by side with a bottom review bar and **Apply**.
@@ -243,7 +246,7 @@ flowchart TD
 
 ### Page 7: Add Apps Screen (`AddAppsScreen`)
 
-* **Purpose**: Scans installed applications on the device and enables users to add apps to Notiflow in batches.
+* **Purpose**: Discovers installed apps for scheduling or opt-in History-only recording; also hosts the History app manager.
 * **Visual & Functional Elements**:
   * **Search bar (bottom, phone and tablet)**: Pill-shaped bar at the bottom of the page with the hint "Search" and a search icon, like the launcher app drawer. Live substring filtering by app label or package name. The bar floats over the list with a frosted blur, the list scrolls underneath it, and the list fades out at its top and bottom edges instead of being cut. Extra space at the end of the list lets the last app scroll fully above the bar.
   * **Category Filter Chips**:
@@ -252,11 +255,14 @@ flowchart TD
   * **App Discovery List**:
     - Uses the shared installed-apps list (loaded in the background when the dashboard opens), so the list appears instantly.
     - Icons load in screen-sized batches: about two screens first (computed from the real viewport, so a tablet's 2-column grid loads more), then the next batch when the user scrolls about halfway through what's loaded. Fast flings skip fetching; search or category changes fetch the visible matches first.
-    - Displays extracted app icons, app names, package IDs, and selection checkboxes.
-    - Already-managed apps are marked with an *"Already Managed"* badge.
-  * **Sticky Bottom Action Bar**:
-    - Displays selected count: *"Add (X) Apps to Focus Shield"*.
-    - Batch adds selected apps and returns to Dashboard.
+    - Prefetch windows are serviced in serial batches of at most eight icons, yielding a frame between batches. Only icons whose bytes change rebuild when results arrive, not the whole page or app rows; fixed icon slots preserve the list layout. See the first-pass scrolling investigation in [`docs/installed-apps-cache.md`](docs/installed-apps-cache.md).
+    - Displays extracted app icons, app names and category labels, with **Add** or **Manage** actions.
+    - Add offers **Set up rules** or **Record history only**. History-only apps show **History on** and **Manage**.
+  * **History app manager**: Activity → History → **Manage apps** opens this picker with recording checkboxes. Existing scheduling apps show **Using rules** instead of a checkbox, preserving their current settings.
+    - Unchecking or choosing **Stop recording** keeps existing notifications. Missing tracked apps remain manageable.
+    - **Add rules** opens the existing schedule editor and promotes the app only when saved; cancellation leaves recording unchanged.
+    - **Delete recorded history** requires confirmation, keeps recording on, and deletes only that package's History-source notifications from Activity and Digest.
+    - Explanation: *"Save this app's notification history without setting up rules. Quick Mute still applies."* Details: [`docs/history-only.md`](docs/history-only.md).
 
 ---
 
@@ -275,6 +281,7 @@ flowchart TD
     - Quick toggle switch to activate or deactivate individual rules.
     - Delete button to remove rules.
   * **Add Rule FAB (`+ Add Schedule`)**: Navigates to `ScheduleEditorScreen`.
+  * **Floating Done button** (`app-details-done-fab`): always-expanded bottom-right action on phone and tablet, replacing the old bottom-of-form *Save Changes* button. App settings already save immediately; Done only returns to the previous page, or Rules if opened as the root page. Bottom padding keeps the final Remove action clear of the button.
 
 ---
 
@@ -296,7 +303,7 @@ flowchart TD
     - 7 individual day toggle pills (`M`, `T`, `W`, `T`, `F`, `S`, `S`).
   * **Exceptions & Escalation**:
     - **Allow urgent repeated calls**: Passes priority alerts through if received twice within 3 minutes.
-  * **Save Rule Action**: Validates input, saves to local storage, and syncs to the native engine.
+  * **Floating Save action** (`schedule-save-fab`): always-expanded bottom-right button on phone and tablet, visible without scrolling and positioned above the keyboard when open. Replaces the inline *Save Schedule Rule*, *Update Schedule Rule*, *Save Changes* and *Save Rule* buttons. All four modes keep their existing validation, duplicate handling, persistence and navigation/return values; the button disables and shows a spinner while saving. Saved-rule explanatory text remains in the form, and bottom padding keeps the final controls clear.
 
 ---
 
@@ -307,11 +314,13 @@ flowchart TD
   * **Top Metrics Row**:
     - `Intercepted` counter, `Focus Gain` score, and `Leak Rate` percentage.
   * **Filter Bar**:
-    - Segmented filter controls: `All`, `Silenced Only`, `Allowed Only`.
+    - Filters in order: `All`, `Digest`, `History`, `Silenced`, `Allowed`.
+    - **History** shows events captured through History-only tracking, not every event for currently selected apps. A floating **Manage apps** button appears only here, with Rules-style colours and the shared smooth scroll-driven label animation.
   * **Notification Event Stream**:
     - App icon, notification title, timestamp, and action badge (`SILENCED` in amber/coral, `ALLOWED` in green).
+    - A separate **History** badge identifies the stored capture source on cards and in the inspector. Quick Mute can silence these entries; All / History / Silenced share the same stored notification, not copies. Stopping recording or adding rules does not relabel old events.
     - Triage reasoning tag: e.g. *"Blocked by 'Work Focus' rule"*, *"Allowed: Outside schedule"*, *"Muted by quick override"*.
-    - **Conversation grouping**: back-to-back messages from the same app and person/chat with the same status, each within 30 minutes of the previous one, share one card showing *"time · N messages"* and the latest message. The arrow next to the sender expands the card in place to show every message; tapping the card opens the details sheet. Filter chips count messages; *"N Events"* counts cards.
+    - **Conversation grouping**: back-to-back messages from the same app and person/chat with the same status and capture source, each within 30 minutes of the previous one, share one card showing *"time · N messages"* and the latest message. The arrow next to the sender expands the card in place to show every message; tapping the card opens the details sheet. Filter chips count messages; *"N Events"* counts cards.
     - Group-summary copies of a message and the user's own replies are not logged.
     - The log shows immediately; app names and icons come from the shared installed-apps list, and only icons of apps in the log are fetched.
     - Entries from apps that are no longer installed are greyed out and labelled *"Uninstalled"*.
@@ -356,6 +365,14 @@ flowchart TD
   * Clear explanation of Android 13+'s restricted settings security feature for non-Play Store APKs.
   * **Step 1 Button (`Open App Info`)**: Directly launches Notiflow's system App Info page via `ACTION_APPLICATION_DETAILS_SETTINGS`. Instructs the user to tap `⋮` (top-right menu) $\rightarrow$ select *"Allow restricted settings"* $\rightarrow$ authenticate with PIN/fingerprint.
   * **Step 2 Button (`Open Notification Access`)**: Directly opens Notification Access via `ACTION_NOTIFICATION_LISTENER_SETTINGS` where the toggle switch is now enabled.
+
+### Borderless headers and soft scroll edges
+* Headers retain the single-page look: no bottom border, divider or added shadow. Titles and theme controls stay sharp.
+* `HeaderScrollTransition` in `lib/presentation/widgets/stitch_header.dart` softens the top **24 dp** of a scrolling viewport with a clipped, lightly blurred backdrop (sigma 4) and a gradient into the surrounding surface.
+* The effect appears only after vertical content has scrolled away from the top, fades in/out over **150 ms**, and disappears completely at the top. Reduced-motion mode switches immediately. Restored scroll positions and viewport/content size changes are handled; horizontal filters do not activate it.
+* Applied on phone and tablet to Dashboard, Rules, Settings, App Details, every schedule editor mode, Activity/Digest, Add Apps/History management, bulk rule panels/review, permission recovery, onboarding and import. Fixed filters and panel headings remain outside the effect: the transition follows their list's actual clipping edge.
+* Add Apps keeps its existing frosted bottom search bar and bottom list fade; its top edge uses the shared transition rather than stacking two fades.
+* The strip ignores pointer input and adds no layout padding or accessibility content, so taps, scrolling, floating buttons and keyboard placement keep their existing behavior.
 
 ### Toasts (`AppToast`, `lib/presentation/widgets/app_toast.dart`)
 * **One place**: every screen calls `AppToast.show(context, message:, type:, actionLabel:)`. Look, motion and timing live only in this file, so a change there applies app-wide. A test fails if any screen calls `showSnackBar` directly.

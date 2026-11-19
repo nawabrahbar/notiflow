@@ -33,6 +33,7 @@ Every push to `main` is automatically built and published by GitHub Actions. You
   - **ALLOW Mode (`allowDuring` / `allDayAllow`)**: Only allow notifications during the specified window and silence them at all other times.
 - **Overnight Schedule Math**: Seamlessly handles schedules that cross midnight (e.g., `20:00` to `08:00` the next morning) with day-of-week awareness.
 - **7-Day Recurrence & Quick Presets**: Select individual days (`M` `T` `W` `T` `F` `S` `S`) or one-tap presets (*Everyday*, *Weekdays*, *Weekends*) with custom rule names.
+- **Always-Visible Form Actions**: App Details has a floating **Done** button (changes save immediately); every Schedule Rule Editor mode has a floating **Save** button. Both remain expanded on phone and tablet, stay clear of the last controls and move above the keyboard when open. Existing save behaviour is unchanged.
 - **Apply Rules to Many Apps**: The floating *Apply rules* button on the Rules tab applies one or more saved rules to many apps in one go (phone: Rules → Apps → Review steps; tablet: side by side). Duplicates are skipped, and a result sheet lets you undo a single rule, a whole app or the entire batch. See [`docs/apply-rules.md`](docs/apply-rules.md).
 
 ### 2. Notification Activity Log & Local Vault
@@ -42,8 +43,9 @@ Every push to `main` is automatically built and published by GitHub Actions. You
   - **Full Message Body** (supports multi-line `EXTRA_BIG_TEXT` and inbox-style lines)
   - **Channel / Subtext** (e.g., conversation or account name)
   - **Exact Timestamp** and **Triage Rule Reason** (e.g., `Blocked by ‘Work Focus’ rule (09:00 - 17:00)` or `Silenced by Global Mute override`)
-- **Conversation Cards**: Back-to-back messages from the same app and person (same status, within 30 minutes of each other) are grouped into one expandable card. Duplicate group summaries and your own replies are not logged.
-- **Real-Time Feed & Filters**: Live-updating stream with **All**, **Silenced**, **Allowed** and **Digest** filter chips, pull-to-refresh, and focus metrics (*Intercepted*, *Focus Gain*, *0% Leak Rate*).
+- **History-only Recording**: Add Apps → Add → **Record history only** saves notifications without app-specific rules. **Quick Mute still applies.** Activity → History → floating **Manage apps** lets you select apps, stop recording without deleting entries, add rules, or separately confirm deletion of recorded history. History-only apps stay out of Rules until scheduling is added. See [`docs/history-only.md`](docs/history-only.md).
+- **Conversation Cards**: Back-to-back messages from the same app and person (same status and capture source, within 30 minutes of each other) are grouped into one expandable card. Duplicate group summaries and your own replies are not logged.
+- **Real-Time Feed & Filters**: Live-updating stream with **All**, **Digest**, **History**, **Silenced**, **Allowed** filter chips, in that order. History entries retain a **History** badge alongside their actual delivery status, even after recording stops or rules are added; overlapping filters share one stored event.
 - **30-Day On-Device History**: Events live in a private SQLite database (`notiflow.db`) and are pruned automatically after 30 days.
 - **Catch-Up Digest (in-app)**: When a rule window ends, the **Digest** filter shows one card per app and window with the number of unique notifications it silenced. Messaging apps come first, new windows are marked until opened, and the **Dashboard** shows "N silenced notifications — Review now".
 - **Interactive Notification Inspector**: Tap any recorded notification card to open a bottom sheet with full selectable message text (`SelectableText` for copying OTPs/messages) and a one-tap **Open App** button.
@@ -53,7 +55,7 @@ Every push to `main` is automatically built and published by GitHub Actions. You
 - **Per-App Instant Mute Pills**: Temporarily mute any individual app for **15m**, **30m**, **1h**, or **Today 24h** from the App Details screen without altering recurring schedules.
 
 ### 4. Rules Backup & Portability (`.notiflow`)
-- **Export `.notiflow` Backup File**: Serialize all managed apps, schedules, and preferences into a `.notiflow` file (`notiflow_backup_<timestamp>.notiflow`) and save it directly to your chosen folder on device storage via Android's native Storage Access Framework (`Intent.ACTION_CREATE_DOCUMENT`).
+- **Export `.notiflow` Backup File**: Serialize all managed apps (including History-only selections), schedules, and preferences into a `.notiflow` file (`notiflow_backup_<timestamp>.notiflow`) and save it directly to your chosen folder on device storage via Android's native Storage Access Framework (`Intent.ACTION_CREATE_DOCUMENT`). Notification content is not included.
 - **1-Tap Import from Storage**: Settings → Import opens the system file picker directly (`Intent.ACTION_OPEN_DOCUMENT`) and restores the selected `.notiflow` file in place, then shows an **Import complete** bottom sheet listing imported apps, apps waiting for install, skipped apps and saved rules.
 
 ### 5. 100% On-Device Privacy, Semantic Feedback & Zero Telemetry
@@ -97,16 +99,20 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 ## 📋 Changelog & Recent Updates
 
+- **v1.6.2 (`+12`) — History Capture & UI Polish**:
+  - **History-only apps**: record notifications without app-specific blocking rules; global Quick Mute still applies. Activity filters are **All · Digest · History · Silenced · Allowed**, with History badges and a floating Manage apps action. See [`docs/history-only.md`](docs/history-only.md).
+  - **Consistent surfaces**: themed Add app / History action sheets and soft, scroll-aware transitions beneath borderless headers throughout the app.
+  - **Automatic version display**: Settings reads the installed Android package version and build number, including build-time overrides, instead of maintaining separate hardcoded labels.
 - **v1.6.1 (`+11`) — Shared Installed-Apps Cache, Faster Activity Log & Uninstalled-App Handling**:
   - **Shared installed-apps cache**: one app-wide list loads in the background after the dashboard appears; icons are fetched on demand and only changed packages refresh on resume.
   - **Faster Activity log**: entries show immediately; log and digest load in parallel off the Android main thread.
-  - **Add Apps**: icons load in screen-sized batches (phone and tablet); frosted bottom search bar with edge fade.
+  - **Add Apps**: viewport-based icon prefetching (phone and tablet) runs in serial batches of at most eight, yielding a frame between batches. Arriving icons update individually without rebuilding the page or app rows; frosted bottom search bar and edge fade are preserved.
   - **Uninstalled apps**: Rules cards and Activity entries grey out with an "Uninstalled" label; the rule stays until deleted.
   - **Swipe to delete**: swipe an Activity log or Digest card from left to right to delete it, with Undo; deleted messages leave both the log and the digest.
   - **New toasts**: one shared `AppToast` (`lib/presentation/widgets/app_toast.dart`) replaces every SnackBar. It is a rounded card with a type icon, message, × (or Undo) and a countdown bar. It slides in from the left, slides out to the right after 3 s (4 s with Undo, at once on ×), and floats above everything, including the phone nav bar, dialogs and sheets.
   - **Quick Mute · All apps**: replaces the old Quick Session Overrides on the Dashboard (phone and tablet). It mutes every app for 15m, 30m or 1h, then shows a live "All apps muted · N min left" card with +15m and End now. Repeat callers (a 2nd call within 3 min) now ring through during these mutes when "Let repeat callers ring through" is on.
   - **Import summary sheet**: after a successful `.notiflow` import (Settings or onboarding), an **Import complete** bottom sheet replaces the success toast. Collapsible sections (all expanded at first) show Imported apps with rule counts, apps Waiting for install (vaulted; each has a × to remove it from the vault after a confirmation dialog), Skipped apps (excluded) and Saved rules, with View Rules and Done buttons. `ScheduleRepository.importRulesWithReport` returns the `ImportReport` behind it.
-  - **Rules page Add App button**: the *"+ Add App"* text button in the MANAGED APPS header is now a floating **Add app** button above *Apply rules* (shrinks on scroll, hidden in multi-select and when no apps are managed).
+  - **Rules page Add App button**: the *"+ Add App"* text button in the MANAGED APPS header is now a floating **Add app** button above *Apply rules* (shrinks on scroll, hidden in multi-select and when no apps are managed). Both buttons animate their width and text opacity together over 250 ms with anchored right edges, or switch immediately when reduced motion is enabled.
   - **Apply rules to many apps**: new floating *Apply rules* button on the Rules tab (shrinks while scrolling, hidden in multi-select). It opens a wizard (`BulkApplyScreen`) to pick saved rules (or create a new one with **New rule**, which is saved and selected) and apps, with review counts (*"X new schedules · Y already applied"*), then a **Rules applied** sheet with per-rule ×, per-app undo and Undo all. Pre-existing schedules and apps are never removed. `ScheduleRepository.applyTemplatesToApps` / `removeBulkAppliedRules` back it. Spec: [`docs/apply-rules.md`](docs/apply-rules.md).
 - **v1.6.0 (`+10`) — Botanical Sanctuary Redesign, Rule Templates, Tablet Expansion & Native Hardening**:
   - **Botanical Sanctuary & Nocturne Redesign**: Warm Canvas (`#FEF8F6`) / Deep Forest (`#101412`), Terracotta (`#7D562D` / `#FCBC76`), and Sage Green (`#5A6242` / `#BECCA3`) with elegant Newsreader display serifs and Plus Jakarta Sans body typography.

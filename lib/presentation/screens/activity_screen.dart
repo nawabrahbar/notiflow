@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../data/services/installed_apps_cache.dart';
@@ -10,10 +11,12 @@ import '../../platform/android_notification_platform.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
 import '../widgets/app_toast.dart';
+import '../widgets/animated_fab_label.dart';
+import 'add_apps_screen.dart';
 
 /// Activity Screen (Audit Trail) adhering strictly to Botanical Sanctuary / Nocturne design:
 /// - Responsive: Multi-column tablet layout (>= 600dp) with top 3-metric bento spread and wide audit cards
-/// - Filter bar (All, Silenced, Allowed, Digest) with count badges & Clear Log action
+/// - Filter bar (All, Digest, History, Silenced, Allowed) & Clear Log action
 /// - Digest: one card per finished rule window with the unique notifications it silenced
 /// - Real native app icons from PackageManager
 /// - Notification details inspector bottom sheet
@@ -33,7 +36,8 @@ class ActivityScreen extends StatefulWidget {
 
 class ActivityScreenState extends State<ActivityScreen>
     with WidgetsBindingObserver {
-  String _selectedFilter = 'all'; // 'all', 'silenced', 'allowed', 'digest'
+  String _selectedFilter = 'all';
+  bool _historyFabExtended = true;
   final List<Map<String, dynamic>> _events = [];
   final List<DigestWindow> _digest = [];
   final Map<int, List<Map<String, dynamic>>> _digestEvents = {};
@@ -241,6 +245,7 @@ class ActivityScreenState extends State<ActivityScreen>
         'fullDateTime': _formatFullDateTime(dt),
         'timestampMs': tsMs,
         'isBlocked': isBlocked,
+        'isHistoryOnly': raw['isHistoryOnly'] == true,
         'reason': reason,
       };
     }
@@ -273,14 +278,69 @@ class ActivityScreenState extends State<ActivityScreen>
 
   int get _silencedCount => _events.where((e) => e['isBlocked'] == true).length;
   int get _allowedCount => _events.where((e) => e['isBlocked'] == false).length;
+  int get _historyCount => _events.where((e) => e['isHistoryOnly'] == true).length;
 
   List<Map<String, dynamic>> get _filteredEvents {
-    if (_selectedFilter == 'silenced') {
+    if (_selectedFilter == 'history') {
+      return _events.where((e) => e['isHistoryOnly'] == true).toList();
+    } else if (_selectedFilter == 'silenced') {
       return _events.where((e) => e['isBlocked'] == true).toList();
     } else if (_selectedFilter == 'allowed') {
       return _events.where((e) => e['isBlocked'] == false).toList();
     }
     return _events;
+  }
+
+  void _selectFilter(String filter) {
+    setState(() {
+      _selectedFilter = filter;
+      _historyFabExtended = true;
+    });
+  }
+
+  bool _onActivityScroll(UserScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical ||
+        notification.direction == ScrollDirection.idle) {
+      return false;
+    }
+    final extended = notification.direction == ScrollDirection.forward;
+    if (extended != _historyFabExtended) {
+      setState(() => _historyFabExtended = extended);
+    }
+    return false;
+  }
+
+  Future<void> _manageHistoryApps() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => AddAppsScreen(
+        repository: widget.repository,
+        historyManagement: true,
+      ),
+    ));
+    if (mounted) await _loadNativeEvents();
+  }
+
+  Widget _historyBadge(bool isDark) {
+    return Container(
+      key: const ValueKey('activity-history-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppTheme.darkSecondaryContainer
+            : AppTheme.lightSecondaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        'History',
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: isDark
+              ? AppTheme.darkOnSecondaryContainer
+              : AppTheme.lightOnSecondaryContainer,
+        ),
+      ),
+    );
   }
 
   void _confirmClearActivity() {
@@ -572,6 +632,10 @@ class ActivityScreenState extends State<ActivityScreen>
                   ),
                 ],
               ),
+              if (evt['isHistoryOnly'] == true) ...[
+                const SizedBox(height: 8),
+                _historyBadge(isDark),
+              ],
               const SizedBox(height: 20),
               if (groupEvents.length > 1) ...[
                 Text(
@@ -768,7 +832,27 @@ class ActivityScreenState extends State<ActivityScreen>
       backgroundColor: bg,
       appBar:
           widget.isEmbedded ? null : const StitchHeader(title: 'Activity Log'),
-      body: SafeArea(
+      floatingActionButton: _selectedFilter != 'history'
+          ? null
+          : FloatingActionButton.extended(
+              key: const ValueKey('history-manage-apps-fab'),
+              heroTag: 'history-manage-apps-fab',
+              onPressed: _manageHistoryApps,
+              tooltip: 'Manage history apps',
+              backgroundColor: primary,
+              foregroundColor:
+                  isDark ? AppTheme.darkOnPrimary : AppTheme.lightOnPrimary,
+              extendedIconLabelSpacing: 0,
+              extendedPadding: const EdgeInsets.symmetric(horizontal: 18),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              icon: const Icon(Icons.apps_rounded),
+              label: AnimatedFabLabel(
+                  extended: _historyFabExtended, label: 'Manage apps'),
+            ),
+      body: NotificationListener<UserScrollNotification>(
+        onNotification: _onActivityScroll,
+        child: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final isTablet = constraints.maxWidth >= 600;
@@ -845,14 +929,17 @@ class ActivityScreenState extends State<ActivityScreen>
                                     _buildFilterPill('all', 'All',
                                         _events.length, isDark),
                                     const SizedBox(width: 6),
+                                    _buildFilterPill('digest', 'Digest',
+                                        _digest.length, isDark),
+                                    const SizedBox(width: 6),
+                                    _buildFilterPill('history', 'History',
+                                        _historyCount, isDark),
+                                    const SizedBox(width: 6),
                                     _buildFilterPill('silenced', 'Silenced',
                                         _silencedCount, isDark),
                                     const SizedBox(width: 6),
                                     _buildFilterPill('allowed', 'Allowed',
                                         _allowedCount, isDark),
-                                    const SizedBox(width: 6),
-                                    _buildFilterPill('digest', 'Digest',
-                                        _digest.length, isDark),
                                   ],
                                 ),
                               ),
@@ -913,7 +1000,9 @@ class ActivityScreenState extends State<ActivityScreen>
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      'Notifications intercepted or permitted will appear here in real-time.',
+                                      _selectedFilter == 'history'
+                                          ? 'Use Manage apps to choose apps to record. Quick Mute still applies.'
+                                          : 'Notifications intercepted or permitted will appear here in real-time.',
                                       textAlign: TextAlign.center,
                                       style: GoogleFonts.plusJakartaSans(
                                         fontSize: 12.5,
@@ -923,9 +1012,11 @@ class ActivityScreenState extends State<ActivityScreen>
                                   ],
                                 ),
                               )
-                            : ListView.builder(
-                                padding: const EdgeInsets.only(
-                                    top: 4, bottom: 24),
+                            : HeaderScrollTransition(
+                              child: ListView.builder(
+                                padding: EdgeInsets.only(
+                                    top: 4,
+                                    bottom: _selectedFilter == 'history' ? 96 : 24),
                                 itemCount: events.length,
                                 itemBuilder: (context, index) {
                                   final evt = events[index];
@@ -1058,6 +1149,23 @@ class ActivityScreenState extends State<ActivityScreen>
                                                     ),
                                                   ],
                                                 ),
+                                                if (evt['isHistoryOnly'] == true) ...[
+                                                  const SizedBox(height: 4),
+                                                  Wrap(
+                                                    spacing: 6,
+                                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                                    children: [
+                                                      _historyBadge(isDark),
+                                                      Text(
+                                                        isBlocked ? 'Silenced' : 'Allowed',
+                                                        style: GoogleFonts.plusJakartaSans(
+                                                          fontSize: 10,
+                                                          color: textMuted,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                                 const SizedBox(height: 2),
                                                 Text(
                                                   (evt['notifMessage']
@@ -1089,6 +1197,7 @@ class ActivityScreenState extends State<ActivityScreen>
                                   );
                                 },
                               ),
+                              ),
                       ),
                     ],
                   ),
@@ -1097,6 +1206,7 @@ class ActivityScreenState extends State<ActivityScreen>
             );
           },
         ),
+      ),
       ),
     );
   }
@@ -1115,7 +1225,8 @@ class ActivityScreenState extends State<ActivityScreen>
     Widget filterPill(String key, String label, int count) {
       final selected = _selectedFilter == key;
       return GestureDetector(
-        onTap: () => setState(() => _selectedFilter = key),
+        key: ValueKey('activity-filter-$key'),
+        onTap: () => _selectFilter(key),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           height: 32,
@@ -1158,11 +1269,13 @@ class ActivityScreenState extends State<ActivityScreen>
             children: [
               filterPill('all', 'All', _events.length),
               const SizedBox(width: 8),
+              filterPill('digest', 'Digest', _digest.length),
+              const SizedBox(width: 8),
+              filterPill('history', 'History', _historyCount),
+              const SizedBox(width: 8),
               filterPill('silenced', 'Silenced', _silencedCount),
               const SizedBox(width: 8),
               filterPill('allowed', 'Allowed', _allowedCount),
-              const SizedBox(width: 8),
-              filterPill('digest', 'Digest', _digest.length),
             ],
           ),
         ),
@@ -1238,9 +1351,17 @@ class ActivityScreenState extends State<ActivityScreen>
           child: isDigest
               ? _buildDigestList(isDark, textMain, textMuted)
               : events.isEmpty
-              ? _buildPhoneEmptyState(isDark, textMain, textMuted)
-              : ListView.separated(
-                  padding: const EdgeInsets.only(bottom: 24),
+              ? _buildPhoneEmptyState(
+                  isDark, textMain, textMuted,
+                  message: _selectedFilter == 'history'
+                      ? 'No history recorded yet. Use Manage apps to choose apps. '
+                          'Quick Mute still applies.'
+                      : 'No notifications matching this filter or the log was recently refreshed.',
+                )
+              : HeaderScrollTransition(
+                child: ListView.separated(
+                  padding: EdgeInsets.only(
+                      bottom: _selectedFilter == 'history' ? 96 : 24),
                   itemCount: events.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 14),
                   itemBuilder: (context, index) => _swipeToDelete(
@@ -1250,6 +1371,7 @@ class ActivityScreenState extends State<ActivityScreen>
                     child: _buildPhoneEventCard(
                         events[index], isDark, textMain, textMuted),
                   ),
+                ),
                 ),
         ),
       ],
@@ -1296,7 +1418,8 @@ class ActivityScreenState extends State<ActivityScreen>
             'Nothing to catch up on. When a rule ends, the notifications it silenced are grouped here by app.',
       );
     }
-    return ListView.separated(
+    return HeaderScrollTransition(
+      child: ListView.separated(
       padding: const EdgeInsets.only(top: 4, bottom: 24),
       itemCount: _digest.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
@@ -1306,7 +1429,7 @@ class ActivityScreenState extends State<ActivityScreen>
         onDelete: () => _deleteDigestWindow(_digest[index]),
         child: _buildDigestCard(_digest[index], isDark, textMain, textMuted),
       ),
-    );
+    ));
   }
 
   Widget _buildDigestCard(DigestWindow window, bool isDark, Color textMain,
@@ -1726,6 +1849,10 @@ class ActivityScreenState extends State<ActivityScreen>
                 ),
               ],
             ),
+            if (evt['isHistoryOnly'] == true) ...[
+              const SizedBox(height: 8),
+              _historyBadge(isDark),
+            ],
             if (title.isNotEmpty || message.isNotEmpty || reason.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
@@ -1898,7 +2025,8 @@ class ActivityScreenState extends State<ActivityScreen>
         : AppTheme.lightOnSurfaceVariant;
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = key),
+      key: ValueKey('activity-filter-$key'),
+      onTap: () => _selectFilter(key),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

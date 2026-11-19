@@ -18,7 +18,7 @@ Title **Apply Rules**. The system Back button and the back arrow close the wizar
 A step indicator at the top reads **1. Rules → 2. Apps → 3. Review**. The bottom bar has **Back** and **Next**, and on the last step **Apply**.
 
 1. **Choose rules**: *"Pick saved rules or create a new one."* Every saved rule (including the default *Focus Hours*) is shown with a summary such as *"Block · 9:00 AM - 5:00 PM · Mon-Fri"* or *"Allow all day · Everyday"*. Tap a rule to select it; you can select several.
-   * **New rule** (first tile, `bulk-new-rule`): opens the Schedule Rule Editor as **New Rule** (empty name, *Save Rule* button). Saving adds it to Settings → Saved Rules and returns to the wizard with the new rule already selected. If the same behaviour, times and days are already saved, a dialog offers **Use <rule>** to select that rule instead, since saved rules can't share the same schedule.
+   * **New rule** (first tile, `bulk-new-rule`): opens the Schedule Rule Editor as **New Rule** (empty name, always-visible floating **Save** button, `schedule-save-fab`). The button stays expanded on phone and tablet and moves above the keyboard; the saved-rule explanation remains in the scrollable form. Saving adds it to Settings → Saved Rules and returns to the wizard with the new rule already selected. If the same behaviour, times and days are already saved, a dialog offers **Use <rule>** to select that rule instead, since saved rules can't share the same schedule.
 2. **Choose apps**: shows Notiflow apps first, then other installed apps.
    * Search field, category chips (*All apps, Messaging, Social, Productivity, Other, System*), and **Select all / Clear**, which act on the filtered list.
    * Each app shows its status: *"Managed · N rules"*, *"Managed · no rules"* or *"Not managed yet"*.
@@ -67,6 +67,16 @@ After **Apply**, the wizard closes and a **Rules applied** bottom sheet opens on
 | Wizard UI and `savedRuleSummary` | `lib/presentation/screens/bulk_apply_screen.dart` |
 | Result sheet and undo | `lib/presentation/widgets/bulk_apply_result_sheet.dart` |
 | Floating button | `lib/presentation/screens/dashboard_screen.dart` (`_buildApplyRulesFab`, `_openBulkApply`) |
+
+## Floating-button transition fix
+
+**Reported and implemented:** 19 Nov 2026.
+
+- **Observed:** on the Rules page, both floating buttons (Add app and Apply rules) abruptly switch between labels and icons instead of smoothly expanding and collapsing.
+- **Reproduce:** with enough managed apps to scroll, scroll downward to collapse the buttons, then upward to expand them. Expansion follows the scroll direction; reaching the top is not required.
+- **Confirmed in code:** `DashboardScreen._onRulesScroll` changes `_fabExtended` immediately. Both buttons pass that flag to `FloatingActionButton.extended.isExtended`. The inspected Flutter SDK conditionally inserts/removes the label and spacing without an animated size/opacity transition.
+- **Implemented:** keep the extended button mounted and animate the label's horizontal size (including its spacing) and opacity together over 250 ms with an ease-in-out curve. Both buttons keep their right edges anchored and animate in sync. Colours, actions, spacing and multi-select visibility are unchanged on phone and tablet. Reduced-motion settings disable the transition.
+- **Regression coverage:** phone and tablet tests check intermediate widths, synchronized progress, anchored right edges, collapsed widths and interrupted/reversed transitions. A reduced-motion test checks immediate collapse. Existing wizard and Add Apps navigation tests remain in place.
 
 ## Possible follow-ups (not built)
 

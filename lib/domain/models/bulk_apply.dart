@@ -24,6 +24,7 @@ class BulkApplyAppResult {
 
   /// True when the app wasn't managed before and was added by this batch.
   final bool appAdded;
+  final bool wasHistoryOnly;
 
   /// Schedules created by this batch.
   final List<ScheduleRule> addedRules;
@@ -34,6 +35,7 @@ class BulkApplyAppResult {
   const BulkApplyAppResult({
     required this.app,
     required this.appAdded,
+    this.wasHistoryOnly = false,
     required this.addedRules,
     required this.skipped,
   });

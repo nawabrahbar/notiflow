@@ -109,7 +109,10 @@ class _BulkApplyScreenState extends State<BulkApplyScreen> {
 
   /// Managed apps first, then every other installed app.
   List<_Candidate> _candidates() {
-    final managed = [...widget.repository.managedApps]
+    final managed = [
+      ...widget.repository.managedApps,
+      ...widget.repository.historyApps.where((a) => !a.isDormantVault),
+    ]
       ..sort((a, b) =>
           a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
     final managedPkgs = {for (final a in managed) a.packageName};
@@ -393,7 +396,11 @@ class _BulkApplyScreenState extends State<BulkApplyScreen> {
               : '${_plural(_ruleIds.length, 'rule')} selected',
         ),
         Expanded(
-          child: ListView.separated(
+          child: HeaderScrollTransition(
+            backgroundColor: MediaQuery.sizeOf(context).width >= 600
+                ? p.containerLow
+                : p.bg,
+            child: ListView.separated(
             padding: const EdgeInsets.only(bottom: 16),
             itemCount: templates.length + 2,
             separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -442,6 +449,7 @@ class _BulkApplyScreenState extends State<BulkApplyScreen> {
                 subtitle: savedRuleSummary(widget.repository, t),
               );
             },
+          ),
           ),
         ),
       ],
@@ -546,7 +554,11 @@ class _BulkApplyScreenState extends State<BulkApplyScreen> {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: !_cache.isLoaded && all.isEmpty
+          child: HeaderScrollTransition(
+            backgroundColor: MediaQuery.sizeOf(context).width >= 600
+                ? p.containerLow
+                : p.bg,
+            child: !_cache.isLoaded && all.isEmpty
               ? Center(child: CircularProgressIndicator(color: p.primary))
               : shown.isEmpty
                   ? Center(
@@ -598,6 +610,7 @@ class _BulkApplyScreenState extends State<BulkApplyScreen> {
                         );
                       },
                     ),
+          ),
         ),
       ],
     );
@@ -654,7 +667,8 @@ class _BulkApplyScreenState extends State<BulkApplyScreen> {
       );
     }
 
-    return ListView(
+    return HeaderScrollTransition(
+      child: ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
         _stepHeading(p, 3, 'Review', 'Check everything before applying.'),
@@ -780,7 +794,7 @@ class _BulkApplyScreenState extends State<BulkApplyScreen> {
             ),
         ]),
       ],
-    );
+    ));
   }
 
   Widget _applyButton(_Palette p, List<_Candidate> all,

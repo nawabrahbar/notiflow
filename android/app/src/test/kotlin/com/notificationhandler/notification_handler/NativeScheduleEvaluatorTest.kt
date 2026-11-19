@@ -9,6 +9,36 @@ import java.util.Calendar
 class NativeScheduleEvaluatorTest {
 
     @Test
+    fun historyOnlyAllowsAndRemainsEligibleForRecording() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload("""
+            {"managedApps":[{"id":"history","packageName":"com.example.chat","enabled":true,"isHistoryOnly":true}],
+             "schedules":[],"overrides":[],"unmanagedAppsUntouched":false}
+        """.trimIndent())
+        val decision = evaluator.evaluateNotification("com.example.chat", System.currentTimeMillis())
+        assertFalse(decision.shouldBlock)
+        assertTrue(decision.isManagedOrOverridden)
+        assertTrue(evaluator.isHistoryOnlyPackage("com.example.chat"))
+        assertFalse(evaluator.isHistoryOnlyPackage("com.unknown"))
+    }
+
+    @Test
+    fun globalQuickMuteStillSilencesHistoryOnly() {
+        val evaluator = NativeScheduleEvaluator()
+        evaluator.parsePayload("""
+            {"managedApps":[{"id":"history","packageName":"com.example.chat","enabled":true,"isHistoryOnly":true}],
+             "schedules":[],"overrides":[
+               {"id":"mute","appId":"global_mute","mode":"block",
+                "startDateTime":"2026-01-01T00:00:00Z","endDateTime":"2030-01-01T00:00:00Z"}]}
+        """.trimIndent())
+        val decision = evaluator.evaluateNotification("com.example.chat", 1795000000000L)
+        assertTrue(decision.shouldBlock)
+        assertTrue(decision.isManagedOrOverridden)
+        assertEquals("Global Mute", decision.ruleName)
+        assertTrue(evaluator.isHistoryOnlyPackage("com.example.chat"))
+    }
+
+    @Test
     fun testUnmanagedAppReturnsFalse() {
         val evaluator = NativeScheduleEvaluator()
         evaluator.parsePayload("""
