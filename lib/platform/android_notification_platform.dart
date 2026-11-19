@@ -237,6 +237,20 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
     }
   }
 
+  /// Reads installed package metadata, including Flutter build overrides.
+  static Future<({String version, String buildNumber})> fetchAppVersion() async {
+    final raw = await _channel.invokeMapMethod<String, dynamic>('getAppVersion');
+    final version = raw?['version'];
+    final buildNumber = raw?['buildNumber'];
+    if (version is! String ||
+        version.trim().isEmpty ||
+        buildNumber is! String ||
+        buildNumber.trim().isEmpty) {
+      throw const FormatException('Installed app version is unavailable.');
+    }
+    return (version: version, buildNumber: buildNumber);
+  }
+
   /// Catch-up digest notification settings, or null when unavailable.
   static Future<DigestNotificationSettings?> fetchDigestSettings() async {
     try {
@@ -351,6 +365,14 @@ class AndroidNotificationPlatform implements NotificationPlatformInterface {
     } on Exception {
       // No-op when running in tests or non-Android platform
     }
+  }
+
+  /// Deletes only notifications captured in History-only mode for one package.
+  static Future<void> deleteHistoryForApp(String packageName) async {
+    await _channel.invokeMethod<void>(
+      'deleteHistoryForApp',
+      {'packageName': packageName},
+    );
   }
 
   /// Deletes everything the given digest windows silenced.

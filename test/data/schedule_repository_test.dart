@@ -463,6 +463,106 @@ void main() {
     expect(repository.findDuplicateTemplate(saved), isNull);
   });
 
+  group('History-only recording', () {
+    const pkg = 'com.example.history';
+
+    Future<ManagedApp> start() async {
+      await repository.startHistoryOnly(packageName: pkg, displayName: 'History App');
+      return repository.historyApps.single;
+    }
+
+    ScheduleRule ruleFor(String appId) => ScheduleRule(
+      id: 'history-rule',
+      appId: appId,
+      mode: ScheduleMode.allDayBlock,
+      startTime: const TimeOfDayValue(hour: 0, minute: 0),
+      endTime: const TimeOfDayValue(hour: 23, minute: 59),
+      daysOfWeek: {1, 2, 3, 4, 5, 6, 7},
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+    );
+
+    test('persists and syncs capture without adding an app to Rules', () async {
+      final app = await start();
+      await repository.startHistoryOnly(packageName: pkg, displayName: 'History App');
+      expect(repository.managedApps, isEmpty);
+      expect(repository.allManagedApps.single.id, app.id);
+      expect(repository.schedules, isEmpty);
+      expect(mockPlatform.lastSyncedApps.single.isHistoryOnly, isTrue);
+
+      final restarted = ScheduleRepository(platformService: mockPlatform);
+      await restarted.initialize();
+      expect(restarted.historyApps.single.id, app.id);
+      final backup = restarted.exportRulesJson();
+      expect(await restarted.importRulesJson(backup), isTrue);
+      expect(restarted.historyApps.single.id, app.id);
+      expect(restarted.managedApps, isEmpty);
+
+      await restarted.stopHistoryOnly(app.id);
+      expect(restarted.allManagedApps, isEmpty);
+      expect(mockPlatform.lastSyncedApps, isEmpty);
+    });
+
+    test('saving rules promotes the existing app and protects its schedules', () async {
+      final app = await start();
+      await repository.saveRule(ruleFor(app.id));
+      expect(repository.historyApps, isEmpty);
+      expect(repository.managedApps.single.id, app.id);
+      expect(mockPlatform.lastSyncedApps.single.isHistoryOnly, isFalse);
+      await expectLater(repository.stopHistoryOnly(app.id), throwsStateError);
+      await expectLater(
+        repository.startHistoryOnly(packageName: pkg, displayName: 'History App'),
+        throwsStateError,
+      );
+      expect(repository.schedules.single.appId, app.id);
+    });
+
+    test('bulk apply and undo preserve the previous capture mode and identity', () async {
+      final app = await start();
+      final result = await repository.applyTemplatesToApps(
+        templates: [RuleTemplate.defaultWorkFocus],
+        targets: [const BulkApplyTarget(packageName: pkg, displayName: 'History App')],
+      );
+      expect(result.apps.single.wasHistoryOnly, isTrue);
+      expect(result.apps.single.appAdded, isFalse);
+      expect(repository.managedApps.single.id, app.id);
+      await repository.removeBulkAppliedRules(
+        result.apps.single.addedRules.map((r) => r.id),
+        historyAppIds: {app.id},
+      );
+      expect(repository.historyApps.single.id, app.id);
+      expect(repository.managedApps, isEmpty);
+      expect(repository.schedules, isEmpty);
+    });
+
+    test('merging scheduled backup promotes History using the existing app ID', () async {
+      final app = await start();
+      final incoming = app.copyWith(id: 'different-id', isHistoryOnly: false);
+      expect(await repository.importRulesJson(jsonEncode({
+        'managedApps': [incoming.toJson()],
+        'schedules': [ruleFor(incoming.id).toJson()],
+      }), replaceAll: false), isTrue);
+      expect(repository.allManagedApps.single.id, app.id);
+      expect(repository.schedules.single.appId, app.id);
+      expect(repository.historyApps, isEmpty);
+    });
+
+    test('inconsistent backup retains rules and does not activate a missing app', () async {
+      final app = await start();
+      mockPlatform.installedApps = const [
+        DiscoveredAppInfo(packageName: 'com.other', displayName: 'Other'),
+      ];
+      expect(await repository.importRulesJson(jsonEncode({
+        'managedApps': [app.toJson()],
+        'schedules': [ruleFor(app.id).toJson()],
+      })), isTrue);
+      expect(repository.allManagedApps.single.isHistoryOnly, isFalse);
+      expect(repository.allManagedApps.single.isDormantVault, isTrue);
+      expect(repository.schedules.single.appId, app.id);
+      expect(mockPlatform.lastSyncedApps, isEmpty);
+    });
+  });
+
   group('bulk apply', () {
     final night = RuleTemplate(
       id: 'tpl_night',

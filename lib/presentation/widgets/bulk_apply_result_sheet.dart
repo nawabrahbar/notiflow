@@ -44,6 +44,10 @@ class _BulkApplyResultSheetState extends State<BulkApplyResultSheet> {
     for (final a in widget.result.apps)
       if (a.appAdded) a.app.id,
   };
+  late final Set<String> _historyAppIds = {
+    for (final a in widget.result.apps)
+      if (a.wasHistoryOnly) a.app.id,
+  };
 
   @override
   void initState() {
@@ -144,6 +148,7 @@ class _BulkApplyResultSheetState extends State<BulkApplyResultSheet> {
     await widget.repository.removeBulkAppliedRules(
       [rule.id],
       addedAppIds: _addedAppIds,
+      historyAppIds: _historyAppIds,
     );
     if (!mounted) return;
     AppToast.show(context, message: 'Removed $ruleName from $name');
@@ -166,6 +171,7 @@ class _BulkApplyResultSheetState extends State<BulkApplyResultSheet> {
     await widget.repository.removeBulkAppliedRules(
       live.map((r) => r.id),
       addedAppIds: _addedAppIds,
+      historyAppIds: _historyAppIds,
     );
     if (!mounted) return;
     AppToast.show(context, message: 'Undid changes to $name');
@@ -184,6 +190,7 @@ class _BulkApplyResultSheetState extends State<BulkApplyResultSheet> {
     await widget.repository.removeBulkAppliedRules(
       live.map((r) => r.id),
       addedAppIds: _addedAppIds,
+      historyAppIds: _historyAppIds,
     );
     if (!mounted) return;
     AppToast.show(

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAnimatedOpacity;
 import 'package:notification_handler/data/services/installed_apps_cache.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,6 +81,8 @@ class MockPlatformService implements NotificationPlatformInterface {
   @override
   Future<Map<String, Uint8List>> getAppIcons(List<String> packageNames) async {
     iconRequests++;
+    iconBatches.add(List.of(packageNames));
+    await iconsGate?.future;
     return {
       for (final a in installedApps)
         if (packageNames.contains(a.packageName) && a.iconBytes != null)
@@ -96,6 +99,8 @@ class MockPlatformService implements NotificationPlatformInterface {
   int changeSequence = 0;
   List<String> changedPackages = [];
   int iconRequests = 0;
+  final List<List<String>> iconBatches = [];
+  Completer<void>? iconsGate;
 
   @override
   Future<PackageChanges?> getChangedPackages(int sequenceNumber) async =>
@@ -449,6 +454,485 @@ void main() {
 
     // Verify app was deleted
     expect(repository.managedApps.any((a) => a.id == 'app_test_chat'), isFalse);
+  });
+
+  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+    for (final size in [const Size(390, 844), const Size(800, 1100)]) {
+      testWidgets('Header transition softens only scrolled content ($mode, $size)', (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        final controller = ScrollController();
+        addTearDown(() {
+          controller.dispose();
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+        var tappedItem = -1;
+        var headerTaps = 0;
+        await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: mode,
+          home: Scaffold(
+            appBar: StitchHeader(
+              title: 'Settings',
+              showThemeToggle: false,
+              actions: [
+                IconButton(
+                  key: const ValueKey('header-action'),
+                  onPressed: () => headerTaps++,
+                  icon: const Icon(Icons.settings),
+                ),
+              ],
+            ),
+            body: HeaderScrollTransition(
+              child: ListView.builder(
+                controller: controller,
+                itemExtent: 64,
+                itemCount: 40,
+                itemBuilder: (_, i) => GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => tappedItem = i,
+                  child: Text('Item $i'),
+                ),
+              ),
+            ),
+          ),
+        ));
+        await flushFontsAndSettle(tester);
+        final fade = find.byKey(const ValueKey('header-scroll-fade'));
+        double opacity() => tester.renderObject<RenderAnimatedOpacity>(fade).opacity.value;
+        final headerRect = tester.getRect(find.byType(StitchHeader));
+        final listRect = tester.getRect(find.byType(ListView));
+        final firstRect = tester.getRect(find.text('Item 0'));
+        expect(opacity(), 0);
+
+        controller.jumpTo(140);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 75));
+        expect(opacity(), inExclusiveRange(0, 1));
+        await tester.pumpAndSettle();
+        expect(opacity(), 1);
+        expect(tester.getRect(fade).height, 24);
+        expect(tester.getRect(fade).top, listRect.top);
+        expect(tester.getRect(find.byType(StitchHeader)), headerRect);
+        // The softened strip must not intercept taps on the list underneath.
+        await tester.tapAt(Offset(listRect.left + 20, listRect.top + 18));
+        expect(tappedItem, 2);
+        await tester.tap(find.byKey(const ValueKey('header-action')));
+        expect(headerTaps, 1);
+
+        controller.jumpTo(0);
+        await tester.pumpAndSettle();
+        expect(opacity(), 0);
+        expect(tester.getRect(find.text('Item 0')), firstRect);
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('Add app sheet follows the app theme ($mode, $size)', (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+        mockPlatform.installedApps = const [
+          DiscoveredAppInfo(packageName: 'com.fresh', displayName: 'Fresh App'),
+        ];
+        await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: mode,
+          home: AddAppsScreen(repository: repository),
+        ));
+        await flushFontsAndSettle(tester);
+        await tester.tap(find.byKey(const ValueKey('add-app-com.fresh')));
+        await flushFontsAndSettle(tester);
+
+        final sheet = find.byKey(const ValueKey('app-action-sheet'));
+        final decoration = tester.widget<Container>(sheet).decoration! as BoxDecoration;
+        final isDark = mode == ThemeMode.dark;
+        expect(decoration.color, isDark
+            ? AppTheme.darkSurfaceContainerLow : AppTheme.lightSurfaceContainerLow);
+        final title = tester.widget<Text>(find.descendant(
+          of: sheet, matching: find.text('Fresh App'),
+        ));
+        expect(title.style!.fontFamily, contains('Newsreader'));
+        expect(title.style!.color,
+            isDark ? AppTheme.darkOnSurface : AppTheme.lightOnSurface);
+        final label = tester.widget<Text>(find.text('Set up rules'));
+        expect(label.style!.fontFamily, contains('PlusJakartaSans'));
+        expect(label.style!.color, title.style!.color);
+        expect(tester.getSize(sheet).width, lessThanOrEqualTo(560));
+        expect(tester.getRect(find.text('Record history only')).bottom,
+            lessThanOrEqualTo(size.height));
+
+        await tester.tap(find.byKey(const ValueKey('history-action-rules')));
+        await tester.pump();
+        await flushFontsAndSettle(tester);
+        expect(find.byType(AppDetailsScreen), findsOneWidget);
+        expect(repository.managedApps.single.packageName, 'com.fresh');
+        expect(repository.historyApps, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final size in [const Size(390, 844), const Size(1024, 1100)]) {
+    testWidgets('Settings uses installed app version metadata ($size)', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      const channel = MethodChannel('com.notificationhandler/bridge');
+      final metadata = Completer<Map<String, String>>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'getAppVersion') return metadata.future;
+        return null;
+      });
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+      await tester.pumpWidget(wrapWithTheme(SettingsScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+      final isTablet = size.width >= 600;
+      await tester.scrollUntilVisible(
+        find.text(isTablet ? 'Notiflow Loading version...' : 'Loading version...'),
+        400,
+      );
+      metadata.complete({'version': '9.8.7', 'buildNumber': '321'});
+      await flushFontsAndSettle(tester);
+      expect(find.text(isTablet ? 'Notiflow v9.8.7' : 'v9.8.7'), findsOneWidget);
+      expect(find.textContaining('1.6.0'), findsNothing);
+      if (isTablet) {
+        expect(find.textContaining('Build 321 '), findsOneWidget);
+        await tester.ensureVisible(find.byKey(const ValueKey('settings-licenses')));
+        await tester.tap(find.byKey(const ValueKey('settings-licenses')));
+        await tester.pump();
+        await flushFontsAndSettle(tester);
+        expect(tester.widget<LicensePage>(find.byType(LicensePage)).applicationVersion, 'v9.8.7');
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final malformed in [false, true]) {
+    testWidgets('Settings reports unavailable version instead of stale data (malformed: $malformed)', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      const channel = MethodChannel('com.notificationhandler/bridge');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'getAppVersion') {
+          if (malformed) return {'version': '9.8.7'};
+          throw PlatformException(code: 'APP_VERSION_UNAVAILABLE');
+        }
+        return null;
+      });
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+      await tester.pumpWidget(wrapWithTheme(SettingsScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+      await tester.scrollUntilVisible(find.text('Version unavailable'), 400);
+      expect(find.text('Version unavailable'), findsOneWidget);
+      expect(find.textContaining('v1.6.'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Header transition restores scroll state, respects reduced motion and clears after resize', (tester) async {
+    final controller = ScrollController(initialScrollOffset: 140);
+    final count = ValueNotifier(40);
+    addTearDown(controller.dispose);
+    addTearDown(count.dispose);
+    await tester.pumpWidget(MaterialApp(
+      home: MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: Scaffold(
+          body: HeaderScrollTransition(
+            child: ValueListenableBuilder<int>(
+              valueListenable: count,
+              builder: (_, items, _) => ListView.builder(
+                controller: controller,
+                itemCount: items,
+                itemExtent: 64,
+                itemBuilder: (_, i) => Text('Item $i'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump();
+    final fade = find.byKey(const ValueKey('header-scroll-fade'));
+    double opacity() => tester.renderObject<RenderAnimatedOpacity>(fade).opacity.value;
+    expect(opacity(), 1);
+    controller.jumpTo(0);
+    await tester.pump();
+    expect(opacity(), 0);
+    controller.jumpTo(140);
+    await tester.pump();
+    expect(opacity(), 1);
+    count.value = 2;
+    await tester.pumpAndSettle();
+    expect(controller.offset, 0);
+    expect(opacity(), 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Header transition ignores horizontal filter scrolling', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: HeaderScrollTransition(
+          child: ListView(
+            children: [
+              SizedBox(
+                height: 100,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (var i = 0; i < 20; i++)
+                      SizedBox(width: 120, child: Text('Filter $i')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 1400),
+            ],
+          ),
+        ),
+      ),
+    ));
+    await tester.drag(find.text('Filter 0'), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    final fade = find.byKey(const ValueKey('header-scroll-fade'));
+    expect(tester.renderObject<RenderAnimatedOpacity>(fade).opacity.value, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(390, 1000), const Size(800, 1100)]) {
+    testWidgets('History filters use stored source and preserve delivery status ($size)', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      const channel = MethodChannel('com.notificationhandler/bridge');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method != 'getActivityLog') return null;
+        return jsonEncode([
+          for (var i = 0; i < 3; i++)
+            {
+              'id': '$i',
+              'packageName': 'com.example.history',
+              'appName': 'History App',
+              'timestampMs': 1795000000000 - i * 60000,
+              'isBlocked': i == 1,
+              'isHistoryOnly': i < 2,
+              'title': ['History allowed', 'History silenced', 'Rules allowed'][i],
+              'message': 'Message $i',
+            },
+        ]);
+      });
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+      await repository.startHistoryOnly(
+          packageName: 'com.example.history', displayName: 'History App');
+      await tester.pumpWidget(wrapWithTheme(ActivityScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+
+      expect(find.byKey(const ValueKey('activity-history-badge')), findsNWidgets(2));
+      expect(find.byKey(const ValueKey('history-manage-apps-fab')), findsNothing);
+      final all = find.byKey(const ValueKey('activity-filter-all'));
+      final digest = find.byKey(const ValueKey('activity-filter-digest'));
+      final history = find.byKey(const ValueKey('activity-filter-history'));
+      final silenced = find.byKey(const ValueKey('activity-filter-silenced'));
+      final allowed = find.byKey(const ValueKey('activity-filter-allowed'));
+      expect(tester.getTopLeft(all).dx, lessThan(tester.getTopLeft(digest).dx));
+      expect(tester.getTopLeft(digest).dx, lessThan(tester.getTopLeft(history).dx));
+      expect(tester.getTopLeft(history).dx, lessThan(tester.getTopLeft(silenced).dx));
+      expect(tester.getTopLeft(silenced).dx, lessThan(tester.getTopLeft(allowed).dx));
+
+      await tester.tap(history);
+      await flushFontsAndSettle(tester);
+      expect(find.textContaining('Rules allowed'), findsNothing);
+      expect(find.textContaining('History allowed'), findsOneWidget);
+      expect(find.textContaining('History silenced'), findsOneWidget);
+      expect(find.byKey(const ValueKey('history-manage-apps-fab')), findsOneWidget);
+      await repository.stopHistoryOnly(repository.historyApps.single.id);
+      await flushFontsAndSettle(tester);
+      expect(find.byKey(const ValueKey('activity-history-badge')), findsNWidgets(2));
+
+      await tester.ensureVisible(silenced);
+      await tester.tap(silenced);
+      await flushFontsAndSettle(tester);
+      expect(find.textContaining('History silenced'), findsOneWidget);
+      expect(find.textContaining('History allowed'), findsNothing);
+      expect(find.byKey(const ValueKey('history-manage-apps-fab')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('History Manage apps button animates and opens the picker ($size)', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      const channel = MethodChannel('com.notificationhandler/bridge');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+        if (call.method != 'getActivityLog') return null;
+        return jsonEncode([
+          for (var i = 0; i < 40; i++)
+            {
+              'id': '$i', 'packageName': 'com.example.history', 'appName': 'History App',
+              'timestampMs': 1795000000000 - i * 60000,
+              'isBlocked': false, 'isHistoryOnly': true, 'title': 'Message $i',
+            },
+        ]);
+      });
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null);
+      });
+      await tester.pumpWidget(wrapWithTheme(ActivityScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('activity-filter-history')));
+      await flushFontsAndSettle(tester);
+      final fab = find.byKey(const ValueKey('history-manage-apps-fab'));
+      final original = tester.getRect(fab);
+      final scroll = find.byType(ListView).last;
+      await tester.drag(scroll, const Offset(0, -180));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getSize(fab).width, inExclusiveRange(60, original.width));
+      expect(tester.getRect(fab).right, closeTo(original.right, 0.01));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(fab).width, closeTo(60, 0.01));
+      await tester.drag(scroll, const Offset(0, 100));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(fab).width, closeTo(original.width, 0.01));
+      await tester.tap(fab);
+      await flushFontsAndSettle(tester);
+      expect(find.text('Manage history apps'), findsOneWidget);
+      expect(tester.widget<AddAppsScreen>(find.byType(AddAppsScreen)).historyManagement, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('History Add choice and cancelled promotion keep recording ($size)', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      mockPlatform.installedApps = const [
+        DiscoveredAppInfo(packageName: 'com.example.history', displayName: 'History App'),
+      ];
+      await tester.pumpWidget(wrapWithTheme(AddAppsScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('add-app-com.example.history')));
+      await flushFontsAndSettle(tester);
+      expect(repository.allManagedApps, isEmpty);
+      expect(find.text('Set up rules'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('history-action-history')));
+      await flushFontsAndSettle(tester);
+      expect(repository.managedApps, isEmpty);
+      final id = repository.historyApps.single.id;
+      expect(find.text('History on'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('history-manage-com.example.history')));
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('history-action-add-rules')));
+      await flushFontsAndSettle(tester);
+      expect(find.byType(ScheduleEditorScreen), findsOneWidget);
+      expect(repository.historyApps.single.id, id);
+      Navigator.of(tester.element(find.byType(ScheduleEditorScreen))).pop();
+      await flushFontsAndSettle(tester);
+      expect(repository.historyApps.single.id, id);
+      expect(repository.schedules, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('History checkboxes add recording without changing existing paused rules apps', (tester) async {
+    mockPlatform.installedApps = const [
+      DiscoveredAppInfo(packageName: 'com.fresh', displayName: 'Fresh'),
+      DiscoveredAppInfo(packageName: 'com.rules', displayName: 'Rules App'),
+    ];
+    await repository.addApp(ManagedApp(
+      id: 'rules', packageName: 'com.rules', displayName: 'Rules App',
+      enabled: false, createdAt: DateTime(2026), updatedAt: DateTime(2026),
+    ));
+    await tester.pumpWidget(wrapWithTheme(AddAppsScreen(
+      repository: repository, historyManagement: true,
+    )));
+    await flushFontsAndSettle(tester);
+    expect(find.text('Using rules'), findsOneWidget);
+    expect(find.byKey(const ValueKey('history-toggle-com.rules')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('history-toggle-com.fresh')));
+    await flushFontsAndSettle(tester);
+    expect(repository.historyApps.single.packageName, 'com.fresh');
+    expect(repository.managedApps.single.enabled, isFalse);
+    expect(repository.schedules, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('History manager separates stop from confirmed deletion and reports errors', (tester) async {
+    tester.view.physicalSize = const Size(390, 1000);
+    tester.view.devicePixelRatio = 1;
+    const channel = MethodChannel('com.notificationhandler/bridge');
+    final deletes = <String>[];
+    var failDeletion = true;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'deleteHistoryForApp') {
+        if (failDeletion) throw PlatformException(code: 'FAILED', message: 'History could not be deleted');
+        deletes.add((call.arguments as Map)['packageName'] as String);
+      }
+      return null;
+    });
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+    // Missing from the installed list: still removable in the manager.
+    await repository.startHistoryOnly(
+        packageName: 'com.example.history', displayName: 'History App');
+    await tester.pumpWidget(wrapWithTheme(AddAppsScreen(
+      repository: repository, historyManagement: true,
+    )));
+    await flushFontsAndSettle(tester);
+    final manage = find.byKey(const ValueKey('history-manage-com.example.history'));
+    Future<void> requestDeletion() async {
+      await tester.tap(manage);
+      await flushFontsAndSettle(tester);
+      await tester.tap(find.byKey(const ValueKey('history-action-delete')));
+      await flushFontsAndSettle(tester);
+      expect(deletes, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('history-delete-confirm')));
+      await tester.pump();
+      await pumpFor(tester, const Duration(milliseconds: 350));
+    }
+    await requestDeletion();
+    expect(find.text('History could not be deleted'), findsOneWidget);
+    expect(repository.historyApps, hasLength(1));
+    failDeletion = false;
+    await requestDeletion();
+    expect(deletes, ['com.example.history']);
+    expect(repository.historyApps, hasLength(1));
+    await tester.tap(find.byKey(const ValueKey('history-toggle-com.example.history')));
+    await flushFontsAndSettle(tester);
+    expect(repository.historyApps, isEmpty);
+    expect(deletes, hasLength(1));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('ActivityScreen displays Clear Log button in events section and handles empty state', (WidgetTester tester) async {
@@ -1264,7 +1748,15 @@ void main() {
 
       double top(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(top('Remove from Rules Page'), greaterThan(top('Add Schedule Rule')));
-      expect(top('Remove from Rules Page'), lessThan(top('Save Changes')));
+      final done = find.byKey(const ValueKey('app-details-done-fab'));
+      expect(done.hitTestable(), findsOneWidget);
+      expect(find.text('Save Changes'), findsNothing);
+      expect(tester.getBottomLeft(find.text('Remove from Rules Page')).dy,
+          lessThan(tester.getTopLeft(done).dy));
+      await tester.tap(done);
+      await tester.pump();
+      await flushFontsAndSettle(tester);
+      expect(find.byType(MainNavigationShell), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   }
@@ -1450,6 +1942,140 @@ void main() {
     expect(find.byType(AppDetailsScreen), findsOneWidget);
   });
 
+  for (final size in [const Size(390, 844), const Size(1024, 900)]) {
+    testWidgets('Rules buttons animate together with anchored right edges ($size)', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      for (var i = 0; i < 20; i++) {
+        await repository.addApp(ManagedApp(
+          id: 'app_$i',
+          packageName: 'com.app$i',
+          displayName: 'App $i',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        ));
+      }
+      await tester.pumpWidget(wrapWithTheme(DashboardScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+      final add = find.byKey(const ValueKey('rules-add-app-fab'));
+      final apply = find.byKey(const ValueKey('rules-apply-fab'));
+      final initialAdd = tester.getRect(add);
+      final initialApply = tester.getRect(apply);
+      final scroll = find.byType(Scrollable).first;
+
+      await tester.drag(scroll, const Offset(0, -180));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      final midAdd = tester.getRect(add);
+      final midApply = tester.getRect(apply);
+      expect(midAdd.width, inExclusiveRange(60, initialAdd.width));
+      expect(midApply.width, inExclusiveRange(60, initialApply.width));
+      expect(midAdd.right, closeTo(initialAdd.right, 0.01));
+      expect(midApply.right, closeTo(initialApply.right, 0.01));
+      expect(
+        (midAdd.width - 60) / (initialAdd.width - 60),
+        closeTo((midApply.width - 60) / (initialApply.width - 60), 0.001),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getSize(add).width, closeTo(60, 0.01));
+      expect(tester.getSize(apply).width, closeTo(60, 0.01));
+
+      await tester.drag(scroll, const Offset(0, 100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.getSize(add).width, inExclusiveRange(60, initialAdd.width));
+      await tester.drag(scroll, const Offset(0, -60));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(add).width, closeTo(60, 0.01));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Add Apps icons update without rebuilding rows or shifting the list ($size)', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final icon = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
+      );
+      mockPlatform.installedApps = [
+        for (var i = 0; i < 100; i++)
+          DiscoveredAppInfo(
+            packageName: 'com.app$i',
+            displayName: 'App $i',
+            iconBytes: icon,
+          ),
+      ];
+      mockPlatform.iconsGate = Completer<void>();
+      await tester.pumpWidget(wrapWithTheme(AddAppsScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+
+      final add = find.byKey(const ValueKey('add-app-com.app0'));
+      final buttonBefore = tester.widget(add);
+      final rectBefore = tester.getRect(add);
+      final position = tester.state<ScrollableState>(find.byType(Scrollable).last).position;
+      final offsetBefore = position.pixels;
+      mockPlatform.iconsGate!.complete();
+      await flushFontsAndSettle(tester);
+      expect(identical(tester.widget(add), buttonBefore), isTrue,
+          reason: 'icon arrivals must not rebuild the page or app rows');
+      expect(tester.getRect(add), rectBefore);
+      expect(position.pixels, offsetBefore);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('app-icon-com.app0')),
+          matching: find.byType(Image),
+        ),
+        findsOneWidget,
+      );
+      expect(mockPlatform.iconBatches, isNotEmpty);
+      expect(mockPlatform.iconBatches.every((b) => b.length <= 8), isTrue);
+      expect(mockPlatform.iconBatches.expand((b) => b).toSet().length,
+          lessThan(mockPlatform.installedApps.length),
+          reason: 'prefetch remains viewport-bounded, not all apps up front');
+      final requests = mockPlatform.iconRequests;
+      await InstalledAppsCache.instance.loadIcons(mockPlatform.iconBatches.expand((b) => b));
+      expect(mockPlatform.iconRequests, requests, reason: 'loaded icons stay cached');
+
+      final list = find.byType(Scrollable).last;
+      await tester.fling(list, const Offset(0, -350), 1500);
+      await flushFontsAndSettle(tester);
+      await tester.enterText(find.byType(TextField), 'App 99');
+      await flushFontsAndSettle(tester);
+      expect(find.byKey(const ValueKey('add-app-com.app99')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Rules buttons respect reduced motion', (tester) async {
+    for (var i = 0; i < 20; i++) {
+      await repository.addApp(ManagedApp(
+        id: 'app_$i',
+        packageName: 'com.app$i',
+        displayName: 'App $i',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      ));
+    }
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.darkTheme,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(disableAnimations: true),
+        child: child!,
+      ),
+      home: DashboardScreen(repository: repository),
+    ));
+    await flushFontsAndSettle(tester);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
+    await tester.pump();
+    expect(tester.getSize(find.byKey(const ValueKey('rules-add-app-fab'))).width,
+        closeTo(60, 0.01));
+    expect(tester.getSize(find.byKey(const ValueKey('rules-apply-fab'))).width,
+        closeTo(60, 0.01));
+  });
+
   test('InstalledAppsCache fetches icons once and flags uninstalled apps only after loading', () async {
     final cache = InstalledAppsCache.instance;
     mockPlatform.installedApps = [
@@ -1550,12 +2176,13 @@ void main() {
     (name: 'light tablet', size: const Size(1024, 1300), mode: ThemeMode.light),
     (name: 'dark tablet', size: const Size(1024, 1300), mode: ThemeMode.dark),
   ]) {
-    testWidgets('Schedule editor aligns rule name and puts save button last (${scenario.name})', (WidgetTester tester) async {
+    testWidgets('Schedule editor aligns rule name and keeps Save visible (${scenario.name})', (WidgetTester tester) async {
       tester.view.physicalSize = scenario.size;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() {
         tester.view.resetPhysicalSize();
         tester.view.resetDevicePixelRatio();
+        tester.view.resetViewInsets();
       });
 
       await tester.pumpWidget(MaterialApp(
@@ -1566,6 +2193,9 @@ void main() {
       ));
       await flushFontsAndSettle(tester);
 
+      final button = find.byKey(const ValueKey('schedule-save-fab'));
+      expect(button.hitTestable(), findsOneWidget);
+      final initialButton = tester.getRect(button);
       expect(find.byIcon(Icons.arrow_back_rounded), findsNothing);
       final dropdown = find.byKey(const ValueKey('template-dropdown'));
       final dropdownRect = tester.getRect(dropdown);
@@ -1588,14 +2218,169 @@ void main() {
       final iconCenter = tester.getCenter(find.byIcon(Icons.edit_note_rounded));
       expect((textCenter.dy - iconCenter.dy).abs(), lessThan(1.5));
 
-      final button = find.text('Save Schedule Rule');
-      await tester.scrollUntilVisible(button, 200, scrollable: find.byType(Scrollable).first);
+      final position = tester.state<ScrollableState>(
+        find.byType(Scrollable).first,
+      ).position;
+      position.jumpTo(position.maxScrollExtent);
       await flushFontsAndSettle(tester);
-      final buttonTop = tester.getTopLeft(button).dy;
-      expect(buttonTop, greaterThan(tester.getBottomLeft(find.text('M')).dy));
+      expect(tester.getRect(button), initialButton);
+      expect(button.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(find.text('M')).dy,
+          lessThan(tester.getTopLeft(button).dy));
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(button.hitTestable(), findsOneWidget);
+      expect(tester.getBottomLeft(button).dy,
+          lessThanOrEqualTo(scenario.size.height - 300));
+      expect(tester.takeException(), isNull);
     });
   }
 
+
+  for (final size in [const Size(390, 844), const Size(1024, 900)]) {
+    for (final updating in [false, true]) {
+      testWidgets('Floating Save ${updating ? 'updates' : 'creates'} app schedule ($size)', (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final app = ManagedApp(
+          id: 'editor_app',
+          packageName: 'com.editor',
+          displayName: 'Editor App',
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        );
+        await repository.addApp(app);
+        final original = ScheduleRule(
+          id: 'original',
+          appId: app.id,
+          name: 'Evening',
+          enabled: false,
+          mode: ScheduleMode.allowDuring,
+          startTime: const TimeOfDayValue(hour: 19, minute: 0),
+          endTime: const TimeOfDayValue(hour: 21, minute: 0),
+          daysOfWeek: {6, 7},
+          allowVipContacts: false,
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        );
+        if (updating) {
+          await repository.saveRule(original, autoSaveTemplate: false);
+        }
+        await tester.pumpWidget(MaterialApp(
+          theme: AppTheme.darkTheme,
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ScheduleEditorScreen(
+                      repository: repository,
+                      targetApp: app,
+                      existingRule: updating ? original : null,
+                    ),
+                  ),
+                ),
+                child: const Text('Open editor'),
+              ),
+            ),
+          ),
+        ));
+        await tester.tap(find.text('Open editor'));
+        await flushFontsAndSettle(tester);
+        final save = find.byKey(const ValueKey('schedule-save-fab'));
+        expect(save.hitTestable(), findsOneWidget);
+        await tester.enterText(find.byType(TextField), 'Updated name');
+        await tester.tap(save);
+        await pumpFor(tester, const Duration(milliseconds: 600));
+
+        expect(find.byType(ScheduleEditorScreen), findsNothing);
+        final saved = repository.getRulesForApp(app.id).single;
+        expect(saved.name, 'Updated name');
+        if (updating) {
+          expect(saved.id, original.id);
+          expect(saved.enabled, isFalse);
+          expect(saved.mode, original.mode);
+          expect(saved.daysOfWeek, original.daysOfWeek);
+          expect(saved.startTime, original.startTime);
+          expect(saved.endTime, original.endTime);
+          expect(saved.allowVipContacts, isFalse);
+          expect(saved.createdAt, original.createdAt);
+        } else {
+          expect(saved.mode, ScheduleMode.blockDuring);
+          expect(saved.daysOfWeek, {1, 2, 3, 4, 5});
+          expect(saved.enabled, isTrue);
+        }
+        await pumpFor(tester, const Duration(seconds: 5));
+      });
+    }
+
+    testWidgets('Floating Done stays visible and returns without removing app changes ($size)', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final app = ManagedApp(
+        id: 'details_app',
+        packageName: 'com.details',
+        displayName: 'Details App',
+        createdAt: DateTime(2026),
+        updatedAt: DateTime(2026),
+      );
+      await repository.addApp(app);
+      for (var i = 0; i < 12; i++) {
+        await repository.saveRule(ScheduleRule(
+          id: 'details_rule_$i',
+          appId: app.id,
+          name: 'Rule $i',
+          mode: ScheduleMode.blockDuring,
+          startTime: const TimeOfDayValue(hour: 9, minute: 0),
+          endTime: const TimeOfDayValue(hour: 17, minute: 0),
+          daysOfWeek: {1},
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026),
+        ), autoSaveTemplate: false);
+      }
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.darkTheme,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AppDetailsScreen(repository: repository, app: app),
+                ),
+              ),
+              child: const Text('Open details'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Open details'));
+      await flushFontsAndSettle(tester);
+      final done = find.byKey(const ValueKey('app-details-done-fab'));
+      expect(done.hitTestable(), findsOneWidget);
+      final rect = tester.getRect(done);
+      await tester.tap(find.byType(StitchSwitch).first);
+      await tester.pumpAndSettle();
+      expect(repository.managedApps.single.enabled, isFalse);
+
+      final position = tester.state<ScrollableState>(find.byType(Scrollable).first).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(done), rect);
+      expect(tester.getBottomLeft(find.text('Remove from Rules Page')).dy,
+          lessThan(rect.top));
+      await tester.tap(done);
+      await flushFontsAndSettle(tester);
+      expect(find.byType(AppDetailsScreen), findsNothing);
+      expect(find.text('Open details'), findsOneWidget);
+      expect(repository.managedApps.single.enabled, isFalse);
+      expect(repository.getRulesForApp(app.id), hasLength(12));
+    });
+  }
 
   for (final scenario in [
     (name: 'light phone', size: const Size(390, 3600), mode: ThemeMode.light),
@@ -1648,8 +2433,7 @@ void main() {
       await tester.scrollUntilVisible(everyday, 200, scrollable: find.byType(Scrollable).first);
       await tester.tap(everyday);
       await tester.pump();
-      final save = find.text('Save Changes');
-      await tester.scrollUntilVisible(save, 200, scrollable: find.byType(Scrollable).first);
+      final save = find.byKey(const ValueKey('schedule-save-fab'));
       await tester.tap(save);
       await flushFontsAndSettle(tester);
       expect(find.text('Edit Saved Rule'), findsNothing);
@@ -2117,7 +2901,7 @@ void main() {
       await flushFontsAndSettle(tester);
       expect(find.text('New Rule'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, 'Copy');
-      await tester.tap(find.text('Save Rule'));
+      await tester.tap(find.byKey(const ValueKey('schedule-save-fab')));
       await flushFontsAndSettle(tester);
       await tester.tap(find.text('Use Focus Hours'));
       await pumpFor(tester, const Duration(milliseconds: 600));
@@ -2130,8 +2914,7 @@ void main() {
       await tester.ensureVisible(find.text('Weekends'));
       await tester.tap(find.text('Weekends'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Save Rule'));
-      await tester.tap(find.text('Save Rule'));
+      await tester.tap(find.byKey(const ValueKey('schedule-save-fab')));
       await pumpFor(tester, const Duration(milliseconds: 600));
 
       final created = repository.ruleTemplates.firstWhere((t) => t.name == 'Weekend calm');

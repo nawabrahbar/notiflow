@@ -35,4 +35,14 @@ void main() {
     ]);
     expect(cards.single['groupCount'], 2);
   });
+
+  test('capture source changes start a new card without relabelling old events', () {
+    final cards = groupActivityEvents([
+      {...e(10, 'Sunil'), 'isHistoryOnly': false},
+      {...e(9, 'Sunil'), 'isHistoryOnly': true},
+      {...e(8, 'Sunil'), 'isHistoryOnly': true},
+    ]);
+    expect(cards.map((c) => c['groupCount']), [1, 2]);
+    expect(cards.map((c) => c['isHistoryOnly']), [false, true]);
+  });
 }

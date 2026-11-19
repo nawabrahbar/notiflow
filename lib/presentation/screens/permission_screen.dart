@@ -120,7 +120,8 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
         title: 'Permission Required',
       ),
       body: SafeArea(
-        child: ListView(
+        child: HeaderScrollTransition(
+          child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
           children: [
             const SizedBox(height: 12),
@@ -472,6 +473,7 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
             ),
             const SizedBox(height: 16),
           ],
+        ),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import '../../domain/models/managed_app.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_toast.dart';
 import '../widgets/import_summary_sheet.dart';
+import '../widgets/stitch_header.dart';
 import 'main_navigation_shell.dart';
 
 /// Onboarding step three: optional .notiflow backup import.
@@ -249,7 +250,8 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                     ),
                   ),
                   Expanded(
-                    child: SingleChildScrollView(
+                    child: HeaderScrollTransition(
+                      child: SingleChildScrollView(
                       padding: EdgeInsets.only(
                         top: isTablet ? 42 : 46,
                         bottom: 18,
@@ -315,6 +317,7 @@ class _ImportRulesScreenState extends State<ImportRulesScreen> {
                         ],
                       ),
                     ),
+                  ),
                   ),
                   if (isTablet) ...[
                     Padding(

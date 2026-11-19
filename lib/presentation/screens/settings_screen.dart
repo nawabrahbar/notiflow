@@ -47,6 +47,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _isAccessGranted = false;
   bool _isCheckingUpdate = false;
   DigestNotificationSettings? _digestSettings;
+  ({String version, String buildNumber})? _installedVersion;
+  String? _versionError;
 
   @override
   void initState() {
@@ -54,6 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     WidgetsBinding.instance.addObserver(this);
     _platform = PlatformFactory.createPlatformService();
     _checkStatus();
+    _loadAppVersion();
   }
 
   @override
@@ -78,6 +81,27 @@ class _SettingsScreenState extends State<SettingsScreen>
         _digestSettings = digest;
       });
     }
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final version = await AndroidNotificationPlatform.fetchAppVersion();
+      if (!mounted) return;
+      setState(() {
+        _installedVersion = version;
+        _versionError = null;
+      });
+    } on Exception catch (error) {
+      debugPrint('Could not load installed app version: $error');
+      if (mounted) setState(() => _versionError = 'Version unavailable');
+    }
+  }
+
+  String get _versionLabel {
+    final installed = _installedVersion;
+    return installed == null
+        ? _versionError ?? 'Loading version...'
+        : 'v${installed.version}';
   }
 
   Future<void> _setDigestEnabled(bool enabled) async {
@@ -371,9 +395,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  static const String _appVersion = '1.6.0';
-  static const String _buildNumber = '10';
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -387,7 +408,8 @@ class _SettingsScreenState extends State<SettingsScreen>
           appBar: widget.showBackButton
               ? const StitchHeader(title: 'Settings')
               : null,
-          body: LayoutBuilder(
+          body: HeaderScrollTransition(
+            child: LayoutBuilder(
             builder: (context, constraints) {
               final isTablet = constraints.maxWidth >= 600;
               final twoColumns = constraints.maxWidth >= 900;
@@ -471,6 +493,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ],
               );
             },
+          ),
           ),
         );
       },
@@ -1808,7 +1831,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    _isCheckingUpdate ? 'Checking for updates…' : 'v$_appVersion',
+                    _isCheckingUpdate ? 'Checking for updates…' : _versionLabel,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1904,7 +1927,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Notiflow v$_appVersion',
+                        'Notiflow $_versionLabel',
                         style: GoogleFonts.newsreader(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -1923,7 +1946,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Build $_buildNumber (Release Channel) · 100% On-Device Protocol · Privacy First',
+                        _installedVersion == null
+                            ? _versionError ?? 'Loading build information...'
+                            : 'Build ${_installedVersion!.buildNumber} (Release Channel) · 100% On-Device Protocol · Privacy First',
                         style: GoogleFonts.plusJakartaSans(
                             fontSize: 11.5, color: p.textMuted),
                       ),
@@ -1948,7 +1973,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                     () => showLicensePage(
                       context: context,
                       applicationName: 'Notiflow',
-                      applicationVersion: 'v$_appVersion',
+                      applicationVersion: _installedVersion == null
+                          ? null
+                          : 'v${_installedVersion!.version}',
                     ),
                     key: const ValueKey('settings-licenses'),
                   ),

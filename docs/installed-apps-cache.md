@@ -110,11 +110,47 @@ If the user added a rule for an app and later uninstalls that app:
 ## 6. Resolved questions
 
 - **Search bar position on tablet.** Decided: tablet matches phone — search bar at the bottom with the frosted blur, edge fade and the hint "Search".
+- **Shared soft top edge.** Add Apps and History management use the app-wide `HeaderScrollTransition` above their app list: a 24 dp light blur/fade only once vertically scrolled, with no added border or padding. The existing bottom fade and frosted search bar remain; the old always-on top mask is not layered underneath the new effect.
 
 ---
 
 ## 7. Known limitations
 
+- **First-pass scrolling:** icon-update optimizations are implemented; the original perceived stutter still needs a before/after device performance comparison. See section 8 below.
 - The manifest's `<queries>` only covers launcher apps. Without `QUERY_ALL_PACKAGES`, a package that isn't visible to Notiflow looks "not installed" to `getPackageInfo`. Managed apps come from the launcher list, so they are normally visible; a managed app whose launcher entry was removed may show as uninstalled.
 - `getChangedPackages` needs Android 8.0 (API 26). On older versions, a resume doesn't refresh the list; it refreshes on the next app start.
 - The Catch-Up Digest cards don't grey out uninstalled apps; only the Activity event cards and Rules cards do.
+
+---
+
+## 8. First-pass Add Apps scrolling stutter
+
+**Reported and optimized:** 19 Nov 2026. **Status:** rebuild isolation and bounded loading implemented. The original performance bottleneck has not been confirmed by a before/after device trace; do not treat these changes as proof that all perceived stutter is eliminated.
+
+### User observation and reproduction
+
+Open Add Apps with icons not yet cached, select All Apps and scroll through the list. The first pass can feel shaky or uneven. After scrolling through all apps once, scrolling feels smoother.
+
+### Inspection findings
+
+- `InstalledAppsCache.loadIcons` caches each returned batch and calls `notifyListeners`. `AddAppsScreen._onCacheChanged` calls `setState`, rebuilding the whole page and repeating app filtering for each notification.
+- New icons are displayed through `Image.memory`; first-use decoding and rendering are additional work during scrolling. Subsequent passes reuse cached icon bytes and may reuse Flutter's decoded images.
+- Both the placeholder and image sit inside the same fixed 44-by-44 container. Inspection found no obvious row-size change caused by an icon arriving.
+- The list has a `ShaderMask` fade and a frosted `BackdropFilter` search bar. These are possible additional rendering costs, not confirmed causes.
+- Native icon extraction already runs on a separate executor; it is not directly performed on Android's main thread.
+
+The evidence is consistent with first-load frame stutter rather than a proven scroll-position or layout jump. Icon-related rebuilds, decoding and raster work are candidates, not a measured root cause.
+
+### Implemented changes
+
+- `AddAppsScreen` only rebuilds for shared app-list/loading-state changes, search/filter changes and repository changes, not for icon-only cache notifications.
+- Each app icon listens independently and rebuilds only when its own bytes change. The fixed icon slot is preserved; row contents and list position are not rebuilt when icons arrive.
+- Icon requests are serialized into batches of at most eight packages, with a frame boundary between batches. Pending requests follow the latest requested window and are cleared when the search/category list changes. Already cached icons still reuse the shared cache.
+- Existing fast-fling skipping, viewport-based prefetching, phone/tablet layouts, list fading and frosted search styling remain unchanged.
+- Phone and tablet regression tests hold back icon results, then verify image arrival without rebuilding app-row buttons or changing their bounds/scroll offset. They also cover bounded batches, cache reuse, flinging and search.
+
+### Remaining performance verification
+
+Compare cold-icon and warm-icon scrolling with Flutter frame timings on the phone in profile mode; distinguish UI-thread work from raster work. A before/after trace is still required to quantify the improvement. If decoding or raster work remains a bottleneck, investigate decoding/preparation and compositing separately rather than assuming page rebuilds were the only cause.
+
+A profile build was launched during implementation, but the phone locked before the scrolling comparison could be completed. The final debug build was subsequently installed and launched; no device-level smoothness result is claimed.

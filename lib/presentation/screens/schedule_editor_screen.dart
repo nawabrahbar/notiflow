@@ -426,6 +426,32 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
 
     return Scaffold(
       backgroundColor: bg,
+      floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('schedule-save-fab'),
+        heroTag: 'schedule-save-fab',
+        onPressed: _isSaving ? null : _handleSave,
+        backgroundColor: primaryCol,
+        foregroundColor: isDark ? const Color(0xFF482900) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        icon: _isSaving
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: isDark ? const Color(0xFF482900) : Colors.white,
+                ),
+              )
+            : const Icon(Icons.check_rounded, size: 20),
+        label: Text(
+          'Save',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
         child: Container(
@@ -452,7 +478,8 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
           ),
         ),
       ),
-      body: LayoutBuilder(
+      body: HeaderScrollTransition(
+        child: LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= 600;
 
@@ -1319,67 +1346,25 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
             ],
           );
 
-          final saveButton = SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _handleSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryCol,
-                foregroundColor: isDark
-                    ? const Color(0xFF482900)
-                    : Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(
-                      widget.createTemplate
-                          ? 'Save Rule'
-                          : _isEditingTemplate
-                          ? 'Save Changes'
-                          : widget.existingRule != null
-                          ? 'Update Schedule Rule'
-                          : 'Save Schedule Rule',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.2,
-                      ),
+          final savedRuleNote = _isEditingTemplate
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 32),
+                  child: Text(
+                    widget.createTemplate
+                        ? 'Saved to your rules, so you can use it again later.'
+                        : 'Apps already using this rule keep their current schedule.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      color: textMuted,
                     ),
-            ),
-          );
-
-          final Widget saveArea = _isEditingTemplate
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      widget.createTemplate
-                          ? 'Saved to your rules, so you can use it again later.'
-                          : 'Apps already using this rule keep their current schedule.',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
-                        color: textMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    saveButton,
-                  ],
+                  ),
                 )
-              : saveButton;
+              : null;
 
           if (isTablet) {
             return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(28, 16, 28, 96),
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1389,25 +1374,22 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
                     Expanded(flex: 5, child: timingAndRecurrenceColumn),
                   ],
                 ),
-                const SizedBox(height: 32),
-                saveArea,
-                const SizedBox(height: 32),
+                ?savedRuleNote,
               ],
             );
           }
 
           return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
             children: [
               templateAndNameColumn,
               const SizedBox(height: 24),
               timingAndRecurrenceColumn,
-              const SizedBox(height: 32),
-              saveArea,
-              const SizedBox(height: 32),
+              ?savedRuleNote,
             ],
           );
         },
+      ),
       ),
     );
   }

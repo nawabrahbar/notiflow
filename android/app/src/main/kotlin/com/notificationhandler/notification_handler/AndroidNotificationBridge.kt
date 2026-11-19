@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
@@ -297,6 +298,25 @@ class AndroidNotificationBridge(
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "getAppVersion" -> {
+                try {
+                    val info = context.packageManager.getPackageInfo(context.packageName, 0)
+                    val version = info.versionName
+                    if (version.isNullOrBlank()) {
+                        result.error("APP_VERSION_UNAVAILABLE", "Installed app version is unavailable", null)
+                    } else {
+                        val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            info.longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            info.versionCode.toLong()
+                        }
+                        result.success(mapOf("version" to version, "buildNumber" to buildNumber.toString()))
+                    }
+                } catch (e: PackageManager.NameNotFoundException) {
+                    result.error("APP_VERSION_UNAVAILABLE", "Could not read the installed app version", e.message)
+                }
+            }
             "isPlatformSupported" -> {
                 result.success(true)
             }
@@ -526,6 +546,23 @@ class AndroidNotificationBridge(
                         scheduleStore.deleteDigestWindows(ids)
                     }
                     mainHandler.post { result.success(null) }
+                }
+            }
+            "deleteHistoryForApp" -> {
+                val pkg = call.argument<String>("packageName")
+                if (pkg.isNullOrBlank()) {
+                    result.error("INVALID_PACKAGE", "An app package is required", null)
+                    return
+                }
+                dbExecutor.execute {
+                    try {
+                        scheduleStore.deleteHistoryForApp(pkg)
+                        mainHandler.post { result.success(null) }
+                    } catch (e: Exception) {
+                        mainHandler.post {
+                            result.error("HISTORY_DELETE_ERROR", "Could not delete this app's history", e.message)
+                        }
+                    }
                 }
             }
             "clearActivityLog" -> {
