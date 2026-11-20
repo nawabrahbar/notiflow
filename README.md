@@ -77,7 +77,7 @@ Notiflow is organized into **11 screens** across a clean 4-layer architecture (`
 
 | # | Screen | File | Description |
 | :--- | :--- | :--- | :--- |
-| 1 | **Startup Routing** | [`lib/main.dart`](lib/main.dart) | Android shows the app icon while initializing, then opens Onboarding, Permission, or the main shell (no Flutter splash) |
+| 1 | **Startup Routing** | [`lib/main.dart`](lib/main.dart) | First screen selection runs with local repository initialization; dormant-app discovery and native sync are deferred so they don't delay launch (no Flutter splash) |
 | 2 | **Onboarding Screen** | [`lib/presentation/screens/onboarding_screen.dart`](lib/presentation/screens/onboarding_screen.dart) | 3-step onboarding with direct 1-tap notification access setup |
 | 3 | **Permission Center** | [`lib/presentation/screens/permission_screen.dart`](lib/presentation/screens/permission_screen.dart) | Quick 2-step permission recovery with auto-return & OEM battery tips |
 | 4 | **Import Rules** | [`lib/presentation/screens/import_rules_screen.dart`](lib/presentation/screens/import_rules_screen.dart) | Onboarding step 3 backup import; Settings → Import opens the system file picker directly |

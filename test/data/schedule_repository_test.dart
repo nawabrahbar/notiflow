@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
 
@@ -29,10 +30,14 @@ class MockPlatformService implements NotificationPlatformInterface {
   Future<void> openAppDetailsSettings() async {}
 
   List<DiscoveredAppInfo> installedApps = [];
+  Completer<List<DiscoveredAppInfo>>? installedAppsGate;
+  Completer<void>? installedAppsRequested;
 
   @override
-  Future<List<DiscoveredAppInfo>> getInstalledApplications() async =>
-      installedApps;
+  Future<List<DiscoveredAppInfo>> getInstalledApplications() async {
+    installedAppsRequested?.complete();
+    return await installedAppsGate?.future ?? installedApps;
+  }
 
   @override
   Future<List<DiscoveredAppInfo>> getInstalledAppsLite() async => [];
@@ -110,6 +115,37 @@ void main() {
     expect(repository.managedApps.first.packageName, 'com.example.app');
     expect(mockPlatform.syncCalled, true);
     expect(mockPlatform.lastSyncedApps.length, 1);
+  });
+
+  test('startup initialization does not wait for dormant-app discovery', () async {
+    final dormantApp = ManagedApp(
+      id: 'app_dormant',
+      packageName: 'com.example.dormant',
+      displayName: 'Dormant app',
+      isDormantVault: true,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    SharedPreferences.setMockInitialValues({
+      'pref_managed_apps': jsonEncode([dormantApp.toJson()]),
+    });
+
+    final startupPlatform = MockPlatformService()
+      ..installedAppsGate = Completer<List<DiscoveredAppInfo>>()
+      ..installedAppsRequested = Completer<void>();
+    final startupRepository =
+        ScheduleRepository(platformService: startupPlatform);
+
+    await startupRepository.initialize(deferStartupMaintenance: true);
+
+    expect(startupRepository.isInitialized, isTrue);
+    await startupPlatform.installedAppsRequested!.future;
+    expect(startupRepository.dormantVaultApps.single.packageName,
+        'com.example.dormant');
+
+    startupPlatform.installedAppsGate!.complete([]);
+    await Future<void>.delayed(Duration.zero);
+    expect(startupPlatform.syncCalled, isTrue);
   });
 
   test('Save and delete schedule rules', () async {

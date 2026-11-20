@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -78,7 +79,11 @@ class ScheduleRepository extends ChangeNotifier {
   }
 
   /// Initializes local storage and syncs active configuration with native Android layer.
-  Future<void> initialize() async {
+  ///
+  /// Startup can defer dormant-app discovery and native synchronization so
+  /// those operations don't delay the first screen. Other callers retain the
+  /// original fully-awaited initialization behavior by default.
+  Future<void> initialize({bool deferStartupMaintenance = false}) async {
     final prefs = await SharedPreferences.getInstance();
 
     final appsJson = prefs.getString(_keyManagedApps);
@@ -122,12 +127,24 @@ class ScheduleRepository extends ChangeNotifier {
     _defaultScheduleMode = prefs.getString(_keyDefaultScheduleMode) ?? 'allow';
     _use24HourFormat = prefs.getBool(_keyUse24HourFormat) ?? false;
 
-    await checkAndActivateDormantApps(notify: false);
-
     _isInitialized = true;
     notifyListeners();
 
-    await _syncToNative();
+    if (deferStartupMaintenance) {
+      unawaited(_finishDeferredStartupMaintenance());
+    } else {
+      await checkAndActivateDormantApps(notify: false);
+      await _syncToNative();
+    }
+  }
+
+  Future<void> _finishDeferredStartupMaintenance() async {
+    try {
+      await checkAndActivateDormantApps(notify: false);
+      await _syncToNative();
+    } on Exception catch (error, stackTrace) {
+      debugPrint('Deferred startup maintenance failed: $error\n$stackTrace');
+    }
   }
 
   /// Updates whether 24-hour time format is used across the app.
