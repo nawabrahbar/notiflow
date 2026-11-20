@@ -51,8 +51,13 @@ void main() async {
   final display = PlatformDispatcher.instance.displays.firstOrNull;
   if (display != null) {
     final logical = display.size / display.devicePixelRatio;
-    await SystemChrome.setPreferredOrientations(
-        allowedOrientations(logical.shortestSide));
+    unawaited(
+      SystemChrome.setPreferredOrientations(
+        allowedOrientations(logical.shortestSide),
+      ).catchError((Object error, StackTrace stackTrace) {
+        debugPrint('Could not set startup orientation: $error');
+      }),
+    );
   }
   GoogleFonts.config.allowRuntimeFetching = false;
 
@@ -68,8 +73,9 @@ void main() async {
   unawaited(AndroidNotificationPlatform.setAppThemeMode(savedTheme));
 
   final repository = ScheduleRepository();
-  await repository.initialize();
-  final home = await resolveStartScreen(repository, prefs);
+  final homeFuture = resolveStartScreen(repository, prefs);
+  await repository.initialize(deferStartupMaintenance: true);
+  final home = await homeFuture;
 
   runApp(NotificationHandlerApp(repository: repository, home: home));
 }

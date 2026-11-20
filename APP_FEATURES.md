@@ -122,11 +122,11 @@ flowchart TD
 
 ### Page 1: Startup Routing (no splash screen)
 
-* Notiflow has no Flutter splash. Android's launch screen shows the app icon while `main()` loads preferences and `ScheduleRepository`, then the first screen opens directly:
+* Notiflow has no Flutter splash. Android's launch screen remains until the first Flutter frame. Startup loads preferences and local repository data before selecting a first screen; notification-access routing runs alongside repository initialization, while dormant-app discovery and native schedule sync are deferred so they don't hold up launch:
   - If `pref_onboarding_completed == false` $\rightarrow$ `OnboardingScreen`.
   - If `isNotificationAccessGranted() == false` $\rightarrow$ `PermissionScreen`.
   - Otherwise $\rightarrow$ `MainNavigationShell`.
-* The Android launch window is a plain app-coloured background (light `#FEF8F6`, dark `#101412`); on Android 12+ the system starting-window icon is hidden.
+* The Android launch window uses the system splash icon on Android 12+ and a plain app-coloured background on older Android versions.
 ---
 
 ### Page 2: Onboarding Screen (`OnboardingScreen`)
