@@ -368,10 +368,8 @@ void main() {
     expect(repository.getActiveOverride('global_mute'), isNull);
     expect(find.byKey(const Key('quick_mute_all_15')), findsOneWidget);
 
-    final bypassBefore = repository.vipEmergencyBypass;
-    await tester.tap(find.byKey(const Key('quick_mute_all_repeat_callers')));
-    await flushFontsAndSettle(tester);
-    expect(repository.vipEmergencyBypass, !bypassBefore);
+    expect(find.byKey(const Key('quick_mute_all_repeat_callers')), findsNothing);
+    expect(find.text('Silences notifications for a while. Calls are not controlled.'), findsOneWidget);
   });
 
   testWidgets('SettingsScreen displays Engine status, Zero Telemetry card, and Triage preferences', (WidgetTester tester) async {
@@ -716,7 +714,7 @@ void main() {
   });
 
   for (final size in [const Size(390, 1000), const Size(800, 1100)]) {
-    testWidgets('History filters use stored source and preserve delivery status ($size)', (tester) async {
+    testWidgets('History source replaces delivery status in its badge ($size)', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       const channel = MethodChannel('com.notificationhandler/bridge');
@@ -748,7 +746,7 @@ void main() {
       await tester.pumpWidget(wrapWithTheme(ActivityScreen(repository: repository)));
       await flushFontsAndSettle(tester);
 
-      expect(find.byKey(const ValueKey('activity-history-badge')), findsNWidgets(2));
+      expect(find.text('HISTORY'), findsNWidgets(2));
       expect(find.byKey(const ValueKey('history-manage-apps-fab')), findsNothing);
       final all = find.byKey(const ValueKey('activity-filter-all'));
       final digest = find.byKey(const ValueKey('activity-filter-digest'));
@@ -765,16 +763,18 @@ void main() {
       expect(find.textContaining('Rules allowed'), findsNothing);
       expect(find.textContaining('History allowed'), findsOneWidget);
       expect(find.textContaining('History silenced'), findsOneWidget);
+      expect(find.text('HISTORY'), findsNWidgets(2));
       expect(find.byKey(const ValueKey('history-manage-apps-fab')), findsOneWidget);
       await repository.stopHistoryOnly(repository.historyApps.single.id);
       await flushFontsAndSettle(tester);
-      expect(find.byKey(const ValueKey('activity-history-badge')), findsNWidgets(2));
+      expect(find.text('HISTORY'), findsNWidgets(2));
 
       await tester.ensureVisible(silenced);
       await tester.tap(silenced);
       await flushFontsAndSettle(tester);
       expect(find.textContaining('History silenced'), findsOneWidget);
       expect(find.textContaining('History allowed'), findsNothing);
+      expect(find.text('HISTORY'), findsOneWidget);
       expect(find.byKey(const ValueKey('history-manage-apps-fab')), findsNothing);
       expect(tester.takeException(), isNull);
     });
@@ -1710,6 +1710,46 @@ void main() {
     expect(find.byKey(const ValueKey('rules-add-app-fab')), findsNothing);
   });
 
+  for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+    testWidgets('App Details Done matches the Rules Add app colors and text ($mode)', (tester) async {
+      tester.view.physicalSize = const Size(390, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final now = DateTime.now();
+      final app = ManagedApp(
+        id: 'matching-fab-app',
+        packageName: 'com.example.matchingfab',
+        displayName: 'Example',
+        createdAt: now,
+        updatedAt: now,
+      );
+      await repository.addApp(app);
+      Widget themed(Widget home) => MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: mode,
+        home: home,
+      );
+      await tester.pumpWidget(themed(DashboardScreen(repository: repository)));
+      await flushFontsAndSettle(tester);
+      final add = tester.widget<FloatingActionButton>(
+        find.byKey(const ValueKey('rules-add-app-fab')),
+      );
+      final addTextStyle = tester.widget<Text>(find.text('Add app')).style;
+
+      await tester.pumpWidget(themed(AppDetailsScreen(app: app, repository: repository)));
+      await flushFontsAndSettle(tester);
+      final done = tester.widget<FloatingActionButton>(
+        find.byKey(const ValueKey('app-details-done-fab')),
+      );
+      expect(done.backgroundColor, add.backgroundColor);
+      expect(done.foregroundColor, add.foregroundColor);
+      expect(tester.widget<Text>(find.text('Done')).style, addTextStyle);
+    });
+  }
+
   for (final scenario in [
     (name: 'light phone', size: const Size(390, 2400), mode: ThemeMode.light),
     (name: 'dark phone', size: const Size(390, 2400), mode: ThemeMode.dark),
@@ -2292,6 +2332,7 @@ void main() {
         await flushFontsAndSettle(tester);
         final save = find.byKey(const ValueKey('schedule-save-fab'));
         expect(save.hitTestable(), findsOneWidget);
+        expect(find.text('Urgent Call Escalation'), findsNothing);
         await tester.enterText(find.byType(TextField), 'Updated name');
         await tester.tap(save);
         await pumpFor(tester, const Duration(milliseconds: 600));
@@ -2403,6 +2444,7 @@ void main() {
         startTime: const TimeOfDayValue(hour: 22, minute: 0),
         endTime: const TimeOfDayValue(hour: 23, minute: 0),
         daysOfWeek: const {6, 7},
+        allowVipContacts: false,
         createdAt: DateTime.now(),
       ));
 
@@ -2441,6 +2483,7 @@ void main() {
       final edited = repository.ruleTemplates.firstWhere((t) => t.id == 'template_wrong');
       expect(edited.name, 'Late Weekend');
       expect(edited.daysOfWeek, {1, 2, 3, 4, 5, 6, 7});
+      expect(edited.allowVipContacts, isFalse);
 
       await tester.tap(find.descendant(of: wrongTile, matching: find.byTooltip('Delete')));
       await flushFontsAndSettle(tester);
@@ -2667,7 +2710,6 @@ void main() {
         'SAVED RULES',
         'TRIAGE & AUTOMATION PREFERENCES',
         'Keep Unmanaged Apps Untouched',
-        'Allow Priority Phone Calls',
         '24-Hour Time Format',
         'ON-DEVICE INTEGRITY & STORAGE',
         'Zero Telemetry Guarantee',
@@ -2675,6 +2717,7 @@ void main() {
       ]) {
         expect(find.text(shared), findsOneWidget, reason: shared);
       }
+      expect(find.text('Allow Priority Phone Calls'), findsNothing);
       expect(find.textContaining('Focus Shield'), findsOneWidget);
       expect(find.text('Engine health, security & preferences'), findsNothing);
       expect(find.text('0.00 B'), findsNothing);
@@ -2684,7 +2727,6 @@ void main() {
       final tabletOnly = [
         'ENGINE & BACKGROUND SERVICES',
         'Standard Rule Profile',
-        'High Bypass',
         'Hardware Keystore',
         'DIAGNOSTICS & SYSTEM METRICS',
         'DANGER ZONE',

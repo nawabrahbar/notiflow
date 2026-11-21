@@ -78,9 +78,6 @@ class AppDetailsScreen extends StatelessWidget {
         ? AppTheme.darkOnSurfaceVariant
         : AppTheme.lightOnSurfaceVariant;
     final primaryCol = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
-    final primaryContainerCol = isDark
-        ? AppTheme.darkPrimaryContainer
-        : AppTheme.lightPrimaryContainer;
     final secondaryContainerCol = isDark
         ? AppTheme.darkSecondaryContainer
         : AppTheme.lightSecondaryContainer;
@@ -135,10 +132,10 @@ class AppDetailsScreen extends StatelessWidget {
                   );
                 }
               },
-              backgroundColor: primaryContainerCol,
+              backgroundColor: primaryCol,
               foregroundColor: isDark
                   ? AppTheme.darkOnPrimary
-                  : AppTheme.lightOnSurface,
+                  : AppTheme.lightOnPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -146,7 +143,6 @@ class AppDetailsScreen extends StatelessWidget {
               label: Text(
                 'Done',
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
               ),

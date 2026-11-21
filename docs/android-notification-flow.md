@@ -55,7 +55,7 @@ override fun onNotificationPosted(sbn: StatusBarNotification?) {
 ```
 
 ### Step 2: Management Check
-The service checks if `packageName` is actively managed. If the app is not in the managed set, the method returns immediately, consuming `< 0.1ms` of CPU time.
+The listener first leaves recognized call-like notifications untouched; not every calling app provides recognizable metadata. Other notifications proceed through app management and global override checks.
 
 ### Step 3: Schedule Evaluation in Native Kotlin
 `NativeScheduleStore` evaluates the active rules for the package:
@@ -70,7 +70,7 @@ The service checks if `packageName` is actively managed. If the app is not in th
 ### Step 4: Action Execution
 - **Decision == ALLOW**: Do nothing. The notification appears normally in the status bar with sound/vibration as configured by the user.
 - **Decision == BLOCK during a rule window or pause** (Android 8.0+): Call `snoozeNotification(key, duration)` until one minute after the window ends, and record it in `held_notifications`. When Android returns it, the listener sees the window is over, lets it through without logging it again, and posts one "quiet hours ended" Catch-up digest notification about 15 seconds later.
-- **Decision == BLOCK otherwise** (permanent mute, ongoing/foreground notifications, calls, or if snoozing fails): Call `cancelNotification(key)`. The system immediately dismisses the notification from the notification tray.
+- **Decision == BLOCK otherwise** (permanent mute, eligible foreground notifications, or if snoozing fails): Call `cancelNotification(key)`. The system immediately dismisses the notification from the notification tray. Recognized call notifications never reach this decision.
 
 ---
 

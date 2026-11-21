@@ -15,8 +15,9 @@ User-facing explanation:
 ## Agreed interface
 
 - Activity filters: **All, Digest, History, Silenced, Allowed**, in that order.
-- History-only entries show a **History** badge in All, alongside their actual
-  Allowed/Silenced status. Source and delivery outcome are different properties.
+- History-only entries show one **History** status pill in the same position as
+  the Allowed/Silenced pill, replacing it rather than appearing as a second badge.
+  The stored delivery outcome remains intact for filtering and policy behavior.
 - The History filter shows notifications captured through history-only tracking.
 - A floating **Manage apps** button appears only while History is selected.
   Match the Rules floating-button styling and smooth scroll-driven collapse and
@@ -39,7 +40,7 @@ User-facing explanation:
 - One notification is stored once. A history-only notification silenced by Quick
   Mute can appear in All, History and Silenced without duplicate database rows.
 - Capture source is stored on the event, not inferred from the app's current
-  settings. Earlier History badges and filter membership survive stopping
+  settings. Earlier History status pills and filter membership survive stopping
   recording or adding rules later.
 - Stopping recording preserves existing entries. Deleting notification history
   is a separate, explicit action.
@@ -66,7 +67,7 @@ User-facing explanation:
 | --- | --- | --- |
 | Add Apps > Add > Record history only | Opt in; no scheduling rules created | Unchanged; no retroactive capture |
 | History > Manage apps > check an app | Same opt-in, using the existing app picker | Unchanged |
-| Uncheck / Stop recording | Remove the History-only configuration | Kept with their History badges |
+| Uncheck / Stop recording | Remove the History-only configuration | Kept with their History status pills |
 | Manage > Add rules > Save | Reuse the app ID, add a schedule, show the app in Rules | Kept with their original capture source |
 | Cancel the schedule editor | No promotion or schedule changes | Unchanged |
 | Bulk Apply rules | Reuse the app and promote it to scheduling | Unchanged |

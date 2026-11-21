@@ -277,7 +277,7 @@ Work is split into two phases. Phase 1 is in-app only and needs no new permissio
 **Goal:** when a rule ends, the original notifications come back by themselves and Notiflow posts one short "quiet hours ended" notification.
 
 **Status:** 2.1–2.6 implemented; Kotlin unit tests and widget tests pass. Device checks (2.7) still pending. Notes on how it was built:
-- Silenced notifications are snoozed until one minute after the window's last silenced minute. Cancel is kept for permanent mute, ongoing/foreground notifications, calls, and Android below 8.0.
+- Silenced notifications are snoozed until one minute after the window's last silenced minute. Cancel is kept for permanent mute, eligible foreground notifications, and Android below 8.0. Recognized call notifications are now left untouched.
 - Held notifications are tracked in their own table, `held_notifications` (key, package, window, release time), so a returning original is recognised even if its event was de-duplicated. Database version 2 also adds a `delivery` column to `notification_events` (snoozed / released / removed). The event `action` stays "silenced"; delivery is tracked separately instead of the proposed action values.
 - Decisions are evaluated at the current time, not the notification's original post time, because a returning snoozed notification can keep its old post time.
 - After a rule change the bridge re-checks held notifications: still silenced with a new end → re-snoozed; no longer silenced or window over → released by re-snoozing for 1 second; permanent mute → cancelled.

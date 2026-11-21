@@ -356,7 +356,7 @@ class NativeScheduleEvaluatorTest {
     }
 
     @Test
-    fun testVipEmergencyBypassToggleAndCaseInsensitivePackageLookup() {
+    fun callNotificationsBypassScheduledRulesRegardlessOfLegacySetting() {
         val evaluator = NativeScheduleEvaluator()
         evaluator.parsePayload("""
             {
@@ -389,11 +389,12 @@ class NativeScheduleEvaluatorTest {
         }.timeInMillis
         val callTime2 = callTime1 + 60_000L
 
-        // Case-insensitive lookup ("com.slack" vs "com.Slack") + vipEmergencyBypass = false
         val firstCall = evaluator.evaluateNotification("com.slack", callTime1, category = "call", title = "Alice")
-        val secondCall = evaluator.evaluateNotification("com.slack", callTime2, category = "call", title = "Alice")
-        assertTrue(firstCall.shouldBlock)
-        assertTrue("Second call within 3 mins must still be blocked when global vipEmergencyBypass is false", secondCall.shouldBlock)
+        val secondCall = evaluator.evaluateNotification("com.slack", callTime2, category = "CALL", title = "Alice")
+        assertFalse(firstCall.shouldBlock)
+        assertFalse(firstCall.isManagedOrOverridden)
+        assertFalse(secondCall.shouldBlock)
+        assertTrue(evaluator.evaluateNotification("com.slack", callTime1, category = "msg").shouldBlock)
     }
 
     private fun globalMutePayload(bypass: Boolean) = """
@@ -414,29 +415,46 @@ class NativeScheduleEvaluatorTest {
     """.trimIndent()
 
     @Test
-    fun testRepeatCallerRingsThroughDuringGlobalMute() {
-        val evaluator = NativeScheduleEvaluator()
-        evaluator.parsePayload(globalMutePayload(bypass = true))
+    fun callNotificationsBypassGlobalMuteRegardlessOfLegacySetting() {
         val t1 = java.time.Instant.parse("2026-06-01T12:00:00Z").toEpochMilli()
-
-        val first = evaluator.evaluateNotification("com.google.android.dialer", t1, category = "call", title = "Mom")
-        val second = evaluator.evaluateNotification("com.google.android.dialer", t1 + 90_000L, category = "call", title = "Mom")
-        val chat = evaluator.evaluateNotification("com.whatsapp", t1 + 100_000L, category = "msg", title = "Mom")
-
-        assertTrue("First call is silenced by Quick Mute", first.shouldBlock)
-        assertFalse("Second call within 3 mins must ring through", second.shouldBlock)
-        assertEquals("Urgent Call Bypass", second.ruleName)
-        assertTrue("Non-call notifications stay muted", chat.shouldBlock)
+        for (bypass in listOf(true, false)) {
+            val evaluator = NativeScheduleEvaluator()
+            evaluator.parsePayload(globalMutePayload(bypass))
+            val first = evaluator.evaluateNotification("com.google.android.dialer", t1, category = "call", title = "Mom")
+            val second = evaluator.evaluateNotification("com.google.android.dialer", t1 + 90_000L, category = "call", title = "Mom")
+            assertFalse(first.shouldBlock)
+            assertFalse(second.shouldBlock)
+            assertFalse(first.isManagedOrOverridden)
+            assertTrue(evaluator.evaluateNotification("com.whatsapp", t1, category = "msg").shouldBlock)
+        }
     }
 
     @Test
-    fun testRepeatCallerStaysMutedDuringGlobalMuteWhenBypassOff() {
+    fun callNotificationsBypassPerAppTemporaryMute() {
         val evaluator = NativeScheduleEvaluator()
-        evaluator.parsePayload(globalMutePayload(bypass = false))
+        evaluator.parsePayload("""
+            {
+                "managedApps": [{"id": "app_chat", "packageName": "com.chat", "enabled": true}],
+                "schedules": [],
+                "overrides": [{
+                    "id": "ov_chat", "appId": "app_chat", "mode": "block",
+                    "startDateTime": "2026-01-01T00:00:00Z",
+                    "endDateTime": "2030-01-01T00:00:00Z"
+                }]
+            }
+        """.trimIndent())
         val t1 = java.time.Instant.parse("2026-06-01T12:00:00Z").toEpochMilli()
+        assertFalse(evaluator.evaluateNotification("com.chat", t1, category = "android.category.call").shouldBlock)
+        assertTrue(evaluator.evaluateNotification("com.chat", t1, category = "msg").shouldBlock)
+    }
 
-        evaluator.evaluateNotification("com.google.android.dialer", t1, category = "call", title = "Mom")
-        val second = evaluator.evaluateNotification("com.google.android.dialer", t1 + 90_000L, category = "call", title = "Mom")
-        assertTrue(second.shouldBlock)
+    @Test
+    fun recognizesCallMetadataWithoutTreatingMessagesAsCalls() {
+        assertTrue(isCallNotification("call", false))
+        assertTrue(isCallNotification("CALL", false))
+        assertTrue(isCallNotification("android.category.call", false))
+        assertTrue(isCallNotification("", true))
+        assertFalse(isCallNotification("msg", false))
+        assertFalse(isCallNotification("", false))
     }
 }

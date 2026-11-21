@@ -13,8 +13,8 @@ import java.util.concurrent.Executors
  * System-bound service that listens for posted notifications, records triaged
  * and muted notification details locally on-device for the Activity Log, and applies
  * suppression schedules. Notifications silenced inside a rule window are snoozed until
- * the window ends so Android brings the originals back; permanent mutes, ongoing
- * notifications and calls are cancelled.
+ * the window ends so Android brings the originals back; permanent mutes and eligible
+ * ongoing notifications are cancelled. Recognized call notifications are left alone.
  *
  * Runs as an independent Android background service managed by Android system_server.
  * All recorded activity stays strictly in an on-device SQLite database (zero network transmission).
@@ -95,12 +95,12 @@ class NotificationHandlerListenerService : NotificationListenerService(), HeldNo
         val category = notification?.category ?: ""
         val extras = notification?.extras
 
-        val isCall = category.equals(Notification.CATEGORY_CALL, ignoreCase = true) ||
-                     category.equals("call", ignoreCase = true) ||
-                     extras?.containsKey("android.callType") == true
+        if (isCallNotification(category, extras?.containsKey("android.callType") == true)) {
+            worker.execute { scheduleStore.onHeldNotificationReleased(key) }
+            return
+        }
 
-        // Skip ongoing persistent foreground service notifications UNLESS it is an incoming call
-        if (sbn.isOngoing && !isCall) return
+        if (sbn.isOngoing) return
 
         val isGroupSummary = ((notification?.flags ?: 0) and Notification.FLAG_GROUP_SUMMARY) != 0
 
@@ -150,7 +150,7 @@ class NotificationHandlerListenerService : NotificationListenerService(), HeldNo
 
         val isForeground = ((notification?.flags ?: 0) and Notification.FLAG_FOREGROUND_SERVICE) != 0
         val canSnooze = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !sbn.isOngoing && !isForeground && !isCall
+            !sbn.isOngoing && !isForeground
 
         val decision = scheduleStore.evaluateAndRecordNotification(
             packageName = packageName,

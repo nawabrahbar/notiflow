@@ -7,7 +7,6 @@ import '../../domain/models/rule_template.dart';
 import '../../domain/models/schedule_rule.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stitch_header.dart';
-import '../widgets/stitch_switch.dart';
 import '../widgets/app_toast.dart';
 
 /// Schedule Rule Editor matching Botanical Sanctuary & Nocturne specifications:
@@ -414,12 +413,6 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
     final primaryContainerCol = isDark
         ? AppTheme.darkPrimaryContainer
         : AppTheme.lightPrimaryContainer;
-    final secondaryContainerCol = isDark
-        ? AppTheme.darkSecondaryContainer
-        : AppTheme.lightSecondaryContainer;
-    final onSecondaryContainerCol = isDark
-        ? AppTheme.darkOnSecondaryContainer
-        : AppTheme.lightOnSecondaryContainer;
 
     final spanHours = _calculateSpanHours();
     final templates = widget.repository.savedTemplates;
@@ -934,69 +927,9 @@ class _ScheduleEditorScreenState extends State<ScheduleEditorScreen> {
               ),
 
               const SizedBox(height: 22),
-
-              // Priority Urgent Call Exception Card
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderCol),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.2 : 0.03,
-                      ),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: secondaryContainerCol,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.emergency_rounded,
-                        color: onSecondaryContainerCol,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Urgent Call Escalation',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: textMain,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Allow repeated calls within 3 minutes',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              color: textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    StitchSwitch(
-                      value: _allowUrgent,
-                      onChanged: (val) => setState(() => _allowUrgent = val),
-                    ),
-                  ],
-                ),
+              Text(
+                'Call ringing is not controlled by notification rules.',
+                style: GoogleFonts.plusJakartaSans(fontSize: 12, color: textMuted),
               ),
             ],
           );
