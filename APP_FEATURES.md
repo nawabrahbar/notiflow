@@ -223,10 +223,10 @@ flowchart TD
     - **Silenced Notifications Card**: Counter with `Icons.notifications_paused_rounded`.
     - **Allowed Notifications Card**: Counter with `Icons.notifications_active_rounded`.
   * **Quick Mute · All apps** (`QuickMuteAllCard`, `lib/presentation/widgets/quick_mute_card.dart`, phone and tablet). Replaced the old Quick Session Overrides (phone) and Overrides / Mute All (tablet) sections.
-    - Header "QUICK MUTE · ALL APPS", subtitle *"Silences every app for a while, on top of your schedules."*
+    - Header "QUICK MUTE · ALL APPS"; the subtitle explains that call ringing is not controlled.
     - Idle: three presets `15m` / `30m` / `1h`. They set the shared `global_mute` override, which silences every app (Rules apps and apps you haven't added). Only paused apps still ring through.
     - Active: the presets become a status card *"All apps muted · N min left · until HH:MM"* (refreshed every 15 s) with **+15m** (extends the end time, `ScheduleRepository.extendTemporaryMute`) and **End now** (clears it).
-    - **Let repeat callers ring through** switch (`vipEmergencyBypass`); the row turns soft green while on. During a Quick Mute, a 2nd call from the same caller within 3 minutes rings (native `NativeScheduleEvaluator`, global-mute branch).
+    - Recognized call notifications are left untouched. Call ringing and repeat callers are not controlled; not all calling apps provide recognizable metadata.
   * **Active Monitoring Cards (Managed Apps List)**:
     - Lists all apps currently monitored.
     - App icon, formatted name, package identifier, and current status chip (`SCHEDULED`, `MUTED`, or `ALWAYS ALLOWED`).
@@ -281,7 +281,7 @@ flowchart TD
     - Quick toggle switch to activate or deactivate individual rules.
     - Delete button to remove rules.
   * **Add Rule FAB (`+ Add Schedule`)**: Navigates to `ScheduleEditorScreen`.
-  * **Floating Done button** (`app-details-done-fab`): always-expanded bottom-right action on phone and tablet, replacing the old bottom-of-form *Save Changes* button. App settings already save immediately; Done only returns to the previous page, or Rules if opened as the root page. Bottom padding keeps the final Remove action clear of the button.
+  * **Floating Done button** (`app-details-done-fab`): always-expanded bottom-right action on phone and tablet, replacing the old bottom-of-form *Save Changes* button. Its background and text match the Rules page's Add app button in both themes. App settings already save immediately; Done only returns to the previous page, or Rules if opened as the root page. Bottom padding keeps the final Remove action clear of the button.
 
 ---
 
@@ -302,7 +302,7 @@ flowchart TD
     - Quick preset selector chips: `Everyday`, `Weekdays`, `Weekends`.
     - 7 individual day toggle pills (`M`, `T`, `W`, `T`, `F`, `S`, `S`).
   * **Exceptions & Escalation**:
-    - **Allow urgent repeated calls**: Passes priority alerts through if received twice within 3 minutes.
+    - The editor explains that notification rules do not control call ringing.
   * **Floating Save action** (`schedule-save-fab`): always-expanded bottom-right button on phone and tablet, visible without scrolling and positioned above the keyboard when open. Replaces the inline *Save Schedule Rule*, *Update Schedule Rule*, *Save Changes* and *Save Rule* buttons. All four modes keep their existing validation, duplicate handling, persistence and navigation/return values; the button disables and shows a spinner while saving. Saved-rule explanatory text remains in the form, and bottom padding keeps the final controls clear.
 
 ---
@@ -318,7 +318,7 @@ flowchart TD
     - **History** shows events captured through History-only tracking, not every event for currently selected apps. A floating **Manage apps** button appears only here, with Rules-style colours and the shared smooth scroll-driven label animation.
   * **Notification Event Stream**:
     - App icon, notification title, timestamp, and action badge (`SILENCED` in amber/coral, `ALLOWED` in green).
-    - A separate **History** badge identifies the stored capture source on cards and in the inspector. Quick Mute can silence these entries; All / History / Silenced share the same stored notification, not copies. Stopping recording or adding rules does not relabel old events.
+    - History-only events show a single **History** status pill in the same position as **Silenced** / **Allowed**, replacing rather than adding to that delivery-status pill. Quick Mute can still silence these events; All / History / Silenced share the same stored notification, not copies. Stopping recording or adding rules does not relabel old events.
     - Triage reasoning tag: e.g. *"Blocked by 'Work Focus' rule"*, *"Allowed: Outside schedule"*, *"Muted by quick override"*.
     - **Conversation grouping**: back-to-back messages from the same app and person/chat with the same status and capture source, each within 30 minutes of the previous one, share one card showing *"time · N messages"* and the latest message. The arrow next to the sender expands the card in place to show every message; tapping the card opens the details sheet. Filter chips count messages; *"N Events"* counts cards.
     - Group-summary copies of a message and the user's own replies are not logged.
@@ -348,7 +348,6 @@ flowchart TD
   * **TRIAGE & AUTOMATION PREFERENCES**:
     - **Silence ongoing notifications**: Toggle to filter persistent background notifications.
     - **Silence summary notifications**: Toggle to handle grouped notification bundles.
-    - **Allow priority calls**: Toggle to let incoming phone calls through regardless of rules.
   * **CATCH-UP DIGEST** (Android only):
     - **Notify When Quiet Hours End**: Toggle (default on) for the single "quiet hours ended" notification. Shows `ALLOWED` or `NEEDS PERMISSION`; **Allow Notiflow Notifications** re-asks or opens Android's notification settings.
   * **DANGER ZONE**:

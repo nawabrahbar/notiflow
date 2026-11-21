@@ -348,7 +348,7 @@ class _PermissionScreenState extends State<PermissionScreen> with WidgetsBinding
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1, color: AppTheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
-                  _buildPrivacyRow(Icons.security_rounded, 'Why Notification Access?', 'Android mandates the listener service permission to detect incoming banners and suppress ringers during your defined quiet windows.'),
+                  _buildPrivacyRow(Icons.security_rounded, 'Why Notification Access?', 'Android requires notification access to filter notifications during your defined quiet windows. Call ringing is not controlled.'),
                   const SizedBox(height: 12),
                   _buildPrivacyRow(Icons.lock_rounded, '100% Offline & Private', 'Alert evaluation runs strictly in your local device sandbox. Senders, message text, and chat contents are never sent online.'),
                 ],

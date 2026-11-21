@@ -158,9 +158,9 @@ class RulePreset {
       RulePreset(
         id: 'minimalist',
         title: 'Minimalist Default',
-        description: 'Allows VIP phone calls and direct SMS. Queues all other apps into quiet focus.',
+        description: 'Silences WhatsApp notifications daily from 8 AM to 8 PM.',
         icon: Icons.shield_outlined,
-        badges: ['CALLS: PASS', 'SMS: PASS', 'WHATSAPP: HELD', '24/7 SHIELD'],
+        badges: ['WHATSAPP', '8 AM – 8 PM', 'EVERY DAY'],
         apps: [
           ManagedApp(
             id: 'app_whatsapp',

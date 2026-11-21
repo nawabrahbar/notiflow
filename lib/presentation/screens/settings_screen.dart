@@ -22,7 +22,7 @@ import 'schedule_editor_screen.dart';
 /// - Engine & Background Services (Notification Interceptor, 12h/24h toggle)
 /// - Rules Backup & Portability (.notiflow export, smart import)
 /// - Dormant Vault Status (uninstalled app rules auto-applied upon install)
-/// - Triage & Automation (unmanaged apps untouched, emergency repeated call bypass)
+/// - Triage & Automation preferences
 /// - Catch-up Digest notification (Android only, with notification permission state)
 /// - In-App Update Checker (Play Core IPC, zero INTERNET permission)
 /// - Zero Telemetry & On-Device Security Audit
@@ -1274,24 +1274,6 @@ class _SettingsScreenState extends State<SettingsScreen>
             : 'Notifications from non-configured apps pass through standard ringer channels seamlessly.',
         value: repo.unmanagedAppsUntouched,
         onChanged: repo.setUnmanagedAppsUntouched,
-      ),
-      _buildToggleRow(
-        p,
-        key: const ValueKey('toggle-priority-calls'),
-        icon: Icons.call_outlined,
-        iconBg: p.isTablet ? p.primaryContainer.withValues(alpha: 0.3) : p.lowest,
-        iconFg: p.isTablet
-            ? (p.isDark ? p.primaryContainer : p.onPrimaryContainer)
-            : (p.isDark ? p.primaryContainer : p.primary),
-        title: 'Allow Priority Phone Calls',
-        badge: p.isTablet
-            ? _pill('High Bypass', bg: p.secContainer, fg: p.onSecContainer)
-            : null,
-        description: p.isTablet
-            ? 'Whitelisted contact calls and repeated urgent ring patterns bypass all active schedules, batch digests, and quiet timers immediately.'
-            : 'Incoming phone calls bypass all schedules to ensure emergency reachability.',
-        value: repo.vipEmergencyBypass,
-        onChanged: repo.setVipEmergencyBypass,
       ),
       _buildToggleRow(
         p,

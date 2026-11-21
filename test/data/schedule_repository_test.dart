@@ -499,6 +499,54 @@ void main() {
     expect(repository.findDuplicateTemplate(saved), isNull);
   });
 
+  test('legacy call settings survive backup import and export', () async {
+    final now = DateTime(2026);
+    final app = ManagedApp(
+      id: 'legacy-app',
+      packageName: 'com.example.legacy',
+      displayName: 'Legacy',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final rule = ScheduleRule(
+      id: 'legacy-rule',
+      appId: app.id,
+      mode: ScheduleMode.blockDuring,
+      startTime: const TimeOfDayValue(hour: 8, minute: 0),
+      endTime: const TimeOfDayValue(hour: 18, minute: 0),
+      daysOfWeek: {1, 2, 3, 4, 5},
+      allowVipContacts: false,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final template = RuleTemplate(
+      id: 'legacy-template',
+      name: 'Legacy rule',
+      mode: ScheduleMode.blockDuring,
+      startTime: const TimeOfDayValue(hour: 8, minute: 0),
+      endTime: const TimeOfDayValue(hour: 18, minute: 0),
+      daysOfWeek: {1, 2, 3, 4, 5},
+      allowVipContacts: false,
+      createdAt: now,
+    );
+    final backup = jsonEncode({
+      'managedApps': [app.toJson()],
+      'schedules': [rule.toJson()],
+      'ruleTemplates': [template.toJson()],
+      'vipEmergencyBypass': false,
+    });
+
+    expect(await repository.importRulesJson(backup), isTrue);
+    final exported = jsonDecode(repository.exportRulesJson()) as Map<String, dynamic>;
+    expect(exported['vipEmergencyBypass'], isFalse);
+    expect((exported['schedules'] as List).single['allowVipContacts'], isFalse);
+    expect(
+      (exported['ruleTemplates'] as List)
+          .singleWhere((item) => item['id'] == template.id)['allowVipContacts'],
+      isFalse,
+    );
+  });
+
   group('History-only recording', () {
     const pkg = 'com.example.history';
 

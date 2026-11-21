@@ -320,25 +320,79 @@ class ActivityScreenState extends State<ActivityScreen>
     if (mounted) await _loadNativeEvents();
   }
 
-  Widget _historyBadge(bool isDark) {
-    return Container(
-      key: const ValueKey('activity-history-badge'),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: isDark
+  Widget _eventStatusBadge({
+    required bool isBlocked,
+    required bool isHistoryOnly,
+    required bool isDark,
+  }) {
+    final background = isHistoryOnly
+        ? (isDark
             ? AppTheme.darkSecondaryContainer
-            : AppTheme.lightSecondaryContainer,
+            : AppTheme.lightSecondaryContainer)
+        : isBlocked
+            ? (isDark
+                ? AppTheme.darkSecondaryContainer.withOpacity(0.6)
+                : AppTheme.lightSecondaryContainer)
+            : isDark
+                ? AppTheme.darkPrimaryContainer.withOpacity(0.2)
+                : const Color(0xFFFFDCBD);
+    final foreground = isHistoryOnly || !isBlocked
+        ? (isDark
+            ? isHistoryOnly
+                ? AppTheme.darkOnSecondaryContainer
+                : AppTheme.darkPrimary
+            : isHistoryOnly
+                ? AppTheme.lightOnSecondaryContainer
+                : const Color(0xFF623F18))
+        : (isDark
+            ? AppTheme.darkOnSecondaryContainer
+            : AppTheme.lightOnSecondaryContainer);
+    final border = isHistoryOnly
+        ? Colors.transparent
+        : isBlocked
+            ? (isDark
+                ? AppTheme.darkOnSecondaryContainer.withOpacity(0.2)
+                : Colors.transparent)
+            : (isDark
+                ? AppTheme.darkPrimaryContainer.withOpacity(0.3)
+                : Colors.transparent);
+    final dot = isHistoryOnly
+        ? (isDark
+            ? AppTheme.darkOnSecondaryContainer
+            : AppTheme.lightOnSecondaryContainer)
+        : isBlocked
+            ? (isDark
+                ? AppTheme.darkPrimaryContainer
+                : AppTheme.lightPrimaryContainer)
+            : (isDark ? const Color(0xFFA7D4A3) : AppTheme.lightSecondary);
+
+    return Container(
+      key: const ValueKey('activity-event-status-badge'),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
       ),
-      child: Text(
-        'History',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: isDark
-              ? AppTheme.darkOnSecondaryContainer
-              : AppTheme.lightOnSecondaryContainer,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isHistoryOnly ? 'HISTORY' : isBlocked ? 'SILENCED' : 'ALLOWED',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: foreground,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -522,13 +576,6 @@ class ActivityScreenState extends State<ActivityScreen>
         ? AppTheme.darkOnSurfaceVariant
         : AppTheme.lightOnSurfaceVariant;
     final primary = isDark ? AppTheme.darkPrimary : AppTheme.lightPrimary;
-    final secContainer = isDark
-        ? AppTheme.darkSecondaryContainer
-        : AppTheme.lightSecondaryContainer;
-    final onSecContainer = isDark
-        ? AppTheme.darkOnSecondaryContainer
-        : AppTheme.lightOnSecondaryContainer;
-
     final String appName = evt['appName'] as String? ?? 'Application';
     final String packageName = evt['packageName'] as String? ?? '';
     final Uint8List? iconBytes = evt['iconBytes'] as Uint8List?;
@@ -540,6 +587,7 @@ class ActivityScreenState extends State<ActivityScreen>
     final String fullDateTime =
         evt['fullDateTime'] as String? ?? (evt['time'] as String? ?? '');
     final bool isBlocked = evt['isBlocked'] as bool? ?? false;
+    final bool isHistoryOnly = evt['isHistoryOnly'] == true;
     final String reason = evt['reason'] as String? ?? '';
     final List<Map<String, dynamic>> groupEvents =
         (evt['groupEvents'] as List?)?.cast<Map<String, dynamic>>() ??
@@ -613,29 +661,13 @@ class ActivityScreenState extends State<ActivityScreen>
                       ],
                     ),
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isBlocked ? primary.withOpacity(0.18) : secContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      isBlocked ? 'MUTED' : 'ALLOWED',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
-                        color: isBlocked ? primary : onSecContainer,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                  _eventStatusBadge(
+                    isBlocked: isBlocked,
+                    isHistoryOnly: isHistoryOnly,
+                    isDark: isDark,
                   ),
                 ],
               ),
-              if (evt['isHistoryOnly'] == true) ...[
-                const SizedBox(height: 8),
-                _historyBadge(isDark),
-              ],
               const SizedBox(height: 20),
               if (groupEvents.length > 1) ...[
                 Text(
@@ -1151,19 +1183,10 @@ class ActivityScreenState extends State<ActivityScreen>
                                                 ),
                                                 if (evt['isHistoryOnly'] == true) ...[
                                                   const SizedBox(height: 4),
-                                                  Wrap(
-                                                    spacing: 6,
-                                                    crossAxisAlignment: WrapCrossAlignment.center,
-                                                    children: [
-                                                      _historyBadge(isDark),
-                                                      Text(
-                                                        isBlocked ? 'Silenced' : 'Allowed',
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                          fontSize: 10,
-                                                          color: textMuted,
-                                                        ),
-                                                      ),
-                                                    ],
+                                                  _eventStatusBadge(
+                                                    isBlocked: isBlocked,
+                                                    isHistoryOnly: true,
+                                                    isDark: isDark,
                                                   ),
                                                 ],
                                                 const SizedBox(height: 2),
@@ -1704,6 +1727,7 @@ class ActivityScreenState extends State<ActivityScreen>
   Widget _buildPhoneEventCard(Map<String, dynamic> evt, bool isDark,
       Color textMain, Color textMuted) {
     final isBlocked = evt['isBlocked'] as bool? ?? false;
+    final isHistoryOnly = evt['isHistoryOnly'] == true;
     final iconBytes = evt['iconBytes'] as Uint8List?;
     final title = (evt['notifTitle'] as String? ?? '').trim();
     final message = (evt['notifMessage'] as String? ?? '').trim();
@@ -1713,34 +1737,6 @@ class ActivityScreenState extends State<ActivityScreen>
     final isGroup = group.length > 1;
     final groupId = _groupId(evt);
     final expanded = isGroup && _expandedGroups.contains(groupId);
-
-    final Color badgeBg;
-    final Color badgeFg;
-    final Color badgeBorder;
-    final Color badgeDot;
-    if (isBlocked) {
-      badgeBg = isDark
-          ? AppTheme.darkSecondaryContainer.withOpacity(0.6)
-          : AppTheme.lightSecondaryContainer;
-      badgeFg = isDark
-          ? AppTheme.darkOnSecondaryContainer
-          : AppTheme.lightOnSecondaryContainer;
-      badgeBorder = isDark
-          ? AppTheme.darkOnSecondaryContainer.withOpacity(0.2)
-          : Colors.transparent;
-      badgeDot = isDark
-          ? AppTheme.darkPrimaryContainer
-          : AppTheme.lightPrimaryContainer;
-    } else {
-      badgeBg = isDark
-          ? AppTheme.darkPrimaryContainer.withOpacity(0.2)
-          : const Color(0xFFFFDCBD);
-      badgeFg = isDark ? AppTheme.darkPrimary : const Color(0xFF623F18);
-      badgeBorder = isDark
-          ? AppTheme.darkPrimaryContainer.withOpacity(0.3)
-          : Colors.transparent;
-      badgeDot = isDark ? const Color(0xFFA7D4A3) : AppTheme.lightSecondary;
-    }
 
     final uninstalled = evt['isUninstalled'] == true;
 
@@ -1818,41 +1814,13 @@ class ActivityScreenState extends State<ActivityScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: badgeBg,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: badgeBorder),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                            color: badgeDot, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isBlocked ? 'SILENCED' : 'ALLOWED',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: badgeFg,
-                        ),
-                      ),
-                    ],
-                  ),
+                _eventStatusBadge(
+                  isBlocked: isBlocked,
+                  isHistoryOnly: isHistoryOnly,
+                  isDark: isDark,
                 ),
               ],
             ),
-            if (evt['isHistoryOnly'] == true) ...[
-              const SizedBox(height: 8),
-              _historyBadge(isDark),
-            ],
             if (title.isNotEmpty || message.isNotEmpty || reason.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(

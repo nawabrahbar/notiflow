@@ -257,6 +257,14 @@ class NativeScheduleEvaluator {
         category: String = "",
         title: String = ""
     ): NativeEvaluationDecision {
+        // Keep the legacy repeat-caller implementation below dormant for future research.
+        if (isCallNotification(category, false)) {
+            return NativeEvaluationDecision(
+                shouldBlock = false,
+                isManagedOrOverridden = false,
+                reason = "Call notification left untouched"
+            )
+        }
         val app = findManagedApp(packageName)
         val appOverride = (if (app != null) cachedOverrides[app.id] ?: cachedOverrides[app.packageName] else null)
             ?: cachedOverrides[packageName]
@@ -747,7 +755,20 @@ class NativeScheduleStore(context: Context) {
                 database.finishHeld(key, NotiflowDatabase.DELIVERY_REMOVED)
                 onActivityUpdatedListener?.invoke()
             }
+
         } catch (_: Exception) {
+        }
+    }
+
+    /** A previously held notification returned with call metadata; leave it visible. */
+    fun onHeldNotificationReleased(key: String) {
+        try {
+            if (database.getHeld(key) != null) {
+                database.finishHeld(key, NotiflowDatabase.DELIVERY_RELEASED)
+                onActivityUpdatedListener?.invoke()
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NativeScheduleStore", "Could not release held call notification", e)
         }
     }
 

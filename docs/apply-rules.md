@@ -40,7 +40,7 @@ A step indicator at the top reads **1. Rules → 2. Apps → 3. Review**. The bo
 * **Duplicates are skipped**: if an app already has a schedule with the same mode, times and days (`templateAlreadyApplied`), that rule is not added again for that app. This also applies to duplicates within the same batch.
 * **Overlapping times are allowed**: different rules that overlap are all added; the engine already handles overlapping schedules.
 * **Apps not yet in Notiflow** are added automatically. A matching app waiting in the Dormant Vault is restored instead of being added twice.
-* Each new schedule takes the saved rule's name, mode, times, days and VIP setting, and is turned on.
+* Each new schedule takes the saved rule's name, mode, times, days and legacy VIP value, and is turned on. The legacy value is retained for backup compatibility and has no call-control effect.
 * Everything is saved in one go and synced to the native engine once.
 
 ## Result sheet with flexible undo (`BulkApplyResultSheet`, `lib/presentation/widgets/bulk_apply_result_sheet.dart`)

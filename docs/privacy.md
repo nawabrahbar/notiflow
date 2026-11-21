@@ -19,7 +19,7 @@ When the Android `NotificationListenerService` intercepts an incoming notificati
 - **Evaluated Locally in Memory**:
   - `sbn.packageName` (String): Checked against the user's managed app list and active overrides.
   - `sbn.key` (String): Used to invoke `cancelNotification(key)` when a block rule or mute override applies.
-  - System timestamp & category: Compared against the user's local schedule and urgent repeated call bypass window.
+  - System timestamp & category: Compared against the user's local schedule. Recognized call notifications are excluded from processing.
 - **Strictly Private On-Device Activity Log**:
   - Silenced and allowed notification events for managed apps, including paused apps, are stored strictly in a private on-device SQLite database (`notiflow.db` in the app sandbox) so users can review alerts in the **Activity** tab and its **Digest** view.
   - Each event keeps the app package and name, title, message text (truncated to 1,000 characters), sub-text, category, timestamp, Android notification and conversation keys (used only to count unique notifications), and the rule that applied. Finished rule windows are stored alongside so the Digest can group what each window silenced.

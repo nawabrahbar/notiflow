@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/repositories/schedule_repository.dart';
 import '../../domain/models/temporary_override.dart';
 import '../theme/app_theme.dart';
-import 'stitch_switch.dart';
 
 /// "Quick Mute · All apps" dashboard section.
 ///
@@ -103,7 +102,7 @@ class _QuickMuteAllCardState extends State<QuickMuteAllCard> {
         ),
         const SizedBox(height: 2),
         Text(
-          'Silences every app for a while, on top of your schedules.',
+          'Silences notifications for a while. Calls are not controlled.',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 12,
             fontWeight: FontWeight.w500,
@@ -117,8 +116,6 @@ class _QuickMuteAllCardState extends State<QuickMuteAllCard> {
               ? _buildPresets(isDark)
               : _buildActive(context, isDark, mute),
         ),
-        const SizedBox(height: 8),
-        _buildRepeatCallerRow(isDark),
       ],
     );
   }
@@ -213,72 +210,6 @@ class _QuickMuteAllCardState extends State<QuickMuteAllCard> {
             child: Text('End now',
                 style: GoogleFonts.plusJakartaSans(
                     fontSize: 13, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRepeatCallerRow(bool isDark) {
-    final enabled = widget.repository.vipEmergencyBypass;
-    // Soft green (secondary container) while on, neutral surface while off.
-    final Color bg;
-    final Color strong;
-    final Color muted;
-    final Color? border;
-    if (isDark) {
-      bg = enabled ? const Color(0xFF2E3B32) : const Color(0xFF1A211D);
-      strong = enabled ? const Color(0xFFC5D4BA) : AppTheme.darkOnSurface;
-      muted = enabled ? const Color(0xFFA7D4A3) : const Color(0xFF9AA79B);
-      border = enabled ? const Color(0xFF3A4B3F) : const Color(0xFF2A362F);
-    } else {
-      bg = enabled ? AppTheme.lightSecondaryContainer : AppTheme.lightSurfaceContainer;
-      strong = enabled ? AppTheme.lightSecondary : AppTheme.lightOnSurface;
-      muted = enabled ? AppTheme.lightOnSecondaryContainer : AppTheme.lightOnSurfaceVariant;
-      border = null;
-    }
-
-    return AnimatedContainer(
-      key: const Key('quick_mute_all_repeat_callers_card'),
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-        border: border == null ? null : Border.all(color: border),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.phone_callback_rounded, size: 18, color: muted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Let repeat callers ring through',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: strong,
-                  ),
-                ),
-                Text(
-                  'A 2nd call from the same person within 3 min rings',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          StitchSwitch(
-            key: const Key('quick_mute_all_repeat_callers'),
-            value: enabled,
-            onChanged: (v) => widget.repository.setVipEmergencyBypass(v),
-            activeTrackColor: isDark ? AppTheme.darkSecondary : AppTheme.lightSecondary,
           ),
         ],
       ),
